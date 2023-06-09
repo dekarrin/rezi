@@ -33,6 +33,7 @@ func EncMapStringToInt(m map[string]int) []byte {
 	return enc
 }
 
+// DecMapStringToBinary decodes a map of string-to-int from bytes.
 func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	var totalConsumed int
 
@@ -79,7 +80,9 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	return m, totalConsumed, nil
 }
 
-// Order of keys in output is gauranteed to be consistent.
+// EncMapStringToBinary encodes a map of string to an implementer of
+// encoding.BinaryMarshaler as bytes. The order of keys in output is gauranteed
+// to be consistent.
 func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	if m == nil {
 		return EncInt(-1)
@@ -101,6 +104,8 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	return enc
 }
 
+// DecMapStringToBinary decodes a map of string to an implementer of
+// encoding.BinaryMarshaler from bytes.
 func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string]E, int, error) {
 	var totalConsumed int
 
