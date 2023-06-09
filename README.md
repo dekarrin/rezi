@@ -1,6 +1,6 @@
 # REZI
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/ictiobus.svg)](https://pkg.go.dev/github.com/dekarrin/ictiobus)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi.svg)](https://pkg.go.dev/github.com/dekarrin/rezi)
 
 REZI is the Rarefied Encoding (Compressible) for Interop.
 
