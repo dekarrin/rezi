@@ -11,6 +11,55 @@ import (
 	"unicode/utf8"
 )
 
+// EncPrim encodes the primitve REZI value as rezi-format bytes. The type of the
+// value is examined to determine how to encode it. No type information is
+// included in the returned bytes so it is up to the caller to keep track of it.
+//
+// This function may only be called with a value with type or underlying type of
+// int, string, or bool, or a value that implements encoding.BinaryMarshaler.
+// For a more generic encoding function that can handle map and slice types, see
+// Enc. Generally this function is used internally and users of REZI are better
+// off calling the specific type-safe encoding function (EncInt, EncBool,
+// EncString, or EncBinary) for the type being encoded.
+func EncPrim(value interface{}) []byte {
+	switch tVal := value.(type) {
+	case string:
+		return EncString(tVal)
+	case bool:
+		return EncBool(tVal)
+	case uint8:
+		return EncInt(int(tVal))
+	case uint16:
+		return EncInt(int(tVal))
+	case uint32:
+		return EncInt(int(tVal))
+	case uint64:
+		return EncInt(int(tVal))
+	case uint:
+		return EncInt(int(tVal))
+	case int8:
+		return EncInt(int(tVal))
+	case int16:
+		return EncInt(int(tVal))
+	case int32:
+		return EncInt(int(tVal))
+	case int64:
+		return EncInt(int(tVal))
+	case int:
+		return EncInt(tVal)
+	case encoding.BinaryMarshaler:
+		return EncBinary(tVal)
+	default:
+		panic("%T is not a basic type")
+	}
+}
+
+// DecPrim decodes a primitive value from rezi-format bytes into the value
+// pointed-to by ptr.
+func DecPrim(data []byte, ptr interface{}) (int, error) {
+
+}
+
 // EncBool encodes the bool value as a slice of bytes. The value can later
 // be decoded with DecBool. No type indicator is included in the output;
 // it is up to the caller to add this if they so wish it.

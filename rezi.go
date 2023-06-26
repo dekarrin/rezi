@@ -54,3 +54,7 @@ func initType[E any]() E {
 
 	return v
 }
+
+// Enc encodes the value as rezi-format bytes. The type of the value is examined
+// to determine how to encode it. No type information is included in the
+// returned bytes so it is up to the caller to keep track of it.
