@@ -7,6 +7,7 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode/utf8"
 )
@@ -50,13 +51,24 @@ func EncPrim(value interface{}) []byte {
 	case encoding.BinaryMarshaler:
 		return EncBinary(tVal)
 	default:
-		panic("%T is not a basic type")
+		panic(fmt.Sprintf("%T is not a REZI primitive type", value))
 	}
 }
 
 // DecPrim decodes a primitive value from rezi-format bytes into the value
-// pointed-to by ptr.
-func DecPrim(data []byte, ptr interface{}) (int, error) {
+// pointed-to by v. V must point to a REZI primitive value (int, bool, string)
+// or implement encoding.BinaryUnmarshaler.
+//
+// This function may only be called with a value with type or underlying type of
+// int, string, or bool, or a value that implements encoding.BinaryUnmarshaler.
+// For a more generic encoding function that can handle map and slice types, see
+// Enc. Generally this function is used internally and users of REZI are better
+// off calling the specific type-safe decoding function (DecInt, DecBool,
+// DecString, or DecBinary) for the type being decoded.
+func DecPrim(data []byte, v interface{}) (int, error) {
+	// we need to do type examination on v
+
+	tInfo := reflect.TypeOf(v)
 
 }
 
