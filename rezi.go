@@ -58,3 +58,9 @@ func initType[E any]() E {
 // Enc encodes the value as rezi-format bytes. The type of the value is examined
 // to determine how to encode it. No type information is included in the
 // returned bytes so it is up to the caller to keep track of it.
+//
+// The value must be one of the supported REZI types. The supported types are:
+// string, bool, uint and its sized variants, int and its sized variants, and
+// any implementor of encoding.BinaryMarshaler. Map and slice types are also
+// supported, as long as their contents are REZI-supported.
+func Enc() {}
