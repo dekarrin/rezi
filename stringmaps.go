@@ -6,102 +6,8 @@ package rezi
 import (
 	"encoding"
 	"fmt"
-	"reflect"
 	"sort"
 )
-
-// ti must containt a main type of tIntegral, tBool, or tString
-type sortableMapKeys struct {
-	keys []reflect.Value
-	ti   typeInfo
-}
-
-func (smk sortableMapKeys) Len() int {
-	return len(smk.keys)
-}
-
-func (smk sortableMapKeys) Swap(i, j int) {
-	smk.keys[i], smk.keys[j] = smk.keys[j], smk.keys[i]
-}
-
-func (smk sortableMapKeys) Less(i, j int) bool {
-	if smk.ti.Main == tBool {
-		b1 := smk.keys[i].Bool()
-		b2 := smk.keys[j].Bool()
-		return !b1 && b2
-	} else if smk.ti.Main == tIntegral {
-		if smk.ti.Signed {
-			i64v1 := smk.keys[i].Int()
-			i64v2 := smk.keys[j].Int()
-			switch smk.ti.Bits {
-			case 64:
-				return i64v1 < i64v2
-			case 32:
-				return int32(i64v1) < int32(i64v2)
-			case 16:
-				return int16(i64v1) < int16(i64v2)
-			case 8:
-				return int8(i64v1) < int8(i64v2)
-			default:
-				return int(i64v1) < int(i64v2)
-			}
-		} else {
-			u64v1 := smk.keys[i].Uint()
-			u64v2 := smk.keys[j].Uint()
-			switch smk.ti.Bits {
-			case 64:
-				return u64v1 < u64v2
-			case 32:
-				return uint32(u64v1) < uint32(u64v2)
-			case 16:
-				return uint16(u64v1) < uint16(u64v2)
-			case 8:
-				return uint8(u64v1) < uint8(u64v2)
-			default:
-				return uint(u64v1) < uint(u64v2)
-			}
-		}
-	} else if smk.ti.Main == tString {
-		s1 := smk.keys[i].String()
-		s2 := smk.keys[j].String()
-		return s1 < s2
-	} else {
-		panic(fmt.Sprintf("invalid map type: %v", smk.ti.Main))
-	}
-}
-
-// encMap encodes a compatible map as a REZI map.
-func encMap(v interface{}, ti typeInfo) []byte {
-	if ti.Main != tMap {
-		panic("not a map type")
-	}
-
-	if v == nil {
-		return EncInt(-1)
-	}
-
-	refVal := reflect.ValueOf(v)
-	mapKeys := refVal.MapKeys()
-	keysToSort := sortableMapKeys{
-		keys: mapKeys,
-		ti:   *ti.KeyType,
-	}
-	sort.Sort(keysToSort)
-	mapKeys = keysToSort.keys
-
-	enc := make([]byte, 0)
-
-	for i := range mapKeys {
-		k := mapKeys[i]
-		v := refVal.MapIndex(k)
-
-		enc = append(enc, Enc(k.Interface())...)
-		enc = append(enc, Enc(v.Interface())...)
-	}
-
-	enc = append(EncInt(len(enc)), enc...)
-	return enc
-}
 
 // EncMapStringToInt encodes a map of string-to-int as bytes. The order of keys
 // in the output is gauranteed to be consistent.
@@ -162,7 +68,7 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 
 		v, n, err := DecInt(data)
 		if err != nil {
-			return nil, totalConsumed, fmt.Errorf("decode key: %w", err)
+			return nil, totalConsumed, fmt.Errorf("decode value: %w", err)
 		}
 		totalConsumed += n
 		i += n

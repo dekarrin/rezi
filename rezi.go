@@ -79,7 +79,26 @@ func Enc(v interface{}) []byte {
 		return encMap(v, info)
 	} else if info.Main == tSlice {
 		return encSlice(v, info)
+	} else {
+		panic("no possible encoding")
+	}
+}
+
+// Dec decodes a value as rezi-format bytes. The argument v must be a pointer to
+// a supported type (or directly implement binary.BinaryMarshaler).
+func Dec(data []byte, v interface{}) (int, error) {
+	info, err := canDecode(v)
+	if err != nil {
+		panic(err.Error())
 	}
 
-	return nil
+	if info.Primitive() {
+		return decPrim(data, v, info)
+	} else if info.Main == tMap {
+		return decMap(data, v, info)
+	} else if info.Main == tSlice {
+		return decSlice(data, v, info)
+	} else {
+		panic("no possible decoding")
+	}
 }

@@ -62,7 +62,7 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 	}
 }
 
-// DecPrim decodes a primitive value from rezi-format bytes into the value
+// decPrim decodes a primitive value from rezi-format bytes into the value
 // pointed-to by v. V must point to a REZI primitive value (int, bool, string)
 // or implement encoding.BinaryUnmarshaler.
 //
@@ -72,60 +72,77 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 // Enc. Generally this function is used internally and users of REZI are better
 // off calling the specific type-safe decoding function (DecInt, DecBool,
 // DecString, or DecBinary) for the type being decoded.
-func DecPrim(data []byte, v interface{}) (int, error) {
-	// we need to do type examination on v
+func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
+	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
+	// or an implementor of BinaryUnmarshaler.
 
-	switch tVal := v.(type) {
-	case *string:
+	switch ti.Main {
+	case tString:
+		tVal := v.(*string)
 		s, n, err := DecString(data)
+		if err != nil {
+			return n, err
+		}
 		*tVal = s
-		return n, err
-	case *bool:
+		return n, nil
+	case tBool:
+		tVal := v.(*bool)
 		b, n, err := DecBool(data)
+		if err != nil {
+			return n, err
+		}
 		*tVal = b
-		return n, err
-	case *uint8:
+		return n, nil
+	case tIntegral:
 		i, n, err := DecInt(data)
-		*tVal = uint8(i)
-		return n, err
-	case *uint16:
-		i, n, err := DecInt(data)
-		*tVal = uint16(i)
-		return n, err
-	case *uint32:
-		i, n, err := DecInt(data)
-		*tVal = uint32(i)
-		return n, err
-	case *uint64:
-		i, n, err := DecInt(data)
-		*tVal = uint64(i)
-		return n, err
-	case *uint:
-		i, n, err := DecInt(data)
-		*tVal = uint(i)
-		return n, err
-	case *int8:
-		i, n, err := DecInt(data)
-		*tVal = int8(i)
-		return n, err
-	case *int16:
-		i, n, err := DecInt(data)
-		*tVal = int16(i)
-		return n, err
-	case *int32:
-		i, n, err := DecInt(data)
-		*tVal = int32(i)
-		return n, err
-	case *int64:
-		i, n, err := DecInt(data)
-		*tVal = int64(i)
-		return n, err
-	case *int:
-		i, n, err := DecInt(data)
-		*tVal = i
-		return n, err
-	case encoding.BinaryUnmarshaler:
-		return DecBinary(data, tVal)
+		if err != nil {
+			return n, err
+		}
+		if ti.Signed {
+			switch ti.Bits {
+			case 64:
+				tVal := v.(*int64)
+				*tVal = int64(i)
+			case 32:
+				tVal := v.(*int32)
+				*tVal = int32(i)
+			case 16:
+				tVal := v.(*int16)
+				*tVal = int16(i)
+			case 8:
+				tVal := v.(*int8)
+				*tVal = int8(i)
+			default:
+				tVal := v.(*int)
+				*tVal = int(i)
+			}
+		} else {
+			switch ti.Bits {
+			case 64:
+				tVal := v.(*uint64)
+				*tVal = uint64(i)
+			case 32:
+				tVal := v.(*uint32)
+				*tVal = uint32(i)
+			case 16:
+				tVal := v.(*uint16)
+				*tVal = uint16(i)
+			case 8:
+				tVal := v.(*uint8)
+				*tVal = uint8(i)
+			default:
+				tVal := v.(*uint)
+				*tVal = uint(i)
+			}
+		}
+
+		return n, nil
+	case tBinary:
+		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
+		// that
+
+		receiver := v.(encoding.BinaryUnmarshaler)
+		return DecBinary(data, receiver)
 	default:
 		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
 	}

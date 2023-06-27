@@ -30,6 +30,63 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 	return enc
 }
 
+func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
+	if ti.Main != tSlice {
+		panic("not a slice type")
+	}
+	var totalConsumed int
+
+	toConsume, n, err := DecInt(data)
+	if err != nil {
+		return 0, fmt.Errorf("decode byte count: %w", err)
+	}
+	data = data[n:]
+	totalConsumed += n
+
+	refVal := reflect.ValueOf(v)
+	refSliceType := refVal.Type().Elem()
+
+	if toConsume == 0 {
+		// initialize to the empty slice
+		emptySlice := reflect.MakeSlice(refSliceType, 0, 0)
+		refVal.Elem().Set(emptySlice)
+		return totalConsumed, nil
+	} else if toConsume == -1 {
+		nilSlice := reflect.Zero(refSliceType)
+		refVal.Elem().Set(nilSlice)
+		return totalConsumed, nil
+	}
+
+	if len(data) < toConsume {
+		return totalConsumed, fmt.Errorf("unexpected EOF")
+	}
+
+	sl := reflect.MakeSlice(refSliceType, 0, 0)
+
+	var i int
+	for i < toConsume {
+		refVType := refSliceType.Elem()
+		// if we specifically are instructed to deref, then instead of the
+		// normal key, get a ptr-to the type of.
+		if ti.ValType.Deref {
+			refVType = reflect.PointerTo(refVType)
+		}
+		refValue := reflect.New(refVType)
+		n, err := Dec(data, refValue.Interface())
+		if err != nil {
+			return totalConsumed, fmt.Errorf("decode item: %w", err)
+		}
+		totalConsumed += n
+		i += n
+		data = data[n:]
+
+		sl = reflect.Append(sl, refValue)
+	}
+
+	refVal.Elem().Set(sl)
+	return totalConsumed, nil
+}
+
 func EncSliceString(sl []string) []byte {
 	if sl == nil {
 		return EncInt(-1)
@@ -81,7 +138,6 @@ func DecSliceString(data []byte) ([]string, int, error) {
 	}
 
 	return sl, totalConsumed, nil
-
 }
 
 func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
