@@ -7,7 +7,6 @@ package rezi
 import (
 	"encoding"
 	"fmt"
-	"reflect"
 	"strings"
 	"unicode/utf8"
 )
@@ -51,7 +50,7 @@ func EncPrim(value interface{}) []byte {
 	case encoding.BinaryMarshaler:
 		return EncBinary(tVal)
 	default:
-		panic(fmt.Sprintf("%T is not a REZI primitive type", value))
+		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
 }
 
@@ -68,8 +67,60 @@ func EncPrim(value interface{}) []byte {
 func DecPrim(data []byte, v interface{}) (int, error) {
 	// we need to do type examination on v
 
-	tInfo := reflect.TypeOf(v)
-
+	switch tVal := v.(type) {
+	case *string:
+		s, n, err := DecString(data)
+		*tVal = s
+		return n, err
+	case *bool:
+		b, n, err := DecBool(data)
+		*tVal = b
+		return n, err
+	case *uint8:
+		i, n, err := DecInt(data)
+		*tVal = uint8(i)
+		return n, err
+	case *uint16:
+		i, n, err := DecInt(data)
+		*tVal = uint16(i)
+		return n, err
+	case *uint32:
+		i, n, err := DecInt(data)
+		*tVal = uint32(i)
+		return n, err
+	case *uint64:
+		i, n, err := DecInt(data)
+		*tVal = uint64(i)
+		return n, err
+	case *uint:
+		i, n, err := DecInt(data)
+		*tVal = uint(i)
+		return n, err
+	case *int8:
+		i, n, err := DecInt(data)
+		*tVal = int8(i)
+		return n, err
+	case *int16:
+		i, n, err := DecInt(data)
+		*tVal = int16(i)
+		return n, err
+	case *int32:
+		i, n, err := DecInt(data)
+		*tVal = int32(i)
+		return n, err
+	case *int64:
+		i, n, err := DecInt(data)
+		*tVal = int64(i)
+		return n, err
+	case *int:
+		i, n, err := DecInt(data)
+		*tVal = i
+		return n, err
+	case encoding.BinaryUnmarshaler:
+		return DecBinary(data, tVal)
+	default:
+		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
+	}
 }
 
 // EncBool encodes the bool value as a slice of bytes. The value can later
