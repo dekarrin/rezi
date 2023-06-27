@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-// EncPrim encodes the primitve REZI value as rezi-format bytes. The type of the
+// encPrim encodes the primitve REZI value as rezi-format bytes. The type of the
 // value is examined to determine how to encode it. No type information is
 // included in the returned bytes so it is up to the caller to keep track of it.
 //
@@ -21,34 +21,42 @@ import (
 // Enc. Generally this function is used internally and users of REZI are better
 // off calling the specific type-safe encoding function (EncInt, EncBool,
 // EncString, or EncBinary) for the type being encoded.
-func EncPrim(value interface{}) []byte {
-	switch tVal := value.(type) {
-	case string:
-		return EncString(tVal)
-	case bool:
-		return EncBool(tVal)
-	case uint8:
-		return EncInt(int(tVal))
-	case uint16:
-		return EncInt(int(tVal))
-	case uint32:
-		return EncInt(int(tVal))
-	case uint64:
-		return EncInt(int(tVal))
-	case uint:
-		return EncInt(int(tVal))
-	case int8:
-		return EncInt(int(tVal))
-	case int16:
-		return EncInt(int(tVal))
-	case int32:
-		return EncInt(int(tVal))
-	case int64:
-		return EncInt(int(tVal))
-	case int:
-		return EncInt(tVal)
-	case encoding.BinaryMarshaler:
-		return EncBinary(tVal)
+func encPrim(value interface{}, ti typeInfo) []byte {
+	switch ti.Main {
+	case tString:
+		return EncString(value.(string))
+	case tBool:
+		return EncBool(value.(bool))
+	case tIntegral:
+		if ti.Signed {
+			switch ti.Bits {
+			case 8:
+				return EncInt(int(value.(int8)))
+			case 16:
+				return EncInt(int(value.(int16)))
+			case 32:
+				return EncInt(int(value.(int32)))
+			case 64:
+				return EncInt(int(value.(int64)))
+			default:
+				return EncInt(value.(int))
+			}
+		} else {
+			switch ti.Bits {
+			case 8:
+				return EncInt(int(value.(uint8)))
+			case 16:
+				return EncInt(int(value.(uint16)))
+			case 32:
+				return EncInt(int(value.(uint32)))
+			case 64:
+				return EncInt(int(value.(uint64)))
+			default:
+				return EncInt(int(value.(uint)))
+			}
+		}
+	case tBinary:
+		return EncBinary(value.(encoding.BinaryMarshaler))
 	default:
 		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
@@ -353,6 +361,10 @@ func DecString(data []byte) (string, int, error) {
 // The output will be variable length; it will contain 8 bytes followed by the
 // number of bytes encoded in those 8 bytes.
 func EncBinary(b encoding.BinaryMarshaler) []byte {
+	if b == nil {
+		return EncInt(-1)
+	}
+
 	enc, _ := b.MarshalBinary()
 
 	enc = append(EncInt(len(enc)), enc...)
@@ -361,7 +373,8 @@ func EncBinary(b encoding.BinaryMarshaler) []byte {
 }
 
 // DecBinary decodes a value at the start of the given bytes and calls
-// UnmarshalBinary on the provided object with those bytes.
+// UnmarshalBinary on the provided object with those bytes. If a nil value was
+// encoded, then a nil byte slice is passed to the UnmarshalBinary func.
 //
 // It returns the total number of bytes read from the data bytes.
 func DecBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
@@ -373,16 +386,21 @@ func DecBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	data = data[readBytes:]
 
 	if len(data) < byteLen {
-		return 0, fmt.Errorf("unexpected end of data")
+		return readBytes, fmt.Errorf("unexpected end of data")
 	}
-	binData := data[:byteLen]
+	var binData []byte
+
+	if byteLen >= 0 {
+		binData = data[:byteLen]
+	}
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return 0, err
+		return readBytes, err
 	}
 
 	return byteLen + readBytes, nil

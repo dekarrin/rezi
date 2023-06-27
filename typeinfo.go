@@ -2,6 +2,7 @@ package rezi
 
 import (
 	"encoding"
+	"fmt"
 	"reflect"
 )
 
@@ -20,55 +21,61 @@ const (
 	tBinary
 	tMap
 	tSlice
+	tNil
 )
 
 // typeInfo holds REZI-specific type info on types that can be encoded and
 // decoded.
 type typeInfo struct {
 	Main    mainType
+	Bits    int
+	Signed  bool
 	Pointer bool
 	KeyType *typeInfo // only valid for maps
 	ValType *typeInfo // valid for map and slice
+	Ref     reflect.Type
 }
 
 func (ti typeInfo) Primitive() bool {
 	return ti.Main == tIntegral || ti.Main == tBool || ti.Main == tString || ti.Main == tBinary
 }
 
-func canEncode(v interface{}) (typeInfo, bool) {
-	var ti typeInfo
+func canEncode(v interface{}) (typeInfo, error) {
+	return encTypeInfo(reflect.TypeOf(v))
 }
 
 func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	switch t.Kind() {
+	case reflect.Invalid:
+		return typeInfo{Ref: t, Main: tNil}, nil
 	case reflect.String:
-		return typeInfo{Main: tString}, nil
+		return typeInfo{Ref: t, Main: tString}, nil
 	case reflect.Bool:
-		return typeInfo{Main: tBool}, nil
+		return typeInfo{Ref: t, Main: tBool}, nil
 	case reflect.Uint8:
-		return typeInfo{Main: tIntegral}, nil
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 8, Signed: false}, nil
 	case reflect.Uint16:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 16, Signed: false}, nil
 	case reflect.Uint32:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 32, Signed: false}, nil
 	case reflect.Uint64:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 64, Signed: false}, nil
 	case reflect.Uint:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 0, Signed: false}, nil
 	case reflect.Int8:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 8, Signed: true}, nil
 	case reflect.Int16:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 16, Signed: true}, nil
 	case reflect.Int32:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 32, Signed: true}, nil
 	case reflect.Int64:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 64, Signed: true}, nil
 	case reflect.Int:
-		return typeInfo{Main: tIntegral}, true
+		return typeInfo{Ref: t, Main: tIntegral, Bits: 0, Signed: true}, nil
 	default:
 		// does it implement binary encoder?
 		if t.Implements(refBinaryMarshalerType) {
-			return typeInfo{Main: tBinary}, true
+			return typeInfo{Ref: t, Main: tBinary}, nil
 		}
 
 		// is it a map type?
@@ -77,28 +84,36 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			mValType := t.Elem()
 			mKeyType := t.Key()
 
-			mValInfo, ok := encTypeInfo(mValType)
-			if !ok {
-				return typeInfo{}, false
+			mValInfo, err := encTypeInfo(mValType)
+			if err != nil {
+				return typeInfo{}, fmt.Errorf("map value type is not encodable: %w", err)
 			}
-			mKeyInfo, ok := encTypeInfo(mKeyType)
-			if !ok {
-				return typeInfo{}, false
+			mKeyInfo, err := encTypeInfo(mKeyType)
+			if err != nil {
+				return typeInfo{}, fmt.Errorf("map key type is not encodable: %w", err)
 			}
-			return typeInfo{Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, true
+
+			// maps in general are not supported; the key type MUST be comparable
+			// and with an ordering, which p much means we exclusively support
+			// non-binary primitives.
+			if !mKeyInfo.Primitive() || mKeyInfo.Main == tBinary {
+				return typeInfo{}, fmt.Errorf("map key type must be bool, string, or castable to int")
+			}
+
+			return typeInfo{Ref: t, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
 		}
 
 		// is it a slice type?
 		if t.Kind() == reflect.Slice {
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
-			slValInfo, ok := encTypeInfo(slValType)
-			if !ok {
-				return typeInfo{}, false
+			slValInfo, err := encTypeInfo(slValType)
+			if err != nil {
+				return typeInfo{}, fmt.Errorf("slice value is not encodable: %w", err)
 			}
-			return typeInfo{Main: tSlice, ValType: &slValInfo}, true
+			return typeInfo{Ref: t, Main: tSlice, ValType: &slValInfo}, nil
 		}
 
-		return typeInfo{}, false
+		return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for encoding", t.String())
 	}
 }

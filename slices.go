@@ -5,7 +5,30 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"reflect"
 )
+
+// encMap encodes a compatible slice as a REZI map.
+func encSlice(v interface{}, ti typeInfo) []byte {
+	if ti.Main != tSlice {
+		panic("not a slice type")
+	}
+
+	if v == nil {
+		return EncInt(-1)
+	}
+
+	enc := make([]byte, 0)
+
+	refVal := reflect.ValueOf(v)
+	for i := 0; i < refVal.Len(); i++ {
+		v := refVal.Index(i)
+		enc = append(enc, Enc(v.Interface())...)
+	}
+
+	enc = append(EncInt(len(enc)), enc...)
+	return enc
+}
 
 func EncSliceString(sl []string) []byte {
 	if sl == nil {

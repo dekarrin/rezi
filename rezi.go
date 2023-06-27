@@ -55,12 +55,31 @@ func initType[E any]() E {
 	return v
 }
 
-// Enc encodes the value as rezi-format bytes. The type of the value is examined
-// to determine how to encode it. No type information is included in the
-// returned bytes so it is up to the caller to keep track of it.
+// Enc encodes the value as rezi-format bytes. The type of the value is
+// examined to determine how to encode it. No type information is included in
+// the returned bytes so it is up to the caller to keep track of it.
 //
 // The value must be one of the supported REZI types. The supported types are:
 // string, bool, uint and its sized variants, int and its sized variants, and
 // any implementor of encoding.BinaryMarshaler. Map and slice types are also
 // supported, as long as their contents are REZI-supported.
-func Enc() {}
+//
+// This function will panic if the type is not rezi supported.
+func Enc(v interface{}) []byte {
+	info, err := canEncode(v)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	if info.Primitive() {
+		return encPrim(v, info)
+	} else if info.Main == tNil {
+		return EncInt(-1)
+	} else if info.Main == tMap {
+		return encMap(v, info)
+	} else if info.Main == tSlice {
+		return encSlice(v, info)
+	}
+
+	return nil
+}
