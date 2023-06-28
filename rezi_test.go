@@ -119,13 +119,31 @@ func Test_Enc_Int(t *testing.T) {
 	}
 
 }
+
 func Test_Enc_Bool(t *testing.T) {
 	testCases := []struct {
-		name string
-	}{}
+		name   string
+		input  bool
+		expect []byte
+	}{
+		{
+			name:   "true",
+			input:  true,
+			expect: []byte{0x01},
+		},
+		{
+			name:   "false",
+			input:  false,
+			expect: []byte{0x00},
+		},
+	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
+			assert := assert.New(t)
+
+			actual := Enc(tc.input)
+
+			assert.Equal(tc.expect, actual)
 		})
 	}
 
