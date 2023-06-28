@@ -256,9 +256,18 @@ func Test_Dec_String(t *testing.T) {
 }
 
 func Test_Dec_Int(t *testing.T) {
+	type result struct {
+		val      interface{}
+		consumed int
+		err      bool
+	}
+
 	testCases := []struct {
-		name string
+		name   string
+		input  []byte
+		expect result
 	}{}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// assert := assert.New(t)
@@ -267,12 +276,50 @@ func Test_Dec_Int(t *testing.T) {
 
 }
 func Test_Dec_Bool(t *testing.T) {
+	type result struct {
+		val      bool
+		consumed int
+		err      bool
+	}
+
 	testCases := []struct {
-		name string
-	}{}
+		name   string
+		input  []byte
+		expect result
+	}{
+		{
+			name:   "true",
+			input:  []byte{0x01},
+			expect: result{val: true, consumed: 1},
+		},
+		{
+			name:   "false",
+			input:  []byte{0x00},
+			expect: result{val: false, consumed: 1},
+		},
+		{
+			name:   "err not enough bytes",
+			input:  []byte{},
+			expect: result{err: true},
+		},
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
+			assert := assert.New(t)
+
+			var actual result
+			var err error
+
+			actual.consumed, err = Dec(tc.input, &actual.val)
+			if tc.expect.err {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
 		})
 	}
 
