@@ -68,6 +68,24 @@ func Test_Enc_Int(t *testing.T) {
 		{name: "int8 large neg mag", input: int8(-124), expect: []byte{0x81, 0x84}},
 		{name: "int8 1", input: int8(1), expect: []byte{0x01, 0x01}},
 		{name: "int8 -1", input: int8(-1), expect: []byte{0x80}},
+
+		{name: "int16 zero", input: int16(0), expect: []byte{0x00}},
+		{name: "int16 large pos mag", input: int16(32760), expect: []byte{0x02, 0x7f, 0xf8}},
+		{name: "int16 large neg mag", input: int16(-32000), expect: []byte{0x82, 0x83, 0x00}},
+		{name: "int16 1", input: int16(1), expect: []byte{0x01, 0x01}},
+		{name: "int16 -1", input: int16(-1), expect: []byte{0x80}},
+
+		{name: "int32 zero", input: int32(0), expect: []byte{0x00}},
+		{name: "int32 large pos mag", input: int32(2147400413), expect: []byte{0x04, 0x7f, 0xfe, 0xba, 0xdd}},
+		{name: "int32 large neg mag", input: int32(-2147400413), expect: []byte{0x84, 0x80, 0x01, 0x45, 0x23}},
+		{name: "int32 1", input: int32(1), expect: []byte{0x01, 0x01}},
+		{name: "int32 -1", input: int32(-1), expect: []byte{0x80}},
+
+		{name: "int64 zero", input: int64(0), expect: []byte{0x00}},
+		{name: "int64 large pos mag", input: int64(8888413612000000000), expect: []byte{0x08, 0x7b, 0x59, 0xfd, 0x16, 0x58, 0x01, 0xb8, 0x00}},
+		{name: "int64 large neg mag", input: int64(-8888413612000000000), expect: []byte{0x88, 0x84, 0xa6, 0x02, 0xe9, 0xa7, 0xfe, 0x48, 0x00}},
+		{name: "int64 1", input: int64(1), expect: []byte{0x01, 0x01}},
+		{name: "int64 -1", input: int64(-1), expect: []byte{0x80}},
 	}
 
 	for _, tc := range testCases {
