@@ -49,12 +49,34 @@ func Test_Enc_String(t *testing.T) {
 }
 
 func Test_Enc_Int(t *testing.T) {
+
 	testCases := []struct {
-		name string
-	}{}
+		name   string
+		input  interface{}
+		expect []byte
+	}{
+		{name: "int zero", input: 0, expect: []byte{0x00}},
+		{name: "int large pos mag", input: 5320721484761530367, expect: []byte{0x08, 0x49, 0xd6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}},
+		{name: "int large neg mag", input: -5320721484761530367, expect: []byte{0x88, 0xb6, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}},
+		{name: "int 1", input: 1, expect: []byte{0x01, 0x01}},
+		{name: "int 256", input: 256, expect: []byte{0x02, 0x01, 0x00}},
+		{name: "int -1", input: -1, expect: []byte{0x80}},
+		{name: "int -413", input: -413, expect: []byte{0x82, 0xfe, 0x63}},
+
+		{name: "int8 zero", input: int8(0), expect: []byte{0x00}},
+		{name: "int8 large pos mag", input: int8(122), expect: []byte{0x01, 0x7a}},
+		{name: "int8 large neg mag", input: int8(-124), expect: []byte{0x81, 0x84}},
+		{name: "int8 1", input: int8(1), expect: []byte{0x01, 0x01}},
+		{name: "int8 -1", input: int8(-1), expect: []byte{0x80}},
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
+			assert := assert.New(t)
+
+			actual := Enc(tc.input)
+
+			assert.Equal(tc.expect, actual)
 		})
 	}
 
