@@ -1,6 +1,9 @@
 package rezi
 
-import "encoding"
+import (
+	"encoding"
+	"fmt"
+)
 
 func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnmarshaler {
 	return marshaledBytesConsumer{fn: byteConsumer}
@@ -8,6 +11,36 @@ func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnm
 
 func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler {
 	return marshaledBytesProducer{fn: byteProducer}
+}
+
+type testBinaryValue struct {
+	number int32
+	data   string
+}
+
+func (tbv testBinaryValue) MarshalBinary() ([]byte, error) {
+	var b []byte
+	b = append(b, Enc(tbv.data)...)
+	b = append(b, Enc(tbv.number)...)
+	return b, nil
+}
+
+func (tbv *testBinaryValue) UnmarshalBinary(data []byte) error {
+	var n int
+	var err error
+
+	n, err = Dec(data, &tbv.data)
+	if err != nil {
+		return fmt.Errorf("data: %w", err)
+	}
+	data = data[n:]
+
+	_, err = Dec(data, &tbv.number)
+	if err != nil {
+		return fmt.Errorf("number: %w", err)
+	}
+
+	return nil
 }
 
 type marshaledBytesConsumer struct {

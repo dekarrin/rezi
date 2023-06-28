@@ -176,6 +176,11 @@ func Test_Enc_Binary(t *testing.T) {
 			input:  valueThatMarshalsWith(func() []byte { return []byte{0x03, 0x44, 0x15} }),
 			expect: []byte{0x01, 0x03, 0x03, 0x44, 0x15},
 		},
+		{
+			name:   "actual object",
+			input:  testBinaryValue{number: 12, data: "Hello, John!!!!!!!!"},
+			expect: []byte{0x01, 0x17, 0x01, 0x13, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x4a, 0x6f, 0x68, 0x6e, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x01, 0x0c},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -466,15 +471,31 @@ func Test_Dec_Bool(t *testing.T) {
 }
 
 func Test_Dec_Binary(t *testing.T) {
-	testCases := []struct {
-		name string
-	}{}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
-		})
-	}
+	// cannot be table-driven easily due to trying different types
 
+	t.Run("normal binary result", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+
+		input := []byte{
+			0x01, 0x17, 0x01, 0x13, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20,
+			0x4a, 0x6f, 0x68, 0x6e, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21,
+			0x21, 0x01, 0x0c,
+		}
+		expect := testBinaryValue{number: 12, data: "Hello, John!!!!!!!!"}
+		expectConsumed := 25
+
+		// exeucte
+		actual := testBinaryValue{}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Dec_Map(t *testing.T) {
