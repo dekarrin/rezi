@@ -267,7 +267,6 @@ func Test_Dec_Int(t *testing.T) {
 		input  []byte
 		expect result
 	}{
-
 		{name: "int zero", input: []byte{0x00}, expect: result{val: int(0), consumed: 1}},
 		{name: "int large pos mag", input: []byte{0x08, 0x49, 0xd6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, expect: result{val: int(5320721484761530367), consumed: 9}},
 		{name: "int large neg mag", input: []byte{0x88, 0xb6, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, expect: result{val: int(-5320721484761530367), consumed: 9}},
@@ -275,6 +274,50 @@ func Test_Dec_Int(t *testing.T) {
 		{name: "int 256", input: []byte{0x02, 0x01, 0x00}, expect: result{val: int(256), consumed: 3}},
 		{name: "int -1", input: []byte{0x80}, expect: result{val: int(-1), consumed: 1}},
 		{name: "int -413", input: []byte{0x82, 0xfe, 0x63}, expect: result{val: int(-413), consumed: 3}},
+
+		{name: "int8 zero", input: []byte{0x00}, expect: result{val: int8(0), consumed: 1}},
+		{name: "int8 large pos mag", input: []byte{0x01, 0x7a}, expect: result{val: int8(122), consumed: 2}},
+		{name: "int8 large neg mag", input: []byte{0x81, 0x84}, expect: result{val: int8(-124), consumed: 2}},
+		{name: "int8 1", input: []byte{0x01, 0x01}, expect: result{val: int8(1), consumed: 2}},
+		{name: "int8 -1", input: []byte{0x80}, expect: result{val: int8(-1), consumed: 1}},
+
+		{name: "int16 zero", input: []byte{0x00}, expect: result{val: int16(0), consumed: 1}},
+		{name: "int16 large pos mag", input: []byte{0x02, 0x7f, 0xf8}, expect: result{val: int16(32760), consumed: 3}},
+		{name: "int16 large neg mag", input: []byte{0x82, 0x83, 0x00}, expect: result{val: int16(-32000), consumed: 3}},
+		{name: "int16 1", input: []byte{0x01, 0x01}, expect: result{val: int16(1), consumed: 2}},
+		{name: "int16 -1", input: []byte{0x80}, expect: result{val: int16(-1), consumed: 1}},
+
+		{name: "int32 zero", input: []byte{0x00}, expect: result{val: int32(0), consumed: 1}},
+		{name: "int32 large pos mag", input: []byte{0x04, 0x7f, 0xfe, 0xba, 0xdd}, expect: result{val: int32(2147400413), consumed: 5}},
+		{name: "int32 large neg mag", input: []byte{0x84, 0x80, 0x01, 0x45, 0x23}, expect: result{val: int32(-2147400413), consumed: 5}},
+		{name: "int32 1", input: []byte{0x01, 0x01}, expect: result{val: int32(1), consumed: 2}},
+		{name: "int32 -1", input: []byte{0x80}, expect: result{val: int32(-1), consumed: 1}},
+
+		{name: "int64 zero", input: []byte{0x00}, expect: result{val: int64(0), consumed: 1}},
+		{name: "int64 large pos mag", input: []byte{0x08, 0x7b, 0x59, 0xfd, 0x16, 0x58, 0x01, 0xb8, 0x00}, expect: result{val: int64(8888413612000000000), consumed: 9}},
+		{name: "int64 large neg mag", input: []byte{0x88, 0x84, 0xa6, 0x02, 0xe9, 0xa7, 0xfe, 0x48, 0x00}, expect: result{val: int64(-8888413612000000000), consumed: 9}},
+		{name: "int64 1", input: []byte{0x01, 0x01}, expect: result{val: int64(1), consumed: 2}},
+		{name: "int64 -1", input: []byte{0x80}, expect: result{val: int64(-1), consumed: 1}},
+
+		{name: "uint zero", input: []byte{0x00}, expect: result{val: uint(0), consumed: 1}},
+		{name: "uint 1", input: []byte{0x01, 0x01}, expect: result{val: uint(1), consumed: 2}},
+		{name: "uint large", input: []byte{0x04, 0x34, 0xfb, 0x5e, 0x30}, expect: result{val: uint(888888880), consumed: 5}},
+
+		{name: "uint8 zero", input: []byte{0x00}, expect: result{val: uint8(0), consumed: 1}},
+		{name: "uint8 1", input: []byte{0x01, 0x01}, expect: result{val: uint8(1), consumed: 2}},
+		{name: "uint8 large", input: []byte{0x01, 0xff}, expect: result{val: uint8(255), consumed: 2}},
+
+		{name: "uint16 zero", input: []byte{0x00}, expect: result{val: uint16(0), consumed: 1}},
+		{name: "uint16 1", input: []byte{0x01, 0x01}, expect: result{val: uint16(1), consumed: 2}},
+		{name: "uint16 large", input: []byte{0x02, 0xe6, 0x08}, expect: result{val: uint16(58888), consumed: 3}},
+
+		{name: "uint32 zero", input: []byte{0x00}, expect: result{val: uint32(0), consumed: 1}},
+		{name: "uint32 1", input: []byte{0x01, 0x01}, expect: result{val: uint32(1), consumed: 2}},
+		{name: "uint32 large", input: []byte{0x04, 0xf9, 0xad, 0x5f, 0x38}, expect: result{val: uint32(4188888888), consumed: 5}},
+
+		{name: "uint64 zero", input: []byte{0x00}, expect: result{val: uint64(0), consumed: 1}},
+		{name: "uint64 1", input: []byte{0x01, 0x01}, expect: result{val: uint64(1), consumed: 2}},
+		{name: "uint64 large", input: []byte{0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64}, expect: result{val: uint64(10004138888888800612), consumed: 9}},
 	}
 
 	for _, tc := range testCases {
