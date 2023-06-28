@@ -1,6 +1,7 @@
 package rezi
 
 import (
+	"encoding"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -151,11 +152,39 @@ func Test_Enc_Bool(t *testing.T) {
 
 func Test_Enc_Binary(t *testing.T) {
 	testCases := []struct {
-		name string
-	}{}
+		name   string
+		input  encoding.BinaryMarshaler
+		expect []byte
+	}{
+		{
+			name:   "encode to nil bytes",
+			input:  valueThatMarshalsWith(func() []byte { return nil }),
+			expect: []byte{0x00},
+		},
+		{
+			name:   "encode to empty bytes",
+			input:  valueThatMarshalsWith(func() []byte { return []byte{} }),
+			expect: []byte{0x00},
+		},
+		{
+			name:   "encode to one byte",
+			input:  valueThatMarshalsWith(func() []byte { return []byte{0x03} }),
+			expect: []byte{0x01, 0x01, 0x03},
+		},
+		{
+			name:   "encode to several bytes",
+			input:  valueThatMarshalsWith(func() []byte { return []byte{0x03, 0x44, 0x15} }),
+			expect: []byte{0x01, 0x03, 0x03, 0x44, 0x15},
+		},
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
+			assert := assert.New(t)
+
+			actual := Enc(tc.input)
+
+			assert.Equal(tc.expect, actual)
 		})
 	}
 
