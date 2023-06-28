@@ -266,11 +266,79 @@ func Test_Dec_Int(t *testing.T) {
 		name   string
 		input  []byte
 		expect result
-	}{}
+	}{
+
+		{name: "int zero", input: []byte{0x00}, expect: result{val: int(0), consumed: 1}},
+		{name: "int large pos mag", input: []byte{0x08, 0x49, 0xd6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, expect: result{val: int(5320721484761530367), consumed: 9}},
+		{name: "int large neg mag", input: []byte{0x88, 0xb6, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}, expect: result{val: int(-5320721484761530367), consumed: 9}},
+		{name: "int 1", input: []byte{0x01, 0x01}, expect: result{val: int(1), consumed: 2}},
+		{name: "int 256", input: []byte{0x02, 0x01, 0x00}, expect: result{val: int(256), consumed: 3}},
+		{name: "int -1", input: []byte{0x80}, expect: result{val: int(-1), consumed: 1}},
+		{name: "int -413", input: []byte{0x82, 0xfe, 0x63}, expect: result{val: int(-413), consumed: 3}},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
+			assert := assert.New(t)
+
+			var actual result
+			var err error
+
+			// we are about to have type examination on our actual pointer
+			// be run, so we'd betta pass it the correct kind of ptr
+			switch tc.expect.val.(type) {
+			case int:
+				var v int
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case int8:
+				var v int8
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case int16:
+				var v int16
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case int32:
+				var v int32
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case int64:
+				var v int64
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case uint:
+				var v uint
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case uint8:
+				var v uint8
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case uint16:
+				var v uint16
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case uint32:
+				var v uint32
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case uint64:
+				var v uint64
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			default:
+				panic("bad test case")
+			}
+
+			if tc.expect.err {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
 		})
 	}
 
