@@ -11,6 +11,12 @@ import (
 	"unicode/utf8"
 )
 
+// AnyInt is a union interface that combines all basic Go integer types. It
+// allows int, uint, and all of their specifically-sized varieties.
+type AnyInt interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
 // encPrim encodes the primitve REZI value as rezi-format bytes. The type of the
 // value is examined to determine how to encode it. No type information is
 // included in the returned bytes so it is up to the caller to keep track of it.
@@ -31,28 +37,28 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return EncInt(int(value.(int8)))
+				return EncAnyInt(value.(int8))
 			case 16:
-				return EncInt(int(value.(int16)))
+				return EncAnyInt(value.(int16))
 			case 32:
-				return EncInt(int(value.(int32)))
+				return EncAnyInt(value.(int32))
 			case 64:
-				return EncInt(int(value.(int64)))
+				return EncAnyInt(value.(int64))
 			default:
-				return EncInt(value.(int))
+				return EncAnyInt(value.(int))
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return EncInt(int(value.(uint8)))
+				return EncAnyInt(value.(uint8))
 			case 16:
-				return EncInt(int(value.(uint16)))
+				return EncAnyInt(value.(uint16))
 			case 32:
-				return EncInt(int(value.(uint32)))
+				return EncAnyInt(value.(uint32))
 			case 64:
-				return EncInt(int(value.(uint64)))
+				return EncAnyInt(value.(uint64))
 			default:
-				return EncInt(int(value.(uint)))
+				return EncAnyInt(value.(uint))
 			}
 		}
 	case tBinary:
@@ -181,40 +187,18 @@ func DecBool(data []byte) (bool, int, error) {
 	}
 }
 
-// EncInt encodes the int value as a slice of bytes. The value can later
-// be decoded with DecInt. No type indicator is included in the output;
-// it is up to the caller to add this if they so wish it. Integers up to 64 bits
-// are supported with this encoding scheme.
-//
-// The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
-// will result in longer slices; only 0 is encoded as a single byte.
-//
-// Encoded integers start with an info byte that packs the sign and the number
-// of following bytes needed to represent the value together. The sign is
-// encoded as the most significant bit (the first/leftmost bit) of the byte,
-// with 0 being positive and 1 being negative. The next significant 3 bits are
-// unused. The least significant 4 bits contain the number of bytes that are
-// used to encode the integer value. The bits in the info byte can be
-// represented as `SXXXLLLL`, where S is the sign bit, X are unused bits, and L
-// are the bits that encode the remaining length.
-//
-// The remaining bytes give the value being encoded as a 2's complement 64-bit
-// big-endian integer, omitting any leading bytes that would be encoded as 0x00
-// if the integer is positive, or 0xff if the integer is negative. The value 0
-// is special and is encoded as with infobyte 0x00 with no additional bytes.
-// Because two's complement is used and as a result of the rules, -1 also
-// requires no bytes besides the info byte (because it would simply be a series
-// of eight 0xff bytes), and is therefore encoded as 0x80.
-//
-// Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
-// 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
-// [0x82 0xfe 0x0c], etc.
-func EncInt(i int) []byte {
-	if i == 0 {
+// EncAnyInt is similar to EncInt but performs specific behavior based on the
+// type of int it is given. This allows, for example, the largest value that can
+// be held by a uint64 to be properly represented where casting would have
+// converted it to a negative integer.
+func EncAnyInt[E AnyInt](v E) []byte {
+	if v == 0 {
 		return []byte{0x00}
 	}
 
-	negative := i < 0
+	negative := v < 0
+
+	i := int64(v)
 
 	b1 := byte((i >> 56) & 0xff)
 	b2 := byte((i >> 48) & 0xff)
@@ -249,6 +233,41 @@ func EncInt(i int) []byte {
 	enc = append([]byte{byteCount}, enc...)
 
 	return enc
+}
+
+// EncInt encodes the int value as a slice of bytes. The value can later
+// be decoded with DecInt. No type indicator is included in the output;
+// it is up to the caller to add this if they so wish it. Integers up to 64 bits
+// are supported with this encoding scheme.
+//
+// TODO: move format info to package docs.
+// TODO: mark as deprecated.
+//
+// The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
+// will result in longer slices; only 0 is encoded as a single byte.
+//
+// Encoded integers start with an info byte that packs the sign and the number
+// of following bytes needed to represent the value together. The sign is
+// encoded as the most significant bit (the first/leftmost bit) of the byte,
+// with 0 being positive and 1 being negative. The next significant 3 bits are
+// unused. The least significant 4 bits contain the number of bytes that are
+// used to encode the integer value. The bits in the info byte can be
+// represented as `SXXXLLLL`, where S is the sign bit, X are unused bits, and L
+// are the bits that encode the remaining length.
+//
+// The remaining bytes give the value being encoded as a 2's complement 64-bit
+// big-endian integer, omitting any leading bytes that would be encoded as 0x00
+// if the integer is positive, or 0xff if the integer is negative. The value 0
+// is special and is encoded as with infobyte 0x00 with no additional bytes.
+// Because two's complement is used and as a result of the rules, -1 also
+// requires no bytes besides the info byte (because it would simply be a series
+// of eight 0xff bytes), and is therefore encoded as 0x80.
+//
+// Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
+// 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
+// [0x82 0xfe 0x0c], etc.
+func EncInt(i int) []byte {
+	return EncAnyInt(i)
 }
 
 // DecInt decodes an integer value at the start of the given bytes and
