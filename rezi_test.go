@@ -984,6 +984,38 @@ func Test_Dec_Slice(t *testing.T) {
 	})
 
 	// TODO: NEED TEST CASE FOR "ptr-to does not implement, thing does directly" i.e. "DO NOT CONSTRUCT PTR FOR THIS BINARY"
+	t.Run("[]dualMarshaler", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0c,
+
+				0x01, 0x04,
+				0x01, 0x02, 0x03, 0x04,
+
+				0x01, 0x04,
+				0x08, 0x08, 0x09, 0x88,
+			}
+			expect = []dualMarshaler{
+				{data: "sup", number: 1},
+				{data: "VRISSY", number: 8},
+			}
+			expectConsumed = 23
+		)
+
+		// execute
+		var actual []testBinary
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
 	/*
 

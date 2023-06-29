@@ -126,11 +126,6 @@ func canDecode(v interface{}) (typeInfo, error) {
 	checkType := reflect.TypeOf(v)
 	origType := checkType
 
-	// TODO: this is probably doubled and can be in decTypeInfo, think thru logic and the two flows
-	if checkType.Implements(refBinaryUnmarshalerType) {
-		return typeInfo{ViaNonPtr: true, Main: tBinary}, nil
-	}
-
 	var checkPtr bool
 
 	if checkType.Kind() == reflect.Pointer {
@@ -144,7 +139,9 @@ func canDecode(v interface{}) (typeInfo, error) {
 	}
 
 	// we do not allow a ref-to binaryUnmarshaler here
-	if info.Main == tBinary && checkPtr {
+	if info.Main == tBinary && checkPtr && info.ViaNonPtr {
+		// no, you pass in an implementor of encoding.BinaryUnmarshaler... not
+		// a ptr to *that*
 		return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for decoding", origType.String())
 	}
 	return info, nil
@@ -152,6 +149,10 @@ func canDecode(v interface{}) (typeInfo, error) {
 
 func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	if t.Implements(refBinaryUnmarshalerType) {
+		// the 'via an embedded struct' way of getting a binary value
+		return typeInfo{ViaNonPtr: true, Main: tBinary}, nil
+	} else if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
+		// the 'normal' way of getting a binary value
 		return typeInfo{ViaNonPtr: false, Main: tBinary}, nil
 	}
 
@@ -189,13 +190,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 			mValInfo, err := decTypeInfo(mValType)
 			if err != nil {
-				// one last chance... if a *pointer* to the map value implements
-				// unmarshaler, we are also okay.
-				if reflect.PointerTo(mValType).Implements(refBinaryUnmarshalerType) {
-					mValInfo = typeInfo{Main: tBinary}
-				} else {
-					return typeInfo{}, fmt.Errorf("map value type is not decodable: %w", err)
-				}
+				return typeInfo{}, fmt.Errorf("map value type is not decodable: %w", err)
 			}
 			mKeyInfo, err := decTypeInfo(mKeyType)
 			if err != nil {
@@ -218,13 +213,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			slValType := t.Elem()
 			slValInfo, err := decTypeInfo(slValType)
 			if err != nil {
-				// one last chance... if a *pointer* to the slice value
-				// implements unmarshaler, ew are also okay.
-				if reflect.PointerTo(slValType).Implements(refBinaryUnmarshalerType) {
-					slValInfo = typeInfo{Main: tBinary}
-				} else {
-					return typeInfo{}, fmt.Errorf("slice value is not decodable: %w", err)
-				}
+				return typeInfo{}, fmt.Errorf("slice value is not decodable: %w", err)
 			}
 			return typeInfo{Main: tSlice, ValType: &slValInfo}, nil
 		}

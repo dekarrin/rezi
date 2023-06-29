@@ -43,6 +43,35 @@ func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// dualMarshaler is for testing an uncommon circumstance for binary
+// encoders - a type that both can marshal itself AND directly unmarshal to
+// itself, as opposed to its pointer implementing unmarshaling.
+//
+// It requires that the data be initialized.
+type dualMarshaler struct {
+	data *[4]byte
+}
+
+func (dm dualMarshaler) UnmarshalBinary(data []byte) error {
+	if len(data) != len(dm.data) {
+		return fmt.Errorf("expected exactly %d bytes in data, but got %d", len(dm.data), len(data))
+	}
+
+	for i := range dm.data {
+		dm.data[i] = data[i]
+	}
+
+	return nil
+}
+
+func (dm dualMarshaler) MarshalBinary() ([]byte, error) {
+	enc := make([]byte, len(dm.data))
+
+	copy(enc, dm.data[:])
+
+	return enc, nil
+}
+
 type marshaledBytesConsumer struct {
 	fn func([]byte) error
 }
