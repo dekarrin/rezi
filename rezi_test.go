@@ -856,12 +856,11 @@ func Test_Dec_Slice(t *testing.T) {
 			input = []byte{
 				0x80,
 			}
-			expect         []int
 			expectConsumed = 1
 		)
 
 		// execute
-		var actual []int
+		actual := []int{1, 2} // start with a value so we can check it is set to nil
 		consumed, err := Dec(input, &actual)
 
 		// assert
@@ -870,7 +869,7 @@ func Test_Dec_Slice(t *testing.T) {
 		}
 
 		assert.Equal(expectConsumed, consumed)
-		assert.Equal(expect, actual)
+		assert.Nil(actual)
 	})
 
 	t.Run("[]int", func(t *testing.T) {

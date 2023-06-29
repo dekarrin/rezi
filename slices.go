@@ -5,6 +5,7 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"log"
 	"reflect"
 )
 
@@ -44,17 +45,17 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	data = data[n:]
 	totalConsumed += n
 
-	refVal := reflect.ValueOf(v)
-	refSliceType := refVal.Type().Elem()
+	refSliceVal := reflect.ValueOf(v)
+	refSliceType := refSliceVal.Type().Elem()
 
 	if toConsume == 0 {
 		// initialize to the empty slice
 		emptySlice := reflect.MakeSlice(refSliceType, 0, 0)
-		refVal.Elem().Set(emptySlice)
+		refSliceVal.Elem().Set(emptySlice)
 		return totalConsumed, nil
 	} else if toConsume == -1 {
 		nilSlice := reflect.Zero(refSliceType)
-		refVal.Elem().Set(nilSlice)
+		refSliceVal.Elem().Set(nilSlice)
 		return totalConsumed, nil
 	}
 
@@ -81,10 +82,12 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		i += n
 		data = data[n:]
 
-		sl = reflect.Append(sl, refValue)
+		sl = reflect.Append(sl, refValue.Elem())
 	}
 
-	refVal.Elem().Set(sl)
+	log.Printf("%s", sl.Kind())
+
+	refSliceVal.Elem().Set(sl)
 	return totalConsumed, nil
 }
 
