@@ -983,6 +983,8 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	// TODO: NEED TEST CASE FOR "ptr-to does not implement, thing does directly" i.e. "DO NOT CONSTRUCT PTR FOR THIS BINARY"
+
 	/*
 
 		t.Run("[]binary", func(t *testing.T) {

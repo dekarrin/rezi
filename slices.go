@@ -69,10 +69,11 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	for i < toConsume {
 		refVType := refSliceType.Elem()
 		// if we specifically are instructed to deref, then instead of the
-		// normal key, get a ptr-to the type of.
-		if ti.ValType.Deref {
-			refVType = reflect.PointerTo(refVType)
-		}
+		// normal key, create a new one, get a POINTER to the new one and then
+		// pass that in
+		// if ti.ValType.Deref {
+		// 	refVType = reflect.PointerTo(refVType)
+		// }
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {

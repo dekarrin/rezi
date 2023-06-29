@@ -156,7 +156,7 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		refVType := refMapType.Elem()
 		// if we specifically are instructed to deref, then instead of the
 		// normal key, get a ptr-to the type of.
-		if ti.ValType.Deref {
+		if ti.ValType.ViaNonPtr {
 			refVType = reflect.PointerTo(refVType)
 		}
 		refValue := reflect.New(refVType)

@@ -27,12 +27,12 @@ const (
 // typeInfo holds REZI-specific type info on types that can be encoded and
 // decoded.
 type typeInfo struct {
-	Main    mainType
-	Bits    int
-	Signed  bool
-	Deref   bool
-	KeyType *typeInfo // only valid for maps
-	ValType *typeInfo // valid for map and slice
+	Main      mainType
+	Bits      int
+	Signed    bool
+	ViaNonPtr bool
+	KeyType   *typeInfo // only valid for maps
+	ValType   *typeInfo // valid for map and slice
 }
 
 func (ti typeInfo) Primitive() bool {
@@ -126,8 +126,9 @@ func canDecode(v interface{}) (typeInfo, error) {
 	checkType := reflect.TypeOf(v)
 	origType := checkType
 
+	// TODO: this is probably doubled and can be in decTypeInfo, think thru logic and the two flows
 	if checkType.Implements(refBinaryUnmarshalerType) {
-		return typeInfo{Deref: false, Main: tBinary}, nil
+		return typeInfo{ViaNonPtr: true, Main: tBinary}, nil
 	}
 
 	var checkPtr bool
@@ -151,7 +152,7 @@ func canDecode(v interface{}) (typeInfo, error) {
 
 func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	if t.Implements(refBinaryUnmarshalerType) {
-		return typeInfo{Deref: false, Main: tBinary}, nil
+		return typeInfo{ViaNonPtr: false, Main: tBinary}, nil
 	}
 
 	switch t.Kind() {
@@ -191,7 +192,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				// one last chance... if a *pointer* to the map value implements
 				// unmarshaler, we are also okay.
 				if reflect.PointerTo(mValType).Implements(refBinaryUnmarshalerType) {
-					mValInfo = typeInfo{Deref: true, Main: tBinary}
+					mValInfo = typeInfo{Main: tBinary}
 				} else {
 					return typeInfo{}, fmt.Errorf("map value type is not decodable: %w", err)
 				}
@@ -220,7 +221,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				// one last chance... if a *pointer* to the slice value
 				// implements unmarshaler, ew are also okay.
 				if reflect.PointerTo(slValType).Implements(refBinaryUnmarshalerType) {
-					slValInfo = typeInfo{Deref: true, Main: tBinary}
+					slValInfo = typeInfo{Main: tBinary}
 				} else {
 					return typeInfo{}, fmt.Errorf("slice value is not decodable: %w", err)
 				}
