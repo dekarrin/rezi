@@ -623,7 +623,6 @@ func Test_Dec_String(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
-
 }
 
 func Test_Dec_Int(t *testing.T) {
@@ -848,13 +847,195 @@ func Test_Dec_Map(t *testing.T) {
 }
 
 func Test_Dec_Slice(t *testing.T) {
-	testCases := []struct {
-		name string
-	}{}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
-		})
-	}
+	// different types, can't rly be table driven easily
 
+	t.Run("nil []int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x80,
+			}
+			expect         []int
+			expectConsumed = 1
+		)
+
+		// execute
+		var actual []int
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0c, 0x01, 0x01, 0x01, 0x03, 0x01, 0x04, 0x01, 0xc8,
+				0x03, 0x04, 0x04b, 0x41,
+			}
+			expect         = []int{1, 3, 4, 200, 281409}
+			expectConsumed = 14
+		)
+
+		// execute
+		var actual []int
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	/*
+
+		t.Run("huge []uint64 numbers", func(t *testing.T) {
+			// setup
+			assert := assert.New(t)
+			var (
+				input  = []uint64{10004138888888800612, 10004138888888800613}
+				expect = []byte{
+					0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
+					0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+				}
+			)
+
+			// execute
+			actual := Enc(input)
+
+			// assert
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("[]string", func(t *testing.T) {
+			// setup
+			assert := assert.New(t)
+			var (
+				input  = []string{"VRISKA", "NEPETA", "TEREZI"}
+				expect = []byte{
+					0x01, 0x18, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+					0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, 0x06,
+					0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+				}
+			)
+
+			// execute
+			actual := Enc(input)
+
+			// assert
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("[]binary", func(t *testing.T) {
+			// setup
+			assert := assert.New(t)
+			var (
+				input = []testBinary{
+					{data: "sup", number: 1},
+					{data: "VRISSY", number: 8},
+				}
+
+				expect = []byte{
+					0x01, 0x15,
+
+					0x01, 0x07,
+					0x01, 0x03, 0x73, 0x75, 0x70,
+					0x01, 0x01,
+
+					0x01, 0x0a,
+					0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
+					0x01, 0x08,
+				}
+			)
+
+			// execute
+			actual := Enc(input)
+
+			// assert
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("[]map[string]bool", func(t *testing.T) {
+			// setup
+			assert := assert.New(t)
+			var (
+				input = []map[string]bool{
+					{
+						"VRISKA":   true,
+						"ARANEA":   false,
+						"MINDFANG": true,
+					},
+					{
+						"NEPETA": true,
+					},
+					{
+						"JOHN": true,
+						"JADE": true,
+					},
+				}
+
+				expect = []byte{
+					0x01, 0x3a, // len=58
+
+					0x01, 0x1d, // len=29
+					0x01, 0x06, 0x41, 0x52, 0x41, 0x4e, 0x45, 0x41, 0x00, // "ARANEA": false
+					0x01, 0x08, 0x4d, 0x49, 0x4e, 0x44, 0x46, 0x41, 0x4e, 0x47, 0x01, // "MINDFANG": true
+					0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, // "VRISKA": true
+
+					0x01, 0x09, // len=9
+					0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, // "NEPETA": true
+
+					0x01, 0x0e, // len=14
+					0x01, 0x04, 0x4a, 0x41, 0x44, 0x45, 0x01, // "JADE": true
+					0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, 0x01, // "JOHN": true
+				}
+			)
+
+			// execute
+			actual := Enc(input)
+
+			// assert
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("meta slice [][]int", func(t *testing.T) {
+			// setup
+			assert := assert.New(t)
+			var (
+				input = [][]int{
+					{1, 2, 3},
+					{8888},
+				}
+
+				expect = []byte{
+					0x01, 0x0d,
+
+					0x01, 0x06,
+					0x01, 0x01,
+					0x01, 0x02,
+					0x01, 0x03,
+
+					0x01, 0x03,
+					0x02, 0x22, 0xb8,
+				}
+			)
+
+			// execute
+			actual := Enc(input)
+
+			// assert
+			assert.Equal(expect, actual)
+		})
+	*/
 }
