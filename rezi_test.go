@@ -406,7 +406,7 @@ func Test_Enc_Slice(t *testing.T) {
 			input  = []int{1, 3, 4, 200, 281409}
 			expect = []byte{
 				0x01, 0x0c, 0x01, 0x01, 0x01, 0x03, 0x01, 0x04, 0x01, 0xc8,
-				0x03, 0x04, 0x04b, 0x41,
+				0x03, 0x04, 0x4b, 0x41,
 			}
 		)
 
@@ -878,7 +878,7 @@ func Test_Dec_Slice(t *testing.T) {
 		var (
 			input = []byte{
 				0x01, 0x0c, 0x01, 0x01, 0x01, 0x03, 0x01, 0x04, 0x01, 0xc8,
-				0x03, 0x04, 0x04b, 0x41,
+				0x03, 0x04, 0x4b, 0x41,
 			}
 			expect         = []int{1, 3, 4, 200, 281409}
 			expectConsumed = 14
@@ -897,64 +897,101 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("huge []uint64 numbers", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
+				0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+			expect         = []uint64{10004138888888800612, 10004138888888800613}
+			expectConsumed = 20
+		)
+
+		// execute
+		var actual []uint64
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]string", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x18, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, 0x06,
+				0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+			}
+			expect         = []string{"VRISKA", "NEPETA", "TEREZI"}
+			expectConsumed = 26
+		)
+
+		// execute
+		var actual []string
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]binary", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x15,
+
+				0x01, 0x07,
+				0x01, 0x03, 0x73, 0x75, 0x70,
+				0x01, 0x01,
+
+				0x01, 0x0a,
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
+				0x01, 0x08,
+			}
+			expect = []testBinary{
+				{data: "sup", number: 1},
+				{data: "VRISSY", number: 8},
+			}
+			expectConsumed = 23
+		)
+
+		// execute
+		var actual []testBinary
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	/*
-
-		t.Run("huge []uint64 numbers", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []uint64{10004138888888800612, 10004138888888800613}
-				expect = []byte{
-					0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
-					0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]string", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []string{"VRISKA", "NEPETA", "TEREZI"}
-				expect = []byte{
-					0x01, 0x18, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
-					0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, 0x06,
-					0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
 
 		t.Run("[]binary", func(t *testing.T) {
 			// setup
 			assert := assert.New(t)
 			var (
-				input = []testBinary{
-					{data: "sup", number: 1},
-					{data: "VRISSY", number: 8},
-				}
+				input =
 
 				expect = []byte{
-					0x01, 0x15,
-
-					0x01, 0x07,
-					0x01, 0x03, 0x73, 0x75, 0x70,
-					0x01, 0x01,
-
-					0x01, 0x0a,
-					0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
-					0x01, 0x08,
 				}
 			)
 
