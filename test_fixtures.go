@@ -13,19 +13,19 @@ func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler 
 	return marshaledBytesProducer{fn: byteProducer}
 }
 
-type testBinaryValue struct {
+type testBinary struct {
 	number int32
 	data   string
 }
 
-func (tbv testBinaryValue) MarshalBinary() ([]byte, error) {
+func (tbv testBinary) MarshalBinary() ([]byte, error) {
 	var b []byte
 	b = append(b, Enc(tbv.data)...)
 	b = append(b, Enc(tbv.number)...)
 	return b, nil
 }
 
-func (tbv *testBinaryValue) UnmarshalBinary(data []byte) error {
+func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	var n int
 	var err error
 

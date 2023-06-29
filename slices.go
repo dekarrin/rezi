@@ -14,13 +14,14 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 		panic("not a slice type")
 	}
 
-	if v == nil {
+	refVal := reflect.ValueOf(v)
+
+	if v == nil || refVal.IsNil() {
 		return EncInt(-1)
 	}
 
 	enc := make([]byte, 0)
 
-	refVal := reflect.ValueOf(v)
 	for i := 0; i < refVal.Len(); i++ {
 		v := refVal.Index(i)
 		enc = append(enc, Enc(v.Interface())...)

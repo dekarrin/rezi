@@ -178,7 +178,7 @@ func Test_Enc_Binary(t *testing.T) {
 		},
 		{
 			name:   "actual object",
-			input:  testBinaryValue{number: 12, data: "Hello, John!!!!!!!!"},
+			input:  testBinary{number: 12, data: "Hello, John!!!!!!!!"},
 			expect: []byte{0x01, 0x17, 0x01, 0x13, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x4a, 0x6f, 0x68, 0x6e, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x01, 0x0c},
 		},
 	}
@@ -196,27 +196,364 @@ func Test_Enc_Binary(t *testing.T) {
 }
 
 func Test_Enc_Map(t *testing.T) {
-	testCases := []struct {
-		name string
-	}{}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
-		})
-	}
+	// different types, can't easily be table-driven
 
+	t.Run("nil map[string]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  map[string]int
+			expect = []byte{
+				0x80,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[string]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = map[string]int{"ONE": 1, "EIGHT": 8}
+			expect = []byte{
+				0x01, 0x10,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0x01, 0x08,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]uint64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = map[int]uint64{8: 10004138888888800612, 1: 88888888}
+			expect = []byte{
+				0x01, 0x12,
+
+				0x01, 0x01,
+				0x04, 0x05, 0x4c, 0x56, 0x38,
+
+				0x01, 0x08,
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[bool]string", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = map[bool]string{true: "COOL VRISKA", false: "TAV"}
+			expect = []byte{
+				0x01, 0x14,
+
+				0x00,
+				0x01, 0x03, 0x54, 0x41, 0x56,
+
+				0x01,
+				0x01, 0x0b, 0x43, 0x4f, 0x4f, 0x4c, 0x20, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]binary", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]testBinary{
+				413: {data: "JOHN", number: 1},
+				612: {data: "VRISKA", number: 8},
+			}
+			expect = []byte{
+				0x01, 0x1c, // len=28
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x08, // len=8
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+				0x01, 0x01, // 1
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x0a, // len=10
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("meta map[int][]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int][]int{
+				413: {4, 1, 3},
+				612: {6, 1, 2},
+			}
+			expect = []byte{
+				0x01, 0x16, // len=22
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x06, // len=6
+				0x01, 0x04, 0x01, 0x01, 0x01, 0x03, // {4, 1, 3}
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x06, // len=6
+				0x01, 0x06, 0x01, 0x01, 0x01, 0x02, // {6, 1, 2}
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("meta map[int]map[int]string", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]map[int]string{
+				413: {
+					2: "JOHN",
+					4: "ROSE",
+				},
+				612: {
+					8: "VRISKA",
+					4: "NEPETA",
+				},
+			}
+			expect = []byte{
+				0x01, 0x2e, // len=46
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x10, // len=16
+				0x01, 0x02, 0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // 2: "JOHN"
+				0x01, 0x04, 0x01, 0x04, 0x52, 0x4f, 0x53, 0x45, // 4: "ROSE"
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x14, // len=20
+				0x01, 0x04, 0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // 4: "NEPETA"
+				0x01, 0x08, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // 8: "VRISKA"
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Enc_Slice(t *testing.T) {
-	testCases := []struct {
-		name string
-	}{}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// assert := assert.New(t)
-		})
-	}
+	// different types, can't rly be table driven easily
 
+	t.Run("nil []int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  []int
+			expect = []byte{
+				0x80,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []int{1, 3, 4, 200, 281409}
+			expect = []byte{
+				0x01, 0x0c, 0x01, 0x01, 0x01, 0x03, 0x01, 0x04, 0x01, 0xc8,
+				0x03, 0x04, 0x04b, 0x41,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("huge []uint64 numbers", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []uint64{10004138888888800612, 10004138888888800613}
+			expect = []byte{
+				0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
+				0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]string", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []string{"VRISKA", "NEPETA", "TEREZI"}
+			expect = []byte{
+				0x01, 0x18, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, 0x06,
+				0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]binary", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []testBinary{
+				{data: "sup", number: 1},
+				{data: "VRISSY", number: 8},
+			}
+
+			expect = []byte{
+				0x01, 0x15,
+
+				0x01, 0x07,
+				0x01, 0x03, 0x73, 0x75, 0x70,
+				0x01, 0x01,
+
+				0x01, 0x0a,
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
+				0x01, 0x08,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]map[string]bool", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []map[string]bool{
+				{
+					"VRISKA":   true,
+					"ARANEA":   false,
+					"MINDFANG": true,
+				},
+				{
+					"NEPETA": true,
+				},
+				{
+					"JOHN": true,
+					"JADE": true,
+				},
+			}
+
+			expect = []byte{
+				0x01, 0x3a, // len=58
+
+				0x01, 0x1d, // len=29
+				0x01, 0x06, 0x41, 0x52, 0x41, 0x4e, 0x45, 0x41, 0x00, // "ARANEA": false
+				0x01, 0x08, 0x4d, 0x49, 0x4e, 0x44, 0x46, 0x41, 0x4e, 0x47, 0x01, // "MINDFANG": true
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, // "VRISKA": true
+
+				0x01, 0x09, // len=9
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, // "NEPETA": true
+
+				0x01, 0x0e, // len=14
+				0x01, 0x04, 0x4a, 0x41, 0x44, 0x45, 0x01, // "JADE": true
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, 0x01, // "JOHN": true
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("meta slice [][]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = [][]int{
+				{1, 2, 3},
+				{8888},
+			}
+
+			expect = []byte{
+				0x01, 0x0d,
+
+				0x01, 0x06,
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x03,
+				0x02, 0x22, 0xb8,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Dec_String(t *testing.T) {
@@ -482,11 +819,11 @@ func Test_Dec_Binary(t *testing.T) {
 			0x4a, 0x6f, 0x68, 0x6e, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21,
 			0x21, 0x01, 0x0c,
 		}
-		expect := testBinaryValue{number: 12, data: "Hello, John!!!!!!!!"}
+		expect := testBinary{number: 12, data: "Hello, John!!!!!!!!"}
 		expectConsumed := 25
 
 		// exeucte
-		actual := testBinaryValue{}
+		actual := testBinary{}
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return

@@ -72,11 +72,12 @@ func encMap(v interface{}, ti typeInfo) []byte {
 		panic("not a map type")
 	}
 
-	if v == nil {
+	refVal := reflect.ValueOf(v)
+
+	if v == nil || refVal.IsNil() {
 		return EncInt(-1)
 	}
 
-	refVal := reflect.ValueOf(v)
 	mapKeys := refVal.MapKeys()
 	keysToSort := sortableMapKeys{
 		keys: mapKeys,

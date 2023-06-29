@@ -215,7 +215,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 		if t.Kind() == reflect.Slice {
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
-			slValInfo, err := encTypeInfo(slValType)
+			slValInfo, err := decTypeInfo(slValType)
 			if err != nil {
 				// one last chance... if a *pointer* to the slice value
 				// implements unmarshaler, ew are also okay.
