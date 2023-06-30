@@ -7,6 +7,7 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"io"
 	"strings"
 	"unicode/utf8"
 )
@@ -175,7 +176,7 @@ func EncBool(b bool) []byte {
 // returns the value and the number of bytes read.
 func DecBool(data []byte) (bool, int, error) {
 	if len(data) < 1 {
-		return false, 0, fmt.Errorf("unexpected EOF")
+		return false, 0, io.ErrUnexpectedEOF
 	}
 
 	if data[0] == 0 {
@@ -183,7 +184,7 @@ func DecBool(data []byte) (bool, int, error) {
 	} else if data[0] == 1 {
 		return true, 1, nil
 	} else {
-		return false, 0, fmt.Errorf("unknown non-bool value")
+		return false, 0, ErrInvalidType
 	}
 }
 
@@ -274,7 +275,7 @@ func EncInt(i int) []byte {
 // returns the value and the number of bytes read.
 func DecInt(data []byte) (int, int, error) {
 	if len(data) < 1 {
-		return 0, 0, fmt.Errorf("data does not contain at least 1 byte")
+		return 0, 0, io.ErrUnexpectedEOF
 	}
 
 	byteCount := data[0]
@@ -292,7 +293,7 @@ func DecInt(data []byte) (int, int, error) {
 	// for future use
 
 	if len(data) < int(byteCount) {
-		return 0, 0, fmt.Errorf("unexpected EOF")
+		return 0, 0, io.ErrUnexpectedEOF
 	}
 
 	intData := data[:byteCount]
@@ -353,7 +354,7 @@ func EncString(s string) []byte {
 // returns the value and the number of bytes read.
 func DecString(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, fmt.Errorf("unexpected EOF")
+		return "", 0, io.ErrUnexpectedEOF
 	}
 	runeCount, n, err := DecInt(data)
 	if err != nil {
@@ -362,7 +363,7 @@ func DecString(data []byte) (string, int, error) {
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", 0, fmt.Errorf("string rune count < 0")
+		return "", 0, fmt.Errorf("string rune count < 0: %w", ErrMalformedData)
 	}
 
 	readBytes := n
@@ -373,11 +374,11 @@ func DecString(data []byte) (string, int, error) {
 		ch, charBytesRead := utf8.DecodeRune(data)
 		if ch == utf8.RuneError {
 			if charBytesRead == 0 {
-				return "", 0, fmt.Errorf("unexpected EOF")
+				return "", 0, io.ErrUnexpectedEOF
 			} else if charBytesRead == 1 {
-				return "", 0, fmt.Errorf("invalid UTF-8 encoding in string")
+				return "", 0, fmt.Errorf("invalid UTF-8 encoding in string: %w", ErrMalformedData)
 			} else {
-				return "", 0, fmt.Errorf("invalid unicode replacement character in rune")
+				return "", 0, fmt.Errorf("invalid unicode replacement character in rune: %w", ErrMalformedData)
 			}
 		}
 
@@ -426,7 +427,7 @@ func DecBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	data = data[readBytes:]
 
 	if len(data) < byteLen {
-		return readBytes, fmt.Errorf("unexpected end of data")
+		return readBytes, io.ErrUnexpectedEOF
 	}
 	var binData []byte
 

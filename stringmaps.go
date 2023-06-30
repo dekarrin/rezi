@@ -6,11 +6,14 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"io"
 	"sort"
 )
 
 // EncMapStringToInt encodes a map of string-to-int as bytes. The order of keys
 // in the output is gauranteed to be consistent.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncMapStringToInt(m map[string]int) []byte {
 	if m == nil {
 		return EncInt(-1)
@@ -34,6 +37,8 @@ func EncMapStringToInt(m map[string]int) []byte {
 }
 
 // DecMapStringToBinary decodes a map of string-to-int from bytes.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	var totalConsumed int
 
@@ -51,7 +56,7 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	m := map[string]int{}
@@ -83,6 +88,8 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 // EncMapStringToBinary encodes a map of string to an implementer of
 // encoding.BinaryMarshaler as bytes. The order of keys in output is gauranteed
 // to be consistent.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	if m == nil {
 		return EncInt(-1)
@@ -106,6 +113,8 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 
 // DecMapStringToBinary decodes a map of string to an implementer of
 // encoding.BinaryMarshaler from bytes.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string]E, int, error) {
 	var totalConsumed int
 
@@ -123,7 +132,7 @@ func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	m := map[string]E{}

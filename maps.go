@@ -2,6 +2,7 @@ package rezi
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 )
@@ -135,7 +136,7 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, fmt.Errorf("unexpected EOF")
+		return totalConsumed, io.ErrUnexpectedEOF
 	}
 
 	// create the map we will be populating

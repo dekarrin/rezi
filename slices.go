@@ -5,6 +5,7 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"io"
 	"log"
 	"reflect"
 )
@@ -60,7 +61,7 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, fmt.Errorf("unexpected EOF")
+		return totalConsumed, io.ErrUnexpectedEOF
 	}
 
 	sl := reflect.MakeSlice(refSliceType, 0, 0)
@@ -94,6 +95,9 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	return totalConsumed, nil
 }
 
+// EncSliceString encodes a slice of strings from raw REZI bytes.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncSliceString(sl []string) []byte {
 	if sl == nil {
 		return EncInt(-1)
@@ -109,6 +113,9 @@ func EncSliceString(sl []string) []byte {
 	return enc
 }
 
+// DecSliceString decodes a slice of strings from raw REZI bytes.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecSliceString(data []byte) ([]string, int, error) {
 	var totalConsumed int
 
@@ -126,7 +133,7 @@ func DecSliceString(data []byte) ([]string, int, error) {
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	sl := []string{}
@@ -147,6 +154,10 @@ func DecSliceString(data []byte) ([]string, int, error) {
 	return sl, totalConsumed, nil
 }
 
+// EncSliceBinary encodes a slice of implementors of encoding.BinaryMarshaler
+// from the data bytes.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	if sl == nil {
 		return EncInt(-1)
@@ -162,6 +173,13 @@ func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	return enc
 }
 
+// DecSliceBinary decodes a slice of implementors of encoding.BinaryUnmarshaler
+// from the data bytes.
+//
+// Deprecated: This function requires the slice value type to directly implement
+// encoding.BinaryUnmarshaler. Use [Dec] instead, which allows any type as a
+// slice value provided that a *pointer* to it implements
+// encoding.BinaryUnmarshaler.
 func DecSliceBinary[E encoding.BinaryUnmarshaler](data []byte) ([]E, int, error) {
 	var totalConsumed int
 
@@ -179,7 +197,7 @@ func DecSliceBinary[E encoding.BinaryUnmarshaler](data []byte) ([]E, int, error)
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	sl := []E{}

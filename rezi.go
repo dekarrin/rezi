@@ -12,7 +12,13 @@ package rezi
 
 import (
 	"encoding"
+	"errors"
 	"reflect"
+)
+
+var (
+	ErrInvalidType   = errors.New("data is not the correct type")
+	ErrMalformedData = errors.New("data cannot be interpretered")
 )
 
 // NewBinaryEncoder creates an Encoder that can encode to bytes and uses an
