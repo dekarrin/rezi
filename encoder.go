@@ -31,7 +31,7 @@ func (sbe *simpleBinaryEncoder) checkInit() {
 
 func (sbe *simpleBinaryEncoder) EncodeBool(b bool) {
 	sbe.checkInit()
-	val := EncBool(b)
+	val := encBool(b)
 	sbe.b.Write(val)
 }
 
@@ -43,13 +43,13 @@ func (sbe *simpleBinaryEncoder) EncodeInt(i int) {
 
 func (sbe *simpleBinaryEncoder) EncodeString(s string) {
 	sbe.checkInit()
-	val := EncString(s)
+	val := encString(s)
 	sbe.b.Write(val)
 }
 
 func (sbe *simpleBinaryEncoder) Encode(o encoding.BinaryMarshaler) {
 	sbe.checkInit()
-	val := EncBinary(o)
+	val := encBinary(o)
 	sbe.b.Write(val)
 }
 

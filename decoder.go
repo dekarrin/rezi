@@ -168,7 +168,7 @@ type simpleBinaryDecoder struct {
 }
 
 func (sbe *simpleBinaryDecoder) DecodeBool() (bool, error) {
-	val, n, err := DecBool(sbe.b[sbe.cur:])
+	val, n, err := decBool(sbe.b[sbe.cur:])
 	if err != nil {
 		return val, err
 	}
@@ -177,7 +177,7 @@ func (sbe *simpleBinaryDecoder) DecodeBool() (bool, error) {
 }
 
 func (sbe *simpleBinaryDecoder) DecodeInt() (int, error) {
-	val, n, err := DecInt(sbe.b[sbe.cur:])
+	val, n, err := decInt(sbe.b[sbe.cur:])
 	if err != nil {
 		return val, err
 	}
@@ -186,7 +186,7 @@ func (sbe *simpleBinaryDecoder) DecodeInt() (int, error) {
 }
 
 func (sbe *simpleBinaryDecoder) DecodeString() (string, error) {
-	val, n, err := DecString(sbe.b[sbe.cur:])
+	val, n, err := decString(sbe.b[sbe.cur:])
 	if err != nil {
 		return val, err
 	}
@@ -195,7 +195,7 @@ func (sbe *simpleBinaryDecoder) DecodeString() (string, error) {
 }
 
 func (sbe *simpleBinaryDecoder) Decode(o encoding.BinaryUnmarshaler) error {
-	n, err := DecBinary(sbe.b[sbe.cur:], o)
+	n, err := decBinary(sbe.b[sbe.cur:], o)
 	if err != nil {
 		return err
 	}

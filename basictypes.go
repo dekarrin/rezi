@@ -31,39 +31,39 @@ type AnyInt interface {
 func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
-		return EncString(value.(string))
+		return encString(value.(string))
 	case tBool:
-		return EncBool(value.(bool))
+		return encBool(value.(bool))
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return EncAnyInt(value.(int8))
+				return encInt(value.(int8))
 			case 16:
-				return EncAnyInt(value.(int16))
+				return encInt(value.(int16))
 			case 32:
-				return EncAnyInt(value.(int32))
+				return encInt(value.(int32))
 			case 64:
-				return EncAnyInt(value.(int64))
+				return encInt(value.(int64))
 			default:
-				return EncAnyInt(value.(int))
+				return encInt(value.(int))
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return EncAnyInt(value.(uint8))
+				return encInt(value.(uint8))
 			case 16:
-				return EncAnyInt(value.(uint16))
+				return encInt(value.(uint16))
 			case 32:
-				return EncAnyInt(value.(uint32))
+				return encInt(value.(uint32))
 			case 64:
-				return EncAnyInt(value.(uint64))
+				return encInt(value.(uint64))
 			default:
-				return EncAnyInt(value.(uint))
+				return encInt(value.(uint))
 			}
 		}
 	case tBinary:
-		return EncBinary(value.(encoding.BinaryMarshaler))
+		return encBinary(value.(encoding.BinaryMarshaler))
 	default:
 		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
@@ -86,7 +86,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	switch ti.Main {
 	case tString:
 		tVal := v.(*string)
-		s, n, err := DecString(data)
+		s, n, err := decString(data)
 		if err != nil {
 			return n, err
 		}
@@ -94,14 +94,14 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		return n, nil
 	case tBool:
 		tVal := v.(*bool)
-		b, n, err := DecBool(data)
+		b, n, err := decBool(data)
 		if err != nil {
 			return n, err
 		}
 		*tVal = b
 		return n, nil
 	case tIntegral:
-		i, n, err := DecInt(data)
+		i, n, err := decInt(data)
 		if err != nil {
 			return n, err
 		}
@@ -149,18 +149,24 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		// that
 
 		receiver := v.(encoding.BinaryUnmarshaler)
-		return DecBinary(data, receiver)
+		return decBinary(data, receiver)
 	default:
 		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
 	}
 }
 
-// EncBool encodes the bool value as a slice of bytes. The value can later
+// encBool encodes the bool value as a slice of bytes. The value can later
 // be decoded with DecBool. No type indicator is included in the output;
 // it is up to the caller to add this if they so wish it.
 //
 // The output will always contain exactly 1 byte.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncBool(b bool) []byte {
+	return encBool(b)
+}
+
+func encBool(b bool) []byte {
 	enc := make([]byte, 1)
 
 	if b {
@@ -174,7 +180,13 @@ func EncBool(b bool) []byte {
 
 // DecBool decodes a bool value at the start of the given bytes and
 // returns the value and the number of bytes read.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecBool(data []byte) (bool, int, error) {
+	return decBool(data)
+}
+
+func decBool(data []byte) (bool, int, error) {
 	if len(data) < 1 {
 		return false, 0, io.ErrUnexpectedEOF
 	}
@@ -188,11 +200,11 @@ func DecBool(data []byte) (bool, int, error) {
 	}
 }
 
-// EncAnyInt is similar to EncInt but performs specific behavior based on the
+// encInt is similar to EncInt but performs specific behavior based on the
 // type of int it is given. This allows, for example, the largest value that can
 // be held by a uint64 to be properly represented where casting would have
 // converted it to a negative integer.
-func EncAnyInt[E AnyInt](v E) []byte {
+func encInt[E AnyInt](v E) []byte {
 	if v == 0 {
 		return []byte{0x00}
 	}
@@ -241,9 +253,6 @@ func EncAnyInt[E AnyInt](v E) []byte {
 // it is up to the caller to add this if they so wish it. Integers up to 64 bits
 // are supported with this encoding scheme.
 //
-// TODO: move format info to package docs.
-// TODO: mark as deprecated.
-//
 // The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
 // will result in longer slices; only 0 is encoded as a single byte.
 //
@@ -267,13 +276,23 @@ func EncAnyInt[E AnyInt](v E) []byte {
 // Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
 // 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
 // [0x82 0xfe 0x0c], etc.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncInt(i int) []byte {
-	return EncAnyInt(i)
+	return encInt(i)
 }
 
 // DecInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
+//
+// Deprecated: this function has been replaced by [Dec].
 func DecInt(data []byte) (int, int, error) {
+	return decInt(data)
+}
+
+// decInt decodes an integer value at the start of the given bytes and
+// returns the value and the number of bytes read.
+func decInt(data []byte) (int, int, error) {
 	if len(data) < 1 {
 		return 0, 0, io.ErrUnexpectedEOF
 	}
@@ -323,7 +342,7 @@ func DecInt(data []byte) (int, int, error) {
 	return int(iVal), int(byteCount + 1), nil
 }
 
-// EncString encodes a string value as a slice of bytes. The value can
+// encString encodes a string value as a slice of bytes. The value can
 // later be decoded with DecString. Encoded string output starts with an
 // integer (as encoded by EncInt) indicating the number of bytes following
 // that make up the string, followed by that many bytes containing the string
@@ -333,7 +352,13 @@ func DecInt(data []byte) (int, int, error) {
 // bytes that make up X characters, where X is the int value contained in the
 // first 8 bytes. Due to the specifics of how UTF-8 strings are encoded, this
 // may or may not be the actual number of bytes used.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncString(s string) []byte {
+	return encString(s)
+}
+
+func encString(s string) []byte {
 	enc := make([]byte, 0)
 
 	chCount := 0
@@ -352,11 +377,17 @@ func EncString(s string) []byte {
 
 // DecString decodes a string value at the start of the given bytes and
 // returns the value and the number of bytes read.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecString(data []byte) (string, int, error) {
+	return decString(data)
+}
+
+func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, io.ErrUnexpectedEOF
 	}
-	runeCount, n, err := DecInt(data)
+	runeCount, n, err := decInt(data)
 	if err != nil {
 		return "", 0, fmt.Errorf("decoding string rune count: %w", err)
 	}
@@ -390,14 +421,20 @@ func DecString(data []byte) (string, int, error) {
 	return sb.String(), readBytes, nil
 }
 
-// EncBinary encodes a BinaryMarshaler as a slice of bytes. The value can later
+// encBinary encodes a BinaryMarshaler as a slice of bytes. The value can later
 // be decoded with DecBinary. Encoded output starts with an integer (as encoded
 // by EncBinaryInt) indicating the number of bytes following that make up the
 // object, followed by that many bytes containing the encoded value.
 //
 // The output will be variable length; it will contain 8 bytes followed by the
 // number of bytes encoded in those 8 bytes.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncBinary(b encoding.BinaryMarshaler) []byte {
+	return encBinary(b)
+}
+
+func encBinary(b encoding.BinaryMarshaler) []byte {
 	if b == nil {
 		return EncInt(-1)
 	}
@@ -409,17 +446,23 @@ func EncBinary(b encoding.BinaryMarshaler) []byte {
 	return enc
 }
 
-// DecBinary decodes a value at the start of the given bytes and calls
+// decBinary decodes a value at the start of the given bytes and calls
 // UnmarshalBinary on the provided object with those bytes. If a nil value was
 // encoded, then a nil byte slice is passed to the UnmarshalBinary func.
 //
 // It returns the total number of bytes read from the data bytes.
+//
+// Deprecated: this function has been replaced by [Dec].
 func DecBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
+	return decBinary(data, b)
+}
+
+func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	var readBytes int
 	var byteLen int
 	var err error
 
-	byteLen, readBytes, err = DecInt(data)
+	byteLen, readBytes, err = decInt(data)
 	if err != nil {
 		return 0, err
 	}

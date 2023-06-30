@@ -109,7 +109,7 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	var totalConsumed int
 
-	toConsume, n, err := DecInt(data)
+	toConsume, n, err := decInt(data)
 	if err != nil {
 		return 0, fmt.Errorf("decode byte count: %w", err)
 	}
