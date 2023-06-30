@@ -623,6 +623,26 @@ func Test_Dec_String(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*string", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
+			expectVal      = "Vriska"
+			expect         = &expectVal
+			expectConsumed = 8
+		)
+
+		var actual *string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Dec_Int(t *testing.T) {
