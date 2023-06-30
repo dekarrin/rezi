@@ -154,13 +154,16 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		data = data[n:]
 
 		refVType := refMapType.Elem()
-		// if we specifically are instructed to deref, then instead of the
-		// normal key, get a ptr-to the type of.
-		if ti.ValType.ViaNonPtr {
-			refVType = reflect.PointerTo(refVType)
-		}
 		refValue := reflect.New(refVType)
-		n, err = Dec(data, refValue.Interface())
+
+		// ViaNonPtr code is non-functional, return when we can properly handle
+		// decoding thing that directly implements encoding.BinaryUnmarshaler.
+		decTo := refValue
+		if ti.ValType.ViaNonPtr {
+			decTo = decTo.Elem()
+		}
+
+		n, err = Dec(data, decTo.Interface())
 		if err != nil {
 			return totalConsumed, fmt.Errorf("decode value: %w", err)
 		}
@@ -168,7 +171,7 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		i += n
 		data = data[n:]
 
-		m.SetMapIndex(refKey, refValue)
+		m.SetMapIndex(refKey.Elem(), refValue.Elem())
 	}
 
 	refVal.Elem().Set(m)

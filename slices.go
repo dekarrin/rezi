@@ -68,14 +68,16 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	var i int
 	for i < toConsume {
 		refVType := refSliceType.Elem()
-		// if we specifically are instructed to deref, then instead of the
-		// normal key, create a new one, get a POINTER to the new one and then
-		// pass that in
-		// if ti.ValType.Deref {
-		// 	refVType = reflect.PointerTo(refVType)
-		// }
 		refValue := reflect.New(refVType)
-		n, err := Dec(data, refValue.Interface())
+
+		// ViaNonPtr code is non-functional, return when we can properly handle
+		// decoding thing that directly implements encoding.BinaryUnmarshaler.
+		decTo := refValue
+		if ti.ValType.ViaNonPtr {
+			decTo = decTo.Elem()
+		}
+
+		n, err := Dec(data, decTo.Interface())
 		if err != nil {
 			return totalConsumed, fmt.Errorf("decode item: %w", err)
 		}

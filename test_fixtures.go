@@ -52,7 +52,7 @@ type dualMarshaler struct {
 	data *[4]byte
 }
 
-func (dm dualMarshaler) UnmarshalBinary(data []byte) error {
+func (dm *dualMarshaler) UnmarshalBinary(data []byte) error {
 	if len(data) != len(dm.data) {
 		return fmt.Errorf("expected exactly %d bytes in data, but got %d", len(dm.data), len(data))
 	}
@@ -64,7 +64,7 @@ func (dm dualMarshaler) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
-func (dm dualMarshaler) MarshalBinary() ([]byte, error) {
+func (dm *dualMarshaler) MarshalBinary() ([]byte, error) {
 	enc := make([]byte, len(dm.data))
 
 	copy(enc, dm.data[:])
