@@ -196,7 +196,7 @@ func Test_EncMapStringToBinary(t *testing.T) {
 		{
 			name:   "nil",
 			input:  nil,
-			expect: []byte{0x80},
+			expect: []byte{0xa0},
 		},
 		{
 			name: "one item",

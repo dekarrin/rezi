@@ -101,6 +101,53 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 	}
 }
 
+// if ti.Indir > 0, this will assign to the interface at the appropriate
+// indirection level. If ti.Indir == 0, this will not assign. Callers should use
+// that check to determine if it is safe to do their own assignment of the
+// decoded value this function returns.
+func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn func([]byte) (E, int, error)) (decoded E, n int, err error) {
+	var isNil bool
+	var nilLevel int
+
+	if ti.Indir > 0 {
+		isNil, _, nilLevel, n, err = decNilableInt(data)
+		if err != nil {
+			return decoded, n, fmt.Errorf("check nil value: %w", err)
+		}
+	}
+
+	if !isNil {
+		decoded, n, err = decFn(data)
+		if err != nil {
+			return decoded, n, err
+		}
+		nilLevel = ti.Indir
+	}
+
+	if ti.Indir > 0 {
+		// the user has passed in a ptr-ptr-to. We cannot directly assign.
+		assignTarget := reflect.ValueOf(v)
+		// assignTarget is a **string but we want a *string
+
+		for i := 0; i < ti.Indir && i < nilLevel; i++ {
+			// *double indirection ALL THE WAY~*
+			// *acrosssss the sky*
+			// *what does it mean*
+
+			// **string     // *string  // string
+			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
+			assignTarget.Elem().Set(newTarget)
+			assignTarget = newTarget
+		}
+
+		if !isNil {
+			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+		}
+	}
+
+	return decoded, n, nil
+}
+
 // decPrim decodes a primitive value from rezi-format bytes into the value
 // pointed-to by v. V must point to a REZI primitive value (int, bool, string)
 // or implement encoding.BinaryUnmarshaler.
@@ -117,49 +164,11 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case tString:
-		// first, if a pointer was passed in, check if we are about to pull a
-		// nil
-
-		var isNil bool
-		var nilLevel int
-		var s string
-		var n int
-		var err error
-		if ti.Indir > 0 {
-			isNil, _, nilLevel, n, err = decNilableInt(data)
-			if err != nil {
-				return n, fmt.Errorf("check nil value: %w", err)
-			}
+		s, n, err := decWithIndirectAssignment(data, v, ti, decString)
+		if err != nil {
+			return n, err
 		}
-
-		if !isNil {
-			s, n, err = decString(data)
-			if err != nil {
-				return n, err
-			}
-			nilLevel = ti.Indir
-		}
-
-		if ti.Indir > 0 {
-			// the user has passed in a ptr-ptr-to. We cannot directly assign.
-			assignTarget := reflect.ValueOf(v)
-			// assignTarget is a **string but we want a *string
-
-			for i := 0; i < ti.Indir && i < nilLevel; i++ {
-				// *double indirection ALL THE WAY~*
-				// *acrosssss the sky*
-				// *what does it mean*
-
-				// **string     // *string  // string
-				newTarget := reflect.New(assignTarget.Type().Elem().Elem())
-				assignTarget.Elem().Set(newTarget)
-				assignTarget = newTarget
-			}
-
-			if !isNil {
-				assignTarget.Elem().Set(reflect.ValueOf(s))
-			}
-		} else {
+		if ti.Indir == 0 {
 			tVal := v.(*string)
 			*tVal = s
 		}
