@@ -100,7 +100,7 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 // Deprecated: This function has been replaced by [Enc].
 func EncSliceString(sl []string) []byte {
 	if sl == nil {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc := make([]byte, 0)
@@ -109,7 +109,7 @@ func EncSliceString(sl []string) []byte {
 		enc = append(enc, encString(sl[i])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 	return enc
 }
 
@@ -160,7 +160,7 @@ func DecSliceString(data []byte) ([]string, int, error) {
 // Deprecated: This function has been replaced by [Enc].
 func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	if sl == nil {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc := make([]byte, 0)
@@ -169,7 +169,7 @@ func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 		enc = append(enc, encBinary(sl[i])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 	return enc
 }
 

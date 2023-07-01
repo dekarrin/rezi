@@ -16,7 +16,7 @@ import (
 // Deprecated: This function has been replaced by [Enc].
 func EncMapStringToInt(m map[string]int) []byte {
 	if m == nil {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc := make([]byte, 0)
@@ -29,10 +29,10 @@ func EncMapStringToInt(m map[string]int) []byte {
 
 	for i := range keys {
 		enc = append(enc, encString(keys[i])...)
-		enc = append(enc, EncInt(m[keys[i]])...)
+		enc = append(enc, encInt(m[keys[i]])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 	return enc
 }
 
@@ -92,7 +92,7 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 // Deprecated: This function has been replaced by [Enc].
 func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	if m == nil {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc := make([]byte, 0)
@@ -107,7 +107,7 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 		enc = append(enc, encBinary(m[keys[i]])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 	return enc
 }
 
