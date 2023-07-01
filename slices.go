@@ -6,7 +6,6 @@ import (
 	"encoding"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 )
 
@@ -19,7 +18,7 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encInt(-1)
+		return encNil(0)
 	}
 
 	enc := make([]byte, 0)
@@ -89,8 +88,6 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		sl = reflect.Append(sl, refValue.Elem())
 	}
 
-	log.Printf("%s", sl.Kind())
-
 	refSliceVal.Elem().Set(sl)
 	return totalConsumed, nil
 }
@@ -100,7 +97,7 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 // Deprecated: This function has been replaced by [Enc].
 func EncSliceString(sl []string) []byte {
 	if sl == nil {
-		return encInt(-1)
+		return encNil(0)
 	}
 
 	enc := make([]byte, 0)
@@ -160,7 +157,7 @@ func DecSliceString(data []byte) ([]string, int, error) {
 // Deprecated: This function has been replaced by [Enc].
 func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	if sl == nil {
-		return encInt(-1)
+		return encNil(0)
 	}
 
 	enc := make([]byte, 0)

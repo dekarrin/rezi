@@ -76,7 +76,7 @@ func encMap(v interface{}, ti typeInfo) []byte {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encInt(-1)
+		return encNil(0)
 	}
 
 	mapKeys := refVal.MapKeys()

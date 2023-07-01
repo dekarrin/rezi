@@ -80,7 +80,7 @@ func Enc(v interface{}) []byte {
 	if info.Primitive() {
 		return encPrim(v, info)
 	} else if info.Main == tNil {
-		return encNil(-1)
+		return encNil(0)
 	} else if info.Main == tMap {
 		return encMap(v, info)
 	} else if info.Main == tSlice {

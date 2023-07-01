@@ -258,9 +258,12 @@ func encNil(indirLevels int) []byte {
 	// byte will be a non-nil int that gives the number of indirections.
 
 	infoByte := byte(0)
-	infoByte |= infoBitsIndir
+	infoByte |= infoBitsNil
 
-	if indirLevels == 0 {
+	// for compat with older format
+	infoByte |= infoBitsSign
+
+	if indirLevels <= 0 {
 		return []byte{infoByte}
 	}
 
@@ -551,7 +554,7 @@ func EncBinary(b encoding.BinaryMarshaler) []byte {
 
 func encBinary(b encoding.BinaryMarshaler) []byte {
 	if b == nil {
-		return encInt(-1)
+		return encNil(0)
 	}
 
 	enc, _ := b.MarshalBinary()

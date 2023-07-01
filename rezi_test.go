@@ -234,7 +234,7 @@ func Test_Enc_Map(t *testing.T) {
 		var (
 			input  map[string]int
 			expect = []byte{
-				0x80,
+				0xa0,
 			}
 		)
 
@@ -418,7 +418,7 @@ func Test_Enc_Slice(t *testing.T) {
 		var (
 			input  []int
 			expect = []byte{
-				0x80,
+				0xa0,
 			}
 		)
 
@@ -908,12 +908,35 @@ func Test_Dec_Binary(t *testing.T) {
 func Test_Dec_Map(t *testing.T) {
 	// different types, can't easily be table-driven
 
-	t.Run("nil map[string]int", func(t *testing.T) {
+	t.Run("nil map[string]int (implicit nil)", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 		var (
 			input = []byte{
 				0x80,
+			}
+			expectConsumed = 1
+		)
+
+		// execute
+		actual := map[string]int{"A": 1, "B": 2} // start with a value so we can check it is set to nil
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Nil(actual)
+	})
+
+	t.Run("nil map[string]int (explicit nil)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0xa0,
 			}
 			expectConsumed = 1
 		)
@@ -1140,12 +1163,35 @@ func Test_Dec_Map(t *testing.T) {
 func Test_Dec_Slice(t *testing.T) {
 	// different types, can't rly be table driven easily
 
-	t.Run("nil []int", func(t *testing.T) {
+	t.Run("nil []int (implicit nil)", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 		var (
 			input = []byte{
 				0x80,
+			}
+			expectConsumed = 1
+		)
+
+		// execute
+		actual := []int{1, 2} // start with a value so we can check it is set to nil
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Nil(actual)
+	})
+
+	t.Run("nil []int (explicit nil)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0xa0,
 			}
 			expectConsumed = 1
 		)
