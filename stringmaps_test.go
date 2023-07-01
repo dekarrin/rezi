@@ -21,7 +21,7 @@ func Test_EncMapStringToInt(t *testing.T) {
 		{
 			name:   "nil",
 			input:  nil,
-			expect: []byte{0x80},
+			expect: []byte{0xa0},
 		},
 		{
 			name: "one item",
@@ -86,7 +86,7 @@ func Test_DecMapStringToInt(t *testing.T) {
 		},
 		{
 			name:        "nil",
-			input:       []byte{0x80},
+			input:       []byte{0xa0},
 			expectValue: nil,
 			expectRead:  1,
 		},

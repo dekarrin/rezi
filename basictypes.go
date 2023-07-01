@@ -45,10 +45,21 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 			encodeTarget := reflect.ValueOf(value)
 			// encodeTarget is a *THING but we want a THING
 
+			nilLevel := -1
 			for i := 0; i < ti.Indir; i++ {
+				if encodeTarget.IsNil() {
+					// so if it were a *string we deal w, nil level can only be 0.
+					// if it were a **string we deal w, nil level can be 0 or 1.
+					// *string -> indir is 1 - nl 0
+					// **string -> indir is 2 - nl 0-1
+					nilLevel = i
+					break
+				}
 				encodeTarget = encodeTarget.Elem()
 			}
-
+			if nilLevel > -1 {
+				return encNil(nilLevel)
+			}
 			return encString(encodeTarget.String())
 		} else {
 			return encString(value.(string))
@@ -106,9 +117,27 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case tString:
-		s, n, err := decString(data)
-		if err != nil {
-			return n, err
+		// first, if a pointer was passed in, check if we are about to pull a
+		// nil
+
+		var isNil bool
+		var nilLevel int
+		var s string
+		var n int
+		var err error
+		if ti.Indir > 0 {
+			isNil, _, nilLevel, n, err = decNilableInt(data)
+			if err != nil {
+				return n, fmt.Errorf("check nil value: %w", err)
+			}
+		}
+
+		if !isNil {
+			s, n, err = decString(data)
+			if err != nil {
+				return n, err
+			}
+			nilLevel = ti.Indir
 		}
 
 		if ti.Indir > 0 {
@@ -116,7 +145,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			assignTarget := reflect.ValueOf(v)
 			// assignTarget is a **string but we want a *string
 
-			for i := 0; i < ti.Indir; i++ {
+			for i := 0; i < ti.Indir && i < nilLevel; i++ {
 				// *double indirection ALL THE WAY~*
 				// *acrosssss the sky*
 				// *what does it mean*
@@ -127,7 +156,9 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				assignTarget = newTarget
 			}
 
-			assignTarget.Elem().Set(reflect.ValueOf(s))
+			if !isNil {
+				assignTarget.Elem().Set(reflect.ValueOf(s))
+			}
 		} else {
 			tVal := v.(*string)
 			*tVal = s

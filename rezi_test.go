@@ -77,6 +77,23 @@ func Test_Enc_String(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("**string, but nil string part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr   *string
+			input = &ptr
+			// 0b10110000 - negative num that is nil with indir count following
+			// 0x01, 0x01
+
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
 }
 
 func Test_Enc_Int(t *testing.T) {
@@ -693,6 +710,27 @@ func Test_Dec_String(t *testing.T) {
 
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
+	})
+
+	t.Run("**string, but nil string part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{0xb0, 0x01, 0x01}
+
+			expectConsumed = 3
+		)
+
+		var actual **string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
 	})
 }
 
