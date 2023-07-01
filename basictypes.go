@@ -21,33 +21,18 @@ const (
 	infoBitsLen   = 0b00001111
 )
 
-// AnyInt is a union interface that combines all basic Go integer types. It
-// allows int, uint, and all of their specifically-sized varieties.
-type AnyInt interface {
-	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+type anyUint interface {
+	uint | uint8 | uint16 | uint32 | uint64
 }
 
-func encIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn func(E) []byte) []byte {
-	// we cannot directly encode, we must get at the reel value.
-	encodeTarget := reflect.ValueOf(value)
-	// encodeTarget is a *THING but we want a THING
+type anyInt interface {
+	int | int8 | int16 | int32 | int64
+}
 
-	nilLevel := -1
-	for i := 0; i < ti.Indir; i++ {
-		if encodeTarget.IsNil() {
-			// so if it were a *string we deal w, nil level can only be 0.
-			// if it were a **string we deal w, nil level can be 0 or 1.
-			// *string -> indir is 1 - nl 0
-			// **string -> indir is 2 - nl 0-1
-			nilLevel = i
-			break
-		}
-		encodeTarget = encodeTarget.Elem()
-	}
-	if nilLevel > -1 {
-		return encNil(nilLevel)
-	}
-	return encFn(convFn(encodeTarget))
+// anyIntegral is a union interface that combines all basic Go integer types. It
+// allows int, uint, and all of their specifically-sized varieties.
+type anyIntegral interface {
+	anyInt | anyUint
 }
 
 // encPrim encodes the primitve REZI value as rezi-format bytes. The type of the
@@ -63,39 +48,35 @@ func encIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Valu
 func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
-		if ti.Indir > 0 {
-			return encIndirect(value, ti, reflect.Value.String, encString)
-		} else {
-			return encString(value.(string))
-		}
+		return encWithIndirect(value, ti, reflect.Value.String, encString)
 	case tBool:
-		return encBool(value.(bool))
+		return encWithIndirect(value, ti, reflect.Value.Bool, encBool)
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return encInt(value.(int8))
+				return encIntWithIndirect[int8](value, ti)
 			case 16:
-				return encInt(value.(int16))
+				return encIntWithIndirect[int16](value, ti)
 			case 32:
-				return encInt(value.(int32))
+				return encIntWithIndirect[int32](value, ti)
 			case 64:
-				return encInt(value.(int64))
+				return encIntWithIndirect[int64](value, ti)
 			default:
-				return encInt(value.(int))
+				return encIntWithIndirect[int](value, ti)
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return encInt(value.(uint8))
+				return encUintWithIndirect[uint8](value, ti)
 			case 16:
-				return encInt(value.(uint16))
+				return encUintWithIndirect[uint16](value, ti)
 			case 32:
-				return encInt(value.(uint32))
+				return encUintWithIndirect[uint32](value, ti)
 			case 64:
-				return encInt(value.(uint64))
+				return encUintWithIndirect[uint64](value, ti)
 			default:
-				return encInt(value.(uint))
+				return encUintWithIndirect[uint](value, ti)
 			}
 		}
 	case tBinary:
@@ -275,7 +256,7 @@ func encNil(indirLevels int) []byte {
 // type of int it is given. This allows, for example, the largest value that can
 // be held by a uint64 to be properly represented where casting would have
 // converted it to a negative integer.
-func encInt[E AnyInt](v E) []byte {
+func encInt[E anyIntegral](v E) []byte {
 	if v == 0 {
 		return []byte{0x00}
 	}
@@ -599,6 +580,41 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	}
 
 	return byteLen + readBytes, nil
+}
+
+func encIntWithIndirect[E anyInt](value interface{}, ti typeInfo) []byte {
+	return encWithIndirect(value, ti, func(r reflect.Value) E { return E(r.Int()) }, encInt[E])
+}
+
+func encUintWithIndirect[E anyUint](value interface{}, ti typeInfo) []byte {
+	return encWithIndirect(value, ti, func(r reflect.Value) E { return E(r.Uint()) }, encInt[E])
+}
+
+func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn func(E) []byte) []byte {
+	if ti.Indir > 0 {
+		// we cannot directly encode, we must get at the reel value.
+		encodeTarget := reflect.ValueOf(value)
+		// encodeTarget is a *THING but we want a THING
+
+		nilLevel := -1
+		for i := 0; i < ti.Indir; i++ {
+			if encodeTarget.IsNil() {
+				// so if it were a *string we deal w, nil level can only be 0.
+				// if it were a **string we deal w, nil level can be 0 or 1.
+				// *string -> indir is 1 - nl 0
+				// **string -> indir is 2 - nl 0-1
+				nilLevel = i
+				break
+			}
+			encodeTarget = encodeTarget.Elem()
+		}
+		if nilLevel > -1 {
+			return encNil(nilLevel)
+		}
+		return encFn(convFn(encodeTarget))
+	} else {
+		return encFn(value.(E))
+	}
 }
 
 // if ti.Indir > 0, this will assign to the interface at the appropriate

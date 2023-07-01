@@ -166,6 +166,49 @@ func Test_Enc_Int(t *testing.T) {
 		})
 	}
 
+	t.Run("*int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 8
+			input    = &inputVal
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 8
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int, but nil string part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
 }
 
 func Test_Enc_Bool(t *testing.T) {
