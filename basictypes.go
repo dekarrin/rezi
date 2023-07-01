@@ -27,6 +27,29 @@ type AnyInt interface {
 	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
 }
 
+func encIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn func(E) []byte) []byte {
+	// we cannot directly encode, we must get at the reel value.
+	encodeTarget := reflect.ValueOf(value)
+	// encodeTarget is a *THING but we want a THING
+
+	nilLevel := -1
+	for i := 0; i < ti.Indir; i++ {
+		if encodeTarget.IsNil() {
+			// so if it were a *string we deal w, nil level can only be 0.
+			// if it were a **string we deal w, nil level can be 0 or 1.
+			// *string -> indir is 1 - nl 0
+			// **string -> indir is 2 - nl 0-1
+			nilLevel = i
+			break
+		}
+		encodeTarget = encodeTarget.Elem()
+	}
+	if nilLevel > -1 {
+		return encNil(nilLevel)
+	}
+	return encFn(convFn(encodeTarget))
+}
+
 // encPrim encodes the primitve REZI value as rezi-format bytes. The type of the
 // value is examined to determine how to encode it. No type information is
 // included in the returned bytes so it is up to the caller to keep track of it.
@@ -41,26 +64,7 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
 		if ti.Indir > 0 {
-			// we cannot directly encode, we must get at the reel value.
-			encodeTarget := reflect.ValueOf(value)
-			// encodeTarget is a *THING but we want a THING
-
-			nilLevel := -1
-			for i := 0; i < ti.Indir; i++ {
-				if encodeTarget.IsNil() {
-					// so if it were a *string we deal w, nil level can only be 0.
-					// if it were a **string we deal w, nil level can be 0 or 1.
-					// *string -> indir is 1 - nl 0
-					// **string -> indir is 2 - nl 0-1
-					nilLevel = i
-					break
-				}
-				encodeTarget = encodeTarget.Elem()
-			}
-			if nilLevel > -1 {
-				return encNil(nilLevel)
-			}
-			return encString(encodeTarget.String())
+			return encIndirect(value, ti, reflect.Value.String, encString)
 		} else {
 			return encString(value.(string))
 		}
@@ -99,53 +103,6 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 	default:
 		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
-}
-
-// if ti.Indir > 0, this will assign to the interface at the appropriate
-// indirection level. If ti.Indir == 0, this will not assign. Callers should use
-// that check to determine if it is safe to do their own assignment of the
-// decoded value this function returns.
-func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn func([]byte) (E, int, error)) (decoded E, n int, err error) {
-	var isNil bool
-	var nilLevel int
-
-	if ti.Indir > 0 {
-		isNil, _, nilLevel, n, err = decNilableInt(data)
-		if err != nil {
-			return decoded, n, fmt.Errorf("check nil value: %w", err)
-		}
-	}
-
-	if !isNil {
-		decoded, n, err = decFn(data)
-		if err != nil {
-			return decoded, n, err
-		}
-		nilLevel = ti.Indir
-	}
-
-	if ti.Indir > 0 {
-		// the user has passed in a ptr-ptr-to. We cannot directly assign.
-		assignTarget := reflect.ValueOf(v)
-		// assignTarget is a **string but we want a *string
-
-		for i := 0; i < ti.Indir && i < nilLevel; i++ {
-			// *double indirection ALL THE WAY~*
-			// *acrosssss the sky*
-			// *what does it mean*
-
-			// **string     // *string  // string
-			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
-			assignTarget.Elem().Set(newTarget)
-			assignTarget = newTarget
-		}
-
-		if !isNil {
-			assignTarget.Elem().Set(reflect.ValueOf(decoded))
-		}
-	}
-
-	return decoded, n, nil
 }
 
 // decPrim decodes a primitive value from rezi-format bytes into the value
@@ -642,4 +599,51 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	}
 
 	return byteLen + readBytes, nil
+}
+
+// if ti.Indir > 0, this will assign to the interface at the appropriate
+// indirection level. If ti.Indir == 0, this will not assign. Callers should use
+// that check to determine if it is safe to do their own assignment of the
+// decoded value this function returns.
+func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn func([]byte) (E, int, error)) (decoded E, n int, err error) {
+	var isNil bool
+	var nilLevel int
+
+	if ti.Indir > 0 {
+		isNil, _, nilLevel, n, err = decNilableInt(data)
+		if err != nil {
+			return decoded, n, fmt.Errorf("check nil value: %w", err)
+		}
+	}
+
+	if !isNil {
+		decoded, n, err = decFn(data)
+		if err != nil {
+			return decoded, n, err
+		}
+		nilLevel = ti.Indir
+	}
+
+	if ti.Indir > 0 {
+		// the user has passed in a ptr-ptr-to. We cannot directly assign.
+		assignTarget := reflect.ValueOf(v)
+		// assignTarget is a **string but we want a *string
+
+		for i := 0; i < ti.Indir && i < nilLevel; i++ {
+			// *double indirection ALL THE WAY~*
+			// *acrosssss the sky*
+			// *what does it mean*
+
+			// **string     // *string  // string
+			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
+			assignTarget.Elem().Set(newTarget)
+			assignTarget = newTarget
+		}
+
+		if !isNil {
+			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+		}
+	}
+
+	return decoded, n, nil
 }
