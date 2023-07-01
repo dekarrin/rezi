@@ -49,38 +49,42 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 		return typeInfo{Main: tNil}, nil
 	}
 
-	if t.Implements(refBinaryMarshalerType) {
-		return typeInfo{Main: tBinary}, nil
-	}
+	origType := t
 
-	switch t.Kind() {
-	case reflect.String:
-		return typeInfo{Main: tString}, nil
-	case reflect.Bool:
-		return typeInfo{Main: tBool}, nil
-	case reflect.Uint8:
-		return typeInfo{Main: tIntegral, Bits: 8, Signed: false}, nil
-	case reflect.Uint16:
-		return typeInfo{Main: tIntegral, Bits: 16, Signed: false}, nil
-	case reflect.Uint32:
-		return typeInfo{Main: tIntegral, Bits: 32, Signed: false}, nil
-	case reflect.Uint64:
-		return typeInfo{Main: tIntegral, Bits: 64, Signed: false}, nil
-	case reflect.Uint:
-		return typeInfo{Main: tIntegral, Bits: 0, Signed: false}, nil
-	case reflect.Int8:
-		return typeInfo{Main: tIntegral, Bits: 8, Signed: true}, nil
-	case reflect.Int16:
-		return typeInfo{Main: tIntegral, Bits: 16, Signed: true}, nil
-	case reflect.Int32:
-		return typeInfo{Main: tIntegral, Bits: 32, Signed: true}, nil
-	case reflect.Int64:
-		return typeInfo{Main: tIntegral, Bits: 64, Signed: true}, nil
-	case reflect.Int:
-		return typeInfo{Main: tIntegral, Bits: 0, Signed: true}, nil
-	default:
-		// is it a map type?
-		if t.Kind() == reflect.Map {
+	trying := true
+	indirCount := 0
+
+	for trying {
+		if t.Implements(refBinaryMarshalerType) {
+			return typeInfo{Indir: indirCount, Main: tBinary}, nil
+		}
+
+		switch t.Kind() {
+		case reflect.String:
+			return typeInfo{Indir: indirCount, Main: tString}, nil
+		case reflect.Bool:
+			return typeInfo{Indir: indirCount, Main: tBool}, nil
+		case reflect.Uint8:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: false}, nil
+		case reflect.Uint16:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: false}, nil
+		case reflect.Uint32:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: false}, nil
+		case reflect.Uint64:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: false}, nil
+		case reflect.Uint:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: false}, nil
+		case reflect.Int8:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: true}, nil
+		case reflect.Int16:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: true}, nil
+		case reflect.Int32:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: true}, nil
+		case reflect.Int64:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: true}, nil
+		case reflect.Int:
+			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: true}, nil
+		case reflect.Map:
 			// could be okay, but key and value types must be encodable.
 			mValType := t.Elem()
 			mKeyType := t.Key()
@@ -101,22 +105,26 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				return typeInfo{}, fmt.Errorf("map key type must be bool, string, or castable to int")
 			}
 
-			return typeInfo{Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
-		}
-
-		// is it a slice type?
-		if t.Kind() == reflect.Slice {
+			return typeInfo{Indir: indirCount, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
+		case reflect.Slice:
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
 			slValInfo, err := encTypeInfo(slValType)
 			if err != nil {
 				return typeInfo{}, fmt.Errorf("slice value is not encodable: %w", err)
 			}
-			return typeInfo{Main: tSlice, ValType: &slValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: tSlice, ValType: &slValInfo}, nil
+		case reflect.Pointer:
+			// try removing one level of indrection and checking THAT
+			t = t.Elem()
+			trying = true
+			indirCount++
+		default:
+			return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for encoding", origType.String())
 		}
-
-		return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for encoding", t.String())
 	}
+
+	panic("should not be possible to escape check loop")
 }
 
 func canDecode(v interface{}) (typeInfo, error) {

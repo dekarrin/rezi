@@ -19,7 +19,7 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc := make([]byte, 0)
@@ -29,7 +29,7 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 		enc = append(enc, Enc(v.Interface())...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 	return enc
 }
 

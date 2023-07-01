@@ -151,7 +151,7 @@ func Test_EncInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncInt(tc.input)
+			actual := encInt(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})

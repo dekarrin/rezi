@@ -8,8 +8,17 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"unicode/utf8"
+)
+
+const (
+	infoBitsSign  = 0b10000000
+	infoBitsExt   = 0b01000000
+	infoBitsNil   = 0b00100000
+	infoBitsIndir = 0b00010000
+	infoBitsLen   = 0b00001111
 )
 
 // AnyInt is a union interface that combines all basic Go integer types. It
@@ -31,7 +40,19 @@ type AnyInt interface {
 func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
-		return encString(value.(string))
+		if ti.Indir > 0 {
+			// we cannot directly encode, we must get at the reel value.
+			encodeTarget := reflect.ValueOf(value)
+			// encodeTarget is a *THING but we want a THING
+
+			for i := 0; i < ti.Indir; i++ {
+				encodeTarget = encodeTarget.Elem()
+			}
+
+			return encString(encodeTarget.String())
+		} else {
+			return encString(value.(string))
+		}
 	case tBool:
 		return encBool(value.(bool))
 	case tIntegral:
@@ -85,12 +106,32 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case tString:
-		tVal := v.(*string)
 		s, n, err := decString(data)
 		if err != nil {
 			return n, err
 		}
-		*tVal = s
+
+		if ti.Indir > 0 {
+			// the user has passed in a ptr-ptr-to. We cannot directly assign.
+			assignTarget := reflect.ValueOf(v)
+			// assignTarget is a **string but we want a *string
+
+			for i := 0; i < ti.Indir; i++ {
+				// *double indirection ALL THE WAY~*
+				// *acrosssss the sky*
+				// *what does it mean*
+
+				// **string     // *string  // string
+				newTarget := reflect.New(assignTarget.Type().Elem().Elem())
+				assignTarget.Elem().Set(newTarget)
+				assignTarget = newTarget
+			}
+
+			assignTarget.Elem().Set(reflect.ValueOf(s))
+		} else {
+			tVal := v.(*string)
+			*tVal = s
+		}
 		return n, nil
 	case tBool:
 		tVal := v.(*bool)
@@ -200,6 +241,36 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
+func encNil(indirLevels int) []byte {
+	// nils are encoded as a special negative that is distinct from others,
+	// should it be checked.
+	//
+	// ints always start with SXXXLLLL where S is sign bit, L are byte len, and
+	// X are unused bits for the number encoding. 0 is a special case, encoded
+	// as simply b00000000, and -1 is a special case, encoded as b10000000.
+	//
+	// for an explicit nil, we will use the additional bits, XXX. We will label
+	// them X, N, and I, respectively, for a total info byte scheme of SXNILLLL.
+	// X is reserved for use to indicate info extension, which means the next
+	// byte has MORE info bits in it. N indicates that the value is not a number
+	// but rather an explicit nil. I indicates whether there is more than one
+	// level of indirection; if so, the bytes that follow after the extension
+	// byte will be a non-nil int that gives the number of indirections.
+
+	infoByte := byte(0)
+	infoByte |= infoBitsIndir
+
+	if indirLevels == 0 {
+		return []byte{infoByte}
+	}
+
+	infoByte |= infoBitsIndir
+	enc := []byte{infoByte}
+
+	enc = append(enc, encInt(indirLevels)...)
+	return enc
+}
+
 // encInt is similar to EncInt but performs specific behavior based on the
 // type of int it is given. This allows, for example, the largest value that can
 // be held by a uint64 to be properly represented where casting would have
@@ -240,7 +311,7 @@ func encInt[E AnyInt](v E) []byte {
 	// byteCount will never be more than 8 so we can encode sign info in most
 	// significant bit
 	if negative {
-		byteCount |= 0x80
+		byteCount |= infoBitsSign
 	}
 
 	enc = append([]byte{byteCount}, enc...)
@@ -290,6 +361,50 @@ func DecInt(data []byte) (int, int, error) {
 	return decInt(data)
 }
 
+// decNilableInt decodes an integer that could also represent a nil value. It's
+// rly only used in places where nil is allowed to be directly encoded, such as
+// when decoding a byte/element count.
+//
+// This function DOES respect the info extension bit, unless it is interpreted
+// as an int.
+func decNilableInt(data []byte) (isNil bool, iVal int, indir int, consumed int, err error) {
+	if len(data) < 1 {
+		return false, 0, 0, 0, io.ErrUnexpectedEOF
+	}
+
+	infoByte := data[0]
+	if infoByte&infoBitsNil != infoBitsNil {
+		// not a nil, regular number, do no more manipulation of data and
+		// interpret as a regular int.
+		iVal, consumed, err = decInt(data)
+		return false, iVal, 0, consumed, err
+	}
+
+	// it is a nil. do other checks.
+
+	// skip over any extension bytes in the info header
+	for data[0]&infoBitsExt == infoBitsExt {
+		data = data[1:]
+		consumed++
+	}
+
+	// data now starts with the last info byte, skip it.
+	data = data[1:]
+	consumed++
+
+	if infoByte&infoBitsIndir == infoBitsIndir {
+		// the level of indirection is encoded in following bytes
+		var n int
+		indir, n, err = decInt(data)
+		consumed += n
+		if err != nil {
+			return true, 0, indir, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
+		}
+	}
+
+	return true, 0, indir, consumed, nil
+}
+
 // decInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
 func decInt(data []byte) (int, int, error) {
@@ -305,8 +420,8 @@ func decInt(data []byte) (int, int, error) {
 	data = data[1:]
 
 	// pull count and sign out of byteCount
-	negative := byteCount&0x80 != 0
-	byteCount &= 0x0f
+	negative := byteCount&infoBitsSign != 0
+	byteCount &= infoBitsLen
 
 	// do not examine the 2nd, 3rd, and 4th left-most bits; they are reserved
 	// for future use
@@ -369,7 +484,7 @@ func encString(s string) []byte {
 		chCount++
 	}
 
-	countBytes := EncInt(chCount)
+	countBytes := encInt(chCount)
 	enc = append(countBytes, enc...)
 
 	return enc
@@ -436,12 +551,12 @@ func EncBinary(b encoding.BinaryMarshaler) []byte {
 
 func encBinary(b encoding.BinaryMarshaler) []byte {
 	if b == nil {
-		return EncInt(-1)
+		return encInt(-1)
 	}
 
 	enc, _ := b.MarshalBinary()
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(len(enc)), enc...)
 
 	return enc
 }

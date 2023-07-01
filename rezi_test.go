@@ -47,6 +47,36 @@ func Test_Enc_String(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*string", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = "Vriska"
+			input    = &inputVal
+			expect   = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**string", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = "Vriska"
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
 }
 
 func Test_Enc_Int(t *testing.T) {
@@ -635,6 +665,27 @@ func Test_Dec_String(t *testing.T) {
 		)
 
 		var actual *string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**string", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
+			expectVal      = "Vriska"
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 8
+		)
+
+		var actual **string
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
