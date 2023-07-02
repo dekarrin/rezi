@@ -366,6 +366,59 @@ func Test_Enc_Binary(t *testing.T) {
 		})
 	}
 
+	t.Run("*binary", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testBinary{number: 8, data: "VRISKA"}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x0a, // len=10
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**binary", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testBinary{number: 8, data: "VRISKA"}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x0a, // len=10
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**binary, but nil binary part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *testBinary
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
 }
 
 func Test_Enc_Map(t *testing.T) {

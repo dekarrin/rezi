@@ -100,7 +100,9 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 			}
 		}
 	case tBinary:
-		return encBinary(value.(encoding.BinaryMarshaler))
+		return encWithIndirect(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
+			return r.Interface().(encoding.BinaryMarshaler)
+		})
 	default:
 		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
