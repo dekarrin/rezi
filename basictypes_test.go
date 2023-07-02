@@ -30,7 +30,7 @@ func Test_EncBool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncBool(tc.input)
+			actual := encBool(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -90,7 +90,7 @@ func Test_DecBool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := DecBool(tc.input)
+			actualValue, actualRead, err := decBool(tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -151,7 +151,7 @@ func Test_EncInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncInt(tc.input)
+			actual := encInt(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -208,7 +208,7 @@ func Test_DecInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := DecInt(tc.input)
+			actualValue, actualRead, err := decInt[int](tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -254,7 +254,7 @@ func Test_EncString(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncString(tc.input)
+			actual := encString(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -300,7 +300,7 @@ func Test_DecString(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := DecString(tc.input)
+			actualValue, actualRead, err := decString(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
@@ -355,7 +355,7 @@ func Test_EncBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncBinary(tc.input)
+			actual := encBinary(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -423,7 +423,7 @@ func Test_DecBinary(t *testing.T) {
 
 			unmarshalTo := valueThatUnmarshalsWith(tc.consumerFunc)
 
-			actualRead, err := DecBinary(tc.input, unmarshalTo)
+			actualRead, err := decBinary(tc.input, unmarshalTo)
 			if tc.expectError {
 				assert.Error(err)
 				return

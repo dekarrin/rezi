@@ -21,7 +21,7 @@ func Test_EncSliceString(t *testing.T) {
 		{
 			name:   "nil",
 			input:  nil,
-			expect: []byte{0x80},
+			expect: []byte{0xa0},
 		},
 		{
 			name:   "one item",
@@ -62,7 +62,7 @@ func Test_DecSliceString(t *testing.T) {
 		},
 		{
 			name:        "nil",
-			input:       []byte{0x80},
+			input:       []byte{0xa0},
 			expectValue: nil,
 			expectRead:  1,
 		},
@@ -122,7 +122,7 @@ func Test_EncSliceBinary(t *testing.T) {
 		{
 			name:   "nil",
 			input:  nil,
-			expect: []byte{0x80},
+			expect: []byte{0xa0},
 		},
 		{
 			name: "one item",

@@ -6,14 +6,17 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"io"
 	"sort"
 )
 
 // EncMapStringToInt encodes a map of string-to-int as bytes. The order of keys
 // in the output is gauranteed to be consistent.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncMapStringToInt(m map[string]int) []byte {
 	if m == nil {
-		return EncInt(-1)
+		return encNil(0)
 	}
 
 	enc := make([]byte, 0)
@@ -25,19 +28,21 @@ func EncMapStringToInt(m map[string]int) []byte {
 	sort.Strings(keys)
 
 	for i := range keys {
-		enc = append(enc, EncString(keys[i])...)
-		enc = append(enc, EncInt(m[keys[i]])...)
+		enc = append(enc, encString(keys[i])...)
+		enc = append(enc, encInt(m[keys[i]])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(tLen(len(enc))), enc...)
 	return enc
 }
 
 // DecMapStringToBinary decodes a map of string-to-int from bytes.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := DecInt(data)
+	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}
@@ -51,14 +56,14 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	m := map[string]int{}
 
 	var i int
 	for i < toConsume {
-		k, n, err := DecString(data)
+		k, n, err := decString(data)
 		if err != nil {
 			return nil, totalConsumed, fmt.Errorf("decode key: %w", err)
 		}
@@ -66,9 +71,9 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 		i += n
 		data = data[n:]
 
-		v, n, err := DecInt(data)
+		v, n, err := decInt[int](data)
 		if err != nil {
-			return nil, totalConsumed, fmt.Errorf("decode key: %w", err)
+			return nil, totalConsumed, fmt.Errorf("decode value: %w", err)
 		}
 		totalConsumed += n
 		i += n
@@ -83,9 +88,11 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 // EncMapStringToBinary encodes a map of string to an implementer of
 // encoding.BinaryMarshaler as bytes. The order of keys in output is gauranteed
 // to be consistent.
+//
+// Deprecated: This function has been replaced by [Enc].
 func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	if m == nil {
-		return EncInt(-1)
+		return encNil(0)
 	}
 
 	enc := make([]byte, 0)
@@ -96,20 +103,22 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	}
 	sort.Strings(keys)
 	for i := range keys {
-		enc = append(enc, EncString(keys[i])...)
-		enc = append(enc, EncBinary(m[keys[i]])...)
+		enc = append(enc, encString(keys[i])...)
+		enc = append(enc, encBinary(m[keys[i]])...)
 	}
 
-	enc = append(EncInt(len(enc)), enc...)
+	enc = append(encInt(tLen(len(enc))), enc...)
 	return enc
 }
 
 // DecMapStringToBinary decodes a map of string to an implementer of
 // encoding.BinaryMarshaler from bytes.
+//
+// Deprecated: This function has been replaced by [Dec].
 func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string]E, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := DecInt(data)
+	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}
@@ -123,14 +132,14 @@ func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string
 	}
 
 	if len(data) < toConsume {
-		return nil, 0, fmt.Errorf("unexpected EOF")
+		return nil, 0, io.ErrUnexpectedEOF
 	}
 
 	m := map[string]E{}
 
 	var i int
 	for i < toConsume {
-		k, n, err := DecString(data)
+		k, n, err := decString(data)
 		if err != nil {
 			return nil, totalConsumed, fmt.Errorf("decode key: %w", err)
 		}
@@ -139,7 +148,7 @@ func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string
 		data = data[n:]
 
 		v := initType[E]()
-		n, err = DecBinary(data, v)
+		n, err = decBinary(data, v)
 		if err != nil {
 			return nil, totalConsumed, fmt.Errorf("decode key: %w", err)
 		}
