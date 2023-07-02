@@ -122,45 +122,114 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		return n, nil
 	case tIntegral:
-		i, n, err := decInt[int64](data)
-		if err != nil {
-			return n, err
-		}
+		var n int
+		var err error
+
 		if ti.Signed {
 			switch ti.Bits {
 			case 64:
-				tVal := v.(*int64)
-				*tVal = int64(i)
+				var i int64
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int64])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*int64)
+					*tVal = i
+				}
 			case 32:
-				tVal := v.(*int32)
-				*tVal = int32(i)
+				var i int32
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int32])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*int32)
+					*tVal = i
+				}
 			case 16:
-				tVal := v.(*int16)
-				*tVal = int16(i)
+				var i int16
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int16])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*int16)
+					*tVal = i
+				}
 			case 8:
-				tVal := v.(*int8)
-				*tVal = int8(i)
+				var i int8
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int8])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*int8)
+					*tVal = i
+				}
 			default:
-				tVal := v.(*int)
-				*tVal = int(i)
+				var i int
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*int)
+					*tVal = i
+				}
 			}
 		} else {
 			switch ti.Bits {
 			case 64:
-				tVal := v.(*uint64)
-				*tVal = uint64(i)
+				var i uint64
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint64])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*uint64)
+					*tVal = i
+				}
 			case 32:
-				tVal := v.(*uint32)
-				*tVal = uint32(i)
+				var i uint32
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint32])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*uint32)
+					*tVal = i
+				}
 			case 16:
-				tVal := v.(*uint16)
-				*tVal = uint16(i)
+				var i uint16
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint16])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*uint16)
+					*tVal = i
+				}
 			case 8:
-				tVal := v.(*uint8)
-				*tVal = uint8(i)
+				var i uint8
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint8])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*uint8)
+					*tVal = i
+				}
 			default:
-				tVal := v.(*uint)
-				*tVal = uint(i)
+				var i uint
+				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint])
+				if err != nil {
+					return n, err
+				}
+				if ti.Indir == 0 {
+					tVal := v.(*uint)
+					*tVal = i
+				}
 			}
 		}
 
