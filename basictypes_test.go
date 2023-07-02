@@ -208,7 +208,7 @@ func Test_DecInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decInt(tc.input)
+			actualValue, actualRead, err := decInt[int](tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return

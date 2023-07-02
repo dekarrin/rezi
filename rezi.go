@@ -16,6 +16,14 @@ import (
 	"reflect"
 )
 
+type (
+	countType    = int
+	nilLevelType = int
+
+	decFunc[E any] func([]byte) (E, int, error)
+	encFunc[E any] func(E) []byte
+)
+
 var (
 	ErrInvalidType   = errors.New("data is not the correct type")
 	ErrMalformedData = errors.New("data cannot be interpretered")

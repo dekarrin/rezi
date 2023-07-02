@@ -29,9 +29,9 @@ type anyInt interface {
 	int | int8 | int16 | int32 | int64
 }
 
-// anyIntegral is a union interface that combines all basic Go integer types. It
+// integral is a union interface that combines all basic Go integer types. It
 // allows int, uint, and all of their specifically-sized varieties.
-type anyIntegral interface {
+type integral interface {
 	anyInt | anyUint
 }
 
@@ -112,15 +112,17 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		return n, nil
 	case tBool:
-		tVal := v.(*bool)
-		b, n, err := decBool(data)
+		b, n, err := decWithIndirectAssignment(data, v, ti, decBool)
 		if err != nil {
 			return n, err
 		}
-		*tVal = b
+		if ti.Indir == 0 {
+			tVal := v.(*bool)
+			*tVal = b
+		}
 		return n, nil
 	case tIntegral:
-		i, n, err := decInt(data)
+		i, n, err := decInt[int64](data)
 		if err != nil {
 			return n, err
 		}
@@ -248,7 +250,7 @@ func encNil(indirLevels int) []byte {
 	infoByte |= infoBitsIndir
 	enc := []byte{infoByte}
 
-	enc = append(enc, encInt(indirLevels)...)
+	enc = append(enc, encInt(nilLevelType(indirLevels))...)
 	return enc
 }
 
@@ -256,7 +258,7 @@ func encNil(indirLevels int) []byte {
 // type of int it is given. This allows, for example, the largest value that can
 // be held by a uint64 to be properly represented where casting would have
 // converted it to a negative integer.
-func encInt[E anyIntegral](v E) []byte {
+func encInt[E integral](v E) []byte {
 	if v == 0 {
 		return []byte{0x00}
 	}
@@ -339,26 +341,32 @@ func EncInt(i int) []byte {
 //
 // Deprecated: this function has been replaced by [Dec].
 func DecInt(data []byte) (int, int, error) {
-	return decInt(data)
+	return decInt[int](data)
 }
 
-// decNilableInt decodes an integer that could also represent a nil value. It's
-// rly only used in places where nil is allowed to be directly encoded, such as
-// when decoding a byte/element count.
+// decNilable decodes a value that could also represent a nil value. If it's not
+// nil, it is decoded by passing it to decFn.
 //
-// This function DOES respect the info extension bit, unless it is interpreted
-// as an int.
-func decNilableInt(data []byte) (isNil bool, iVal int, indir int, consumed int, err error) {
+// To only interpret the nil and skip interpretation when it's not a nil, set
+// decFn to nil.
+//
+// This function DOES respect the info extension bit, but only when decoding a
+// nil.
+func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir nilLevelType, val E, consumed int, err error) {
 	if len(data) < 1 {
-		return false, 0, 0, 0, io.ErrUnexpectedEOF
+		return false, nilLevelType(0), val, 0, io.ErrUnexpectedEOF
 	}
 
 	infoByte := data[0]
 	if infoByte&infoBitsNil != infoBitsNil {
 		// not a nil, regular number, do no more manipulation of data and
-		// interpret as a regular int.
-		iVal, consumed, err = decInt(data)
-		return false, iVal, 0, consumed, err
+		// interpret as a regular value if ffunc to do so is provided
+
+		if decFn != nil {
+			val, consumed, err = decFn(data)
+		}
+
+		return false, nilLevelType(0), val, consumed, err
 	}
 
 	// it is a nil. do other checks.
@@ -376,19 +384,19 @@ func decNilableInt(data []byte) (isNil bool, iVal int, indir int, consumed int, 
 	if infoByte&infoBitsIndir == infoBitsIndir {
 		// the level of indirection is encoded in following bytes
 		var n int
-		indir, n, err = decInt(data)
+		indir, n, err = decInt[nilLevelType](data)
 		consumed += n
 		if err != nil {
-			return true, 0, indir, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
+			return true, indir, val, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
 		}
 	}
 
-	return true, 0, indir, consumed, nil
+	return true, indir, val, consumed, nil
 }
 
 // decInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
-func decInt(data []byte) (int, int, error) {
+func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
 		return 0, 0, io.ErrUnexpectedEOF
 	}
@@ -425,17 +433,17 @@ func decInt(data []byte) (int, int, error) {
 	}
 
 	// keep value as uint until we return so we avoid logical shift semantics
-	var iVal uint
-	iVal |= (uint(intData[0]) << 56)
-	iVal |= (uint(intData[1]) << 48)
-	iVal |= (uint(intData[2]) << 40)
-	iVal |= (uint(intData[3]) << 32)
-	iVal |= (uint(intData[4]) << 24)
-	iVal |= (uint(intData[5]) << 16)
-	iVal |= (uint(intData[6]) << 8)
-	iVal |= (uint(intData[7]))
+	var iVal uint64
+	iVal |= (uint64(intData[0]) << 56)
+	iVal |= (uint64(intData[1]) << 48)
+	iVal |= (uint64(intData[2]) << 40)
+	iVal |= (uint64(intData[3]) << 32)
+	iVal |= (uint64(intData[4]) << 24)
+	iVal |= (uint64(intData[5]) << 16)
+	iVal |= (uint64(intData[6]) << 8)
+	iVal |= (uint64(intData[7]))
 
-	return int(iVal), int(byteCount + 1), nil
+	return E(iVal), int(byteCount + 1), nil
 }
 
 // encString encodes a string value as a slice of bytes. The value can
@@ -483,7 +491,7 @@ func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, io.ErrUnexpectedEOF
 	}
-	runeCount, n, err := decInt(data)
+	runeCount, n, err := decInt[int](data)
 	if err != nil {
 		return "", 0, fmt.Errorf("decoding string rune count: %w", err)
 	}
@@ -558,7 +566,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	var byteLen int
 	var err error
 
-	byteLen, readBytes, err = decInt(data)
+	byteLen, readBytes, err = decInt[countType](data)
 	if err != nil {
 		return 0, err
 	}
@@ -590,7 +598,7 @@ func encUintWithIndirect[E anyUint](value interface{}, ti typeInfo) []byte {
 	return encWithIndirect(value, ti, func(r reflect.Value) E { return E(r.Uint()) }, encInt[E])
 }
 
-func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn func(E) []byte) []byte {
+func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn encFunc[E]) []byte {
 	if ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
 		encodeTarget := reflect.ValueOf(value)
@@ -621,12 +629,12 @@ func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
-func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn func([]byte) (E, int, error)) (decoded E, n int, err error) {
+func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
 	var isNil bool
-	var nilLevel int
+	var nilLevel nilLevelType
 
 	if ti.Indir > 0 {
-		isNil, _, nilLevel, n, err = decNilableInt(data)
+		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
 		if err != nil {
 			return decoded, n, fmt.Errorf("check nil value: %w", err)
 		}

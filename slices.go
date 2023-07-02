@@ -28,7 +28,7 @@ func encSlice(v interface{}, ti typeInfo) []byte {
 		enc = append(enc, Enc(v.Interface())...)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encInt(countType(len(enc))), enc...)
 	return enc
 }
 
@@ -38,7 +38,7 @@ func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return 0, fmt.Errorf("decode byte count: %w", err)
 	}
@@ -106,7 +106,7 @@ func EncSliceString(sl []string) []byte {
 		enc = append(enc, encString(sl[i])...)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encInt(countType(len(enc))), enc...)
 	return enc
 }
 
@@ -116,7 +116,7 @@ func EncSliceString(sl []string) []byte {
 func DecSliceString(data []byte) ([]string, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}
@@ -180,7 +180,7 @@ func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 func DecSliceBinary[E encoding.BinaryUnmarshaler](data []byte) ([]E, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}

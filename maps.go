@@ -97,7 +97,7 @@ func encMap(v interface{}, ti typeInfo) []byte {
 		enc = append(enc, Enc(v.Interface())...)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encInt(countType(len(enc))), enc...)
 	return enc
 }
 
@@ -109,7 +109,7 @@ func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return 0, fmt.Errorf("decode byte count: %w", err)
 	}

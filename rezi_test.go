@@ -195,11 +195,54 @@ func Test_Enc_Int(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**int, but nil string part", func(t *testing.T) {
+	t.Run("**int, but nil int part", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
 			ptr    *int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = uint(8)
+			input    = &inputVal
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = uint(8)
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint, but nil uint part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *uint
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
@@ -237,6 +280,49 @@ func Test_Enc_Bool(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*bool", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = true
+			input    = &inputVal
+			expect   = []byte{0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**bool", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = false
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x00}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**bool, but nil bool part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *bool
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
 
 }
 

@@ -177,7 +177,7 @@ func (sbe *simpleBinaryDecoder) DecodeBool() (bool, error) {
 }
 
 func (sbe *simpleBinaryDecoder) DecodeInt() (int, error) {
-	val, n, err := decInt(sbe.b[sbe.cur:])
+	val, n, err := decInt[int](sbe.b[sbe.cur:])
 	if err != nil {
 		return val, err
 	}

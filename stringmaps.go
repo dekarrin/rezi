@@ -32,7 +32,7 @@ func EncMapStringToInt(m map[string]int) []byte {
 		enc = append(enc, encInt(m[keys[i]])...)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encInt(countType(len(enc))), enc...)
 	return enc
 }
 
@@ -42,7 +42,7 @@ func EncMapStringToInt(m map[string]int) []byte {
 func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}
@@ -71,7 +71,7 @@ func DecMapStringToInt(data []byte) (map[string]int, int, error) {
 		i += n
 		data = data[n:]
 
-		v, n, err := decInt(data)
+		v, n, err := decInt[int](data)
 		if err != nil {
 			return nil, totalConsumed, fmt.Errorf("decode value: %w", err)
 		}
@@ -107,7 +107,7 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 		enc = append(enc, encBinary(m[keys[i]])...)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encInt(countType(len(enc))), enc...)
 	return enc
 }
 
@@ -118,7 +118,7 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 func DecMapStringToBinary[E encoding.BinaryUnmarshaler](data []byte) (map[string]E, int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt(data)
+	toConsume, n, err := decInt[countType](data)
 	if err != nil {
 		return nil, 0, fmt.Errorf("decode byte count: %w", err)
 	}
