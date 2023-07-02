@@ -81,11 +81,8 @@ func Test_Enc_String(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			ptr   *string
-			input = &ptr
-			// 0b10110000 - negative num that is nil with indir count following
-			// 0x01, 0x01
-
+			ptr    *string
+			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
@@ -845,8 +842,7 @@ func Test_Dec_String(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			input = []byte{0xb0, 0x01, 0x01}
-
+			input          = []byte{0xb0, 0x01, 0x01}
 			expectConsumed = 3
 		)
 
@@ -994,6 +990,7 @@ func Test_Dec_Int(t *testing.T) {
 	}
 
 }
+
 func Test_Dec_Bool(t *testing.T) {
 	type result struct {
 		val      bool
@@ -1041,6 +1038,73 @@ func Test_Dec_Bool(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*bool", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01}
+			expectVal      = true
+			expect         = &expectVal
+			expectConsumed = 1
+		)
+
+		var actual *bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**bool", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x00}
+			expectVal      = false
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 1
+		)
+
+		var actual **bool
+
+		// give it original value "true" so we can check it was set to false.
+		actualOrig := true
+		actualPtr := &actualOrig
+		actual = &actualPtr
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**bool, but nil bool part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
 
 }
 
