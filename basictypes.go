@@ -48,35 +48,55 @@ type integral interface {
 func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
-		return encWithIndirect(value, ti, reflect.Value.String, encString)
+		return encWithIndirect(value, ti, encString, reflect.Value.String)
 	case tBool:
-		return encWithIndirect(value, ti, reflect.Value.Bool, encBool)
+		return encWithIndirect(value, ti, encBool, reflect.Value.Bool)
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return encIntWithIndirect[int8](value, ti)
+				return encWithIndirect(value, ti, encInt[int8], func(r reflect.Value) int8 {
+					return int8(r.Int())
+				})
 			case 16:
-				return encIntWithIndirect[int16](value, ti)
+				return encWithIndirect(value, ti, encInt[int16], func(r reflect.Value) int16 {
+					return int16(r.Int())
+				})
 			case 32:
-				return encIntWithIndirect[int32](value, ti)
+				return encWithIndirect(value, ti, encInt[int32], func(r reflect.Value) int32 {
+					return int32(r.Int())
+				})
 			case 64:
-				return encIntWithIndirect[int64](value, ti)
+				return encWithIndirect(value, ti, encInt[int64], func(r reflect.Value) int64 {
+					return int64(r.Int())
+				})
 			default:
-				return encIntWithIndirect[int](value, ti)
+				return encWithIndirect(value, ti, encInt[int], func(r reflect.Value) int {
+					return int(r.Int())
+				})
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return encUintWithIndirect[uint8](value, ti)
+				return encWithIndirect(value, ti, encInt[uint8], func(r reflect.Value) uint8 {
+					return uint8(r.Uint())
+				})
 			case 16:
-				return encUintWithIndirect[uint16](value, ti)
+				return encWithIndirect(value, ti, encInt[uint16], func(r reflect.Value) uint16 {
+					return uint16(r.Uint())
+				})
 			case 32:
-				return encUintWithIndirect[uint32](value, ti)
+				return encWithIndirect(value, ti, encInt[uint32], func(r reflect.Value) uint32 {
+					return uint32(r.Uint())
+				})
 			case 64:
-				return encUintWithIndirect[uint64](value, ti)
+				return encWithIndirect(value, ti, encInt[uint64], func(r reflect.Value) uint64 {
+					return uint64(r.Uint())
+				})
 			default:
-				return encUintWithIndirect[uint](value, ti)
+				return encWithIndirect(value, ti, encInt[uint], func(r reflect.Value) uint {
+					return uint(r.Uint())
+				})
 			}
 		}
 	case tBinary:
@@ -659,15 +679,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	return byteLen + readBytes, nil
 }
 
-func encIntWithIndirect[E anyInt](value interface{}, ti typeInfo) []byte {
-	return encWithIndirect(value, ti, func(r reflect.Value) E { return E(r.Int()) }, encInt[E])
-}
-
-func encUintWithIndirect[E anyUint](value interface{}, ti typeInfo) []byte {
-	return encWithIndirect(value, ti, func(r reflect.Value) E { return E(r.Uint()) }, encInt[E])
-}
-
-func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.Value) E, encFn encFunc[E]) []byte {
+func encWithIndirect[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) []byte {
 	if ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
 		encodeTarget := reflect.ValueOf(value)
