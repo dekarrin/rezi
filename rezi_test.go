@@ -989,6 +989,127 @@ func Test_Dec_Int(t *testing.T) {
 		})
 	}
 
+	t.Run("*int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x08}
+			expectVal      = 8
+			expect         = &expectVal
+			expectConsumed = 2
+		)
+
+		var actual *int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x08}
+			expectVal      = 8
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 2
+		)
+
+		var actual **int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int, but nil int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
+	t.Run("*uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x08}
+			expectVal      = uint(8)
+			expect         = &expectVal
+			expectConsumed = 2
+		)
+
+		var actual *uint
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x01, 0x08}
+			expectVal      = uint(8)
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 2
+		)
+
+		var actual **uint
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint, but nil uint part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **uint
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
 }
 
 func Test_Dec_Bool(t *testing.T) {
