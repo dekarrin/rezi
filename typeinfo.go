@@ -56,7 +56,31 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 	for trying {
 		if t.Implements(refBinaryMarshalerType) {
-			return typeInfo{Indir: indirCount, Main: tBinary}, nil
+			// does it actually implement it itself? or did we just get handed a
+			// ptr type and the pointed-to type defines a value receiver and Go
+			// is performing implicit deref to make it be defined on the ptr
+			// as well?
+
+			if t.Kind() == reflect.Pointer {
+				// is method actually defined on the *value* receiver with
+				// implicit deref?
+				_, definedOnValue := t.Elem().MethodByName("MarshalBinary")
+
+				// only consider it to be implementing if it is *not* defined
+				// on the value type.
+				if !definedOnValue {
+					return typeInfo{Indir: indirCount, Main: tBinary}, nil
+				}
+
+				// if it *is* defined on the value type, we are getting implicit
+				// deref, and should *not* treat the current checked type as
+				// implementing. we'll get it on the next deref pass with the
+				// correct Indir number set.
+			} else {
+				// if it's not a pointer type and it implements, there is no
+				// ambiguity.
+				return typeInfo{Indir: indirCount, Main: tBinary}, nil
+			}
 		}
 
 		switch t.Kind() {
