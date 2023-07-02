@@ -17,8 +17,8 @@ import (
 )
 
 type (
-	countType    = int
-	nilLevelType = int
+	tLen      = int
+	tNilLevel = int
 
 	decFunc[E any] func([]byte) (E, int, error)
 	encFunc[E any] func(E) []byte

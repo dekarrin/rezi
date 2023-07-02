@@ -250,7 +250,7 @@ func encNil(indirLevels int) []byte {
 	infoByte |= infoBitsIndir
 	enc := []byte{infoByte}
 
-	enc = append(enc, encInt(nilLevelType(indirLevels))...)
+	enc = append(enc, encInt(tNilLevel(indirLevels))...)
 	return enc
 }
 
@@ -352,9 +352,9 @@ func DecInt(data []byte) (int, int, error) {
 //
 // This function DOES respect the info extension bit, but only when decoding a
 // nil.
-func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir nilLevelType, val E, consumed int, err error) {
+func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
 	if len(data) < 1 {
-		return false, nilLevelType(0), val, 0, io.ErrUnexpectedEOF
+		return false, tNilLevel(0), val, 0, io.ErrUnexpectedEOF
 	}
 
 	infoByte := data[0]
@@ -366,7 +366,7 @@ func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir nilLeve
 			val, consumed, err = decFn(data)
 		}
 
-		return false, nilLevelType(0), val, consumed, err
+		return false, tNilLevel(0), val, consumed, err
 	}
 
 	// it is a nil. do other checks.
@@ -384,7 +384,7 @@ func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir nilLeve
 	if infoByte&infoBitsIndir == infoBitsIndir {
 		// the level of indirection is encoded in following bytes
 		var n int
-		indir, n, err = decInt[nilLevelType](data)
+		indir, n, err = decInt[tNilLevel](data)
 		consumed += n
 		if err != nil {
 			return true, indir, val, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
@@ -566,7 +566,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	var byteLen int
 	var err error
 
-	byteLen, readBytes, err = decInt[countType](data)
+	byteLen, readBytes, err = decInt[tLen](data)
 	if err != nil {
 		return 0, err
 	}
@@ -631,7 +631,7 @@ func encWithIndirect[E any](value interface{}, ti typeInfo, convFn func(reflect.
 // decoded value this function returns.
 func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
 	var isNil bool
-	var nilLevel nilLevelType
+	var nilLevel tNilLevel
 
 	if ti.Indir > 0 {
 		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
