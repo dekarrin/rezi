@@ -157,13 +157,13 @@ func canDecode(v interface{}) (typeInfo, error) {
 	}
 
 	checkType := reflect.TypeOf(v)
-	origType := checkType
+	//origType := checkType
 
-	var checkPtr bool
+	//var checkPtr bool
 
 	if checkType.Kind() == reflect.Pointer {
 		checkType = checkType.Elem()
-		checkPtr = true
+		//checkPtr = true
 	}
 
 	info, err := decTypeInfo(checkType)
@@ -172,11 +172,11 @@ func canDecode(v interface{}) (typeInfo, error) {
 	}
 
 	// we do not allow a ref-to binaryUnmarshaler here
-	if info.Main == tBinary && checkPtr && info.ViaNonPtr {
+	/*if info.Main == tBinary && checkPtr && info.ViaNonPtr {
 		// no, you pass in an implementor of encoding.BinaryUnmarshaler... not
 		// a ptr to *that*
 		return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for decoding", origType.String())
-	}
+	}*/
 	return info, nil
 }
 
@@ -190,6 +190,30 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 		trying = false
 
 		if t.Implements(refBinaryUnmarshalerType) {
+			// binary = the type that implements Marshaler
+			// (*binary) = the type that implements Unmarshaler
+			// canDecode     decTypeInfo
+			// *(*binary) -> (*binary)
+			// Here, ptr-to would fail. direct implementation would be implied.
+			//
+			//
+			// but also, the user can totally pass in just a pointer to a binary:
+			//
+			// canDecode	 decTypeInfo
+			// *binary   ->  binary
+			//
+			// in which case, we *do* want a ptr-to check. That's fine,
+			// decTypeInfo will grab it via the ptr-to. Normal decoding.
+			//
+			// but often, it will be due to a slice or map needing to get a
+			// level of indirection due to the actual container value being of
+			// type binary:
+			//
+			// (recursion)     decTypeInfo
+			// []binary    ->  binary
+			//
+			// that's fine, decTypeInfo will grab it via the ptr-to. Normal decoded.
+
 			// the 'via an embedded struct' way of getting a binary value
 			return typeInfo{Indir: indirCount, ViaNonPtr: true, Main: tBinary}, nil
 		} else if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {

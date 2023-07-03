@@ -259,9 +259,90 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case tBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
+		bu, n, err := decWithIndirectAssignment(data, v, ti, func(b []byte) (interface{}, int, error) {
+			// v is *(...*)T, ret-val of decFn (this lambda) is T.
+			// TODO: this is a lot of extra info that should probably be checked
+			// in decTypeInfo and cached in the typeInfo struct.
 
-		receiver := v.(encoding.BinaryUnmarshaler)
-		return decBinary(data, receiver)
+			// typical case!
+			// decPrim handed a *T, told to decode a T.
+			// atypical case!
+			// decPrim handed a T, told to decode a T. (not handled atm)
+			//
+			// fundamentally, the actual encoding remains the same.
+			// rly, the big question is, during the DECODING, whether it should
+			// be a ptr-to or the actual type that is sent as the receiver. it
+			// is probably correct to simply assume that v is a *T. the user and
+			// practically all decoding cases will.
+
+			// need a receiver of the correct type.
+
+			// TODO: might make sense to cache the result of the reflection
+			// check mainly for this part. as-is we must call into reflect
+			// again and start doing indirection simply to find the point at
+			// which we can decode.
+			receiverType := reflect.TypeOf(v)
+			// if v is a *T, we are done. but it could be a **T. check now.
+
+			// be able to handle possible future case of being handed a T as
+			// opposed to a *T - don't try our type deref'ing trick if so.
+			if receiverType.Kind() == reflect.Pointer {
+
+				// for every * in the (...*) part of *(...*)T up until the
+				// implementor, do a deref.
+				for i := 0; i < ti.Indir; i++ {
+					receiverType = receiverType.Elem()
+				}
+			}
+
+			// receiverType should now be the exact type which implements
+			// encoding.BinaryUnmarshaler. Assert this for now.
+			//
+			// TODO: remove this check once we know for sure.
+			if !receiverType.Implements(refBinaryUnmarshalerType) {
+				// should never happen, assuming ti.Indir is valid.
+				panic("unwrapped binary type receiver does not implement encoding.BinaryUnmarshaler")
+			}
+
+			var receiverValue reflect.Value
+			if receiverType.Kind() == reflect.Pointer {
+				// receiverType is *T
+				receiverValue = reflect.New(receiverType.Elem())
+			} else {
+				// receiverType is itself T (future-proofing)
+				receiverValue = reflect.Zero(receiverType)
+			}
+
+			receiver := receiverValue.Interface().(encoding.BinaryUnmarshaler)
+			decConsumed, decErr := decBinary(data, receiver)
+			if decErr != nil {
+				return nil, decConsumed, decErr
+			}
+
+			var decoded interface{}
+
+			if receiverType.Kind() == reflect.Pointer {
+				decoded = reflect.ValueOf(receiver).Elem().Interface()
+			} else {
+				decoded = receiver
+			}
+
+			return decoded, decConsumed, decErr
+		})
+		if ti.Indir == 0 {
+			// assume v is a *T, no future-proofing here.
+
+			// due to complicated forcing of decBinary into the decFunc API,
+			// we do now have a T (as an interface{}). We must use reflection to
+			// assign it.
+
+			refReceiver := reflect.ValueOf(v)
+			refReceiver.Elem().Set(reflect.ValueOf(bu))
+		}
+		if err != nil {
+			return n, err
+		}
+		return n, nil
 	default:
 		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
 	}
