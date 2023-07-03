@@ -35,17 +35,18 @@ type integral interface {
 	anyInt | anyUint
 }
 
-// encPrim encodes the primitve REZI value as rezi-format bytes. The type of the
-// value is examined to determine how to encode it. No type information is
-// included in the returned bytes so it is up to the caller to keep track of it.
+// encCheckedPrim encodes the primitve REZI value as rezi-format bytes. The type
+// of the value is examined to determine how to encode it. No type information
+// is included in the returned bytes so it is up to the caller to keep track of
+// it.
 //
-// This function may only be called with a value with type or underlying type of
-// int, string, or bool, or a value that implements encoding.BinaryMarshaler.
-// For a more generic encoding function that can handle map and slice types, see
-// Enc. Generally this function is used internally and users of REZI are better
-// off calling the specific type-safe encoding function (EncInt, EncBool,
-// EncString, or EncBinary) for the type being encoded.
-func encPrim(value interface{}, ti typeInfo) []byte {
+// This function takes type info for a primitive and encodes it. The value can
+// have any level of pointer indirection and will be correctly encoded as the
+// value that the eventual pointed-to element is, or a nil indicating the
+// correct level of indirection of pointer that the passed-in pointer was nil
+// at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
+// type.
+func encCheckedPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
 		return encWithNilCheck(value, ti, encString, reflect.Value.String)
@@ -108,17 +109,11 @@ func encPrim(value interface{}, ti typeInfo) []byte {
 	}
 }
 
-// decPrim decodes a primitive value from rezi-format bytes into the value
-// pointed-to by v. V must point to a REZI primitive value (int, bool, string)
-// or implement encoding.BinaryUnmarshaler.
-//
-// This function may only be called with a value with type or underlying type of
-// int, string, or bool, or a value that implements encoding.BinaryUnmarshaler.
-// For a more generic encoding function that can handle map and slice types, see
-// Enc. Generally this function is used internally and users of REZI are better
-// off calling the specific type-safe decoding function (DecInt, DecBool,
-// DecString, or DecBinary) for the type being decoded.
-func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
+// decCheckedPrim decodes a primitive value from rezi-format bytes into the
+// value pointed-to by v. V must point to a REZI primitive value (int, bool,
+// string), or implement encoding.BinaryUnmarshaler, or be a pointer to one of
+// those types with any level of indirection.
+func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
 

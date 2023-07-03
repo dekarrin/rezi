@@ -87,7 +87,7 @@ func Enc(v interface{}) []byte {
 	}
 
 	if info.Primitive() {
-		return encPrim(v, info)
+		return encCheckedPrim(v, info)
 	} else if info.Main == tNil {
 		return encNil(0)
 	} else if info.Main == tMap {
@@ -108,7 +108,7 @@ func Dec(data []byte, v interface{}) (int, error) {
 	}
 
 	if info.Primitive() {
-		return decPrim(data, v, info)
+		return decCheckedPrim(data, v, info)
 	} else if info.Main == tMap {
 		return decMap(data, v, info)
 	} else if info.Main == tSlice {
