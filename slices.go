@@ -10,11 +10,15 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encSlice(v interface{}, ti typeInfo) []byte {
+func encCheckedSlice(v interface{}, ti typeInfo) []byte {
 	if ti.Main != tSlice {
 		panic("not a slice type")
 	}
 
+	return encSlice(v)
+}
+
+func encSlice(v interface{}) []byte {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {

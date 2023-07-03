@@ -93,7 +93,7 @@ func Enc(v interface{}) []byte {
 	} else if info.Main == tMap {
 		return encMap(v, info)
 	} else if info.Main == tSlice {
-		return encSlice(v, info)
+		return encCheckedSlice(v, info)
 	} else {
 		panic("no possible encoding")
 	}
