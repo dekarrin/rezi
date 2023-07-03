@@ -67,12 +67,18 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 	}
 }
 
-// encMap encodes a compatible map as a REZI map.
-func encMap(v interface{}, ti typeInfo) []byte {
+// encCheckedMap encodes a compatible map as a REZI map.
+func encCheckedMap(v interface{}, ti typeInfo) []byte {
 	if ti.Main != tMap {
 		panic("not a map type")
 	}
 
+	return encWithNilCheck(v, ti, func(val interface{}) []byte {
+		return encMap(val, *ti.KeyType)
+	}, reflect.Value.Interface)
+}
+
+func encMap(v interface{}, keyType typeInfo) []byte {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
@@ -82,7 +88,7 @@ func encMap(v interface{}, ti typeInfo) []byte {
 	mapKeys := refVal.MapKeys()
 	keysToSort := sortableMapKeys{
 		keys: mapKeys,
-		ti:   *ti.KeyType,
+		ti:   keyType,
 	}
 	sort.Sort(keysToSort)
 	mapKeys = keysToSort.keys
