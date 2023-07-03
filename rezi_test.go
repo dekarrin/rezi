@@ -780,6 +780,63 @@ func Test_Enc_Slice(t *testing.T) {
 		// assert
 		assert.Equal(expect, actual)
 	})
+
+	t.Run("*[]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = []int{1, 2, 8, 8}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = []int{1, 2, 8, 8}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[]int, but nil []int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *[]int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Dec_String(t *testing.T) {

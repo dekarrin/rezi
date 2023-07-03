@@ -13,6 +13,7 @@ package rezi
 import (
 	"encoding"
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -86,13 +87,13 @@ func Enc(v interface{}) []byte {
 	}
 
 	if info.Primitive() {
-		return encPrim(v, info)
+		return encCheckedPrim(v, info)
 	} else if info.Main == tNil {
 		return encNil(0)
 	} else if info.Main == tMap {
 		return encMap(v, info)
 	} else if info.Main == tSlice {
-		return encSlice(v, info)
+		return encCheckedSlice(v, info)
 	} else {
 		panic("no possible encoding")
 	}
@@ -107,7 +108,7 @@ func Dec(data []byte, v interface{}) (int, error) {
 	}
 
 	if info.Primitive() {
-		return decPrim(data, v, info)
+		return decCheckedPrim(data, v, info)
 	} else if info.Main == tMap {
 		return decMap(data, v, info)
 	} else if info.Main == tSlice {
@@ -115,4 +116,78 @@ func Dec(data []byte, v interface{}) (int, error) {
 	} else {
 		panic("no possible decoding")
 	}
+}
+
+func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) []byte {
+	if ti.Indir > 0 {
+		// we cannot directly encode, we must get at the reel value.
+		encodeTarget := reflect.ValueOf(value)
+		// encodeTarget is a *THING but we want a THING
+
+		nilLevel := -1
+		for i := 0; i < ti.Indir; i++ {
+			if encodeTarget.IsNil() {
+				// so if it were a *string we deal w, nil level can only be 0.
+				// if it were a **string we deal w, nil level can be 0 or 1.
+				// *string -> indir is 1 - nl 0
+				// **string -> indir is 2 - nl 0-1
+				nilLevel = i
+				break
+			}
+			encodeTarget = encodeTarget.Elem()
+		}
+		if nilLevel > -1 {
+			return encNil(nilLevel)
+		}
+		return encFn(convFn(encodeTarget))
+	} else {
+		return encFn(value.(E))
+	}
+}
+
+// if ti.Indir > 0, this will assign to the interface at the appropriate
+// indirection level. If ti.Indir == 0, this will not assign. Callers should use
+// that check to determine if it is safe to do their own assignment of the
+// decoded value this function returns.
+func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+	var isNil bool
+	var nilLevel tNilLevel
+
+	if ti.Indir > 0 {
+		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
+		if err != nil {
+			return decoded, n, fmt.Errorf("check nil value: %w", err)
+		}
+	}
+
+	if !isNil {
+		decoded, n, err = decFn(data)
+		if err != nil {
+			return decoded, n, err
+		}
+		nilLevel = ti.Indir
+	}
+
+	if ti.Indir > 0 {
+		// the user has passed in a ptr-ptr-to. We cannot directly assign.
+		assignTarget := reflect.ValueOf(v)
+		// assignTarget is a **string but we want a *string
+
+		for i := 0; i < ti.Indir && i < nilLevel; i++ {
+			// *double indirection ALL THE WAY~*
+			// *acrosssss the sky*
+			// *what does it mean*
+
+			// **string     // *string  // string
+			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
+			assignTarget.Elem().Set(newTarget)
+			assignTarget = newTarget
+		}
+
+		if !isNil {
+			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+		}
+	}
+
+	return decoded, n, nil
 }
