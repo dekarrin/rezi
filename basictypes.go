@@ -48,59 +48,59 @@ type integral interface {
 func encPrim(value interface{}, ti typeInfo) []byte {
 	switch ti.Main {
 	case tString:
-		return encWithIndirect(value, ti, encString, reflect.Value.String)
+		return encWithNilCheck(value, ti, encString, reflect.Value.String)
 	case tBool:
-		return encWithIndirect(value, ti, encBool, reflect.Value.Bool)
+		return encWithNilCheck(value, ti, encBool, reflect.Value.Bool)
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return encWithIndirect(value, ti, encInt[int8], func(r reflect.Value) int8 {
+				return encWithNilCheck(value, ti, encInt[int8], func(r reflect.Value) int8 {
 					return int8(r.Int())
 				})
 			case 16:
-				return encWithIndirect(value, ti, encInt[int16], func(r reflect.Value) int16 {
+				return encWithNilCheck(value, ti, encInt[int16], func(r reflect.Value) int16 {
 					return int16(r.Int())
 				})
 			case 32:
-				return encWithIndirect(value, ti, encInt[int32], func(r reflect.Value) int32 {
+				return encWithNilCheck(value, ti, encInt[int32], func(r reflect.Value) int32 {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithIndirect(value, ti, encInt[int64], func(r reflect.Value) int64 {
+				return encWithNilCheck(value, ti, encInt[int64], func(r reflect.Value) int64 {
 					return int64(r.Int())
 				})
 			default:
-				return encWithIndirect(value, ti, encInt[int], func(r reflect.Value) int {
+				return encWithNilCheck(value, ti, encInt[int], func(r reflect.Value) int {
 					return int(r.Int())
 				})
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return encWithIndirect(value, ti, encInt[uint8], func(r reflect.Value) uint8 {
+				return encWithNilCheck(value, ti, encInt[uint8], func(r reflect.Value) uint8 {
 					return uint8(r.Uint())
 				})
 			case 16:
-				return encWithIndirect(value, ti, encInt[uint16], func(r reflect.Value) uint16 {
+				return encWithNilCheck(value, ti, encInt[uint16], func(r reflect.Value) uint16 {
 					return uint16(r.Uint())
 				})
 			case 32:
-				return encWithIndirect(value, ti, encInt[uint32], func(r reflect.Value) uint32 {
+				return encWithNilCheck(value, ti, encInt[uint32], func(r reflect.Value) uint32 {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithIndirect(value, ti, encInt[uint64], func(r reflect.Value) uint64 {
+				return encWithNilCheck(value, ti, encInt[uint64], func(r reflect.Value) uint64 {
 					return uint64(r.Uint())
 				})
 			default:
-				return encWithIndirect(value, ti, encInt[uint], func(r reflect.Value) uint {
+				return encWithNilCheck(value, ti, encInt[uint], func(r reflect.Value) uint {
 					return uint(r.Uint())
 				})
 			}
 		}
 	case tBinary:
-		return encWithIndirect(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
+		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
 	default:
@@ -124,7 +124,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case tString:
-		s, n, err := decWithIndirectAssignment(data, v, ti, decString)
+		s, n, err := decWithNilCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
 		}
@@ -134,7 +134,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		return n, nil
 	case tBool:
-		b, n, err := decWithIndirectAssignment(data, v, ti, decBool)
+		b, n, err := decWithNilCheck(data, v, ti, decBool)
 		if err != nil {
 			return n, err
 		}
@@ -151,7 +151,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i int64
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int64])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int64])
 				if err != nil {
 					return n, err
 				}
@@ -161,7 +161,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i int32
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int32])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int32])
 				if err != nil {
 					return n, err
 				}
@@ -171,7 +171,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i int16
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int16])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int16])
 				if err != nil {
 					return n, err
 				}
@@ -181,7 +181,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i int8
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int8])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int8])
 				if err != nil {
 					return n, err
 				}
@@ -191,7 +191,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i int
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[int])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int])
 				if err != nil {
 					return n, err
 				}
@@ -204,7 +204,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i uint64
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint64])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
@@ -214,7 +214,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i uint32
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint32])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
@@ -224,7 +224,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i uint16
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint16])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
@@ -234,7 +234,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i uint8
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint8])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
@@ -244,7 +244,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i uint
-				i, n, err = decWithIndirectAssignment(data, v, ti, decInt[uint])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint])
 				if err != nil {
 					return n, err
 				}
@@ -259,7 +259,7 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case tBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithIndirectAssignment(data, v, ti, func(b []byte) (interface{}, int, error) {
+		bu, n, err := decWithNilCheck(data, v, ti, func(b []byte) (interface{}, int, error) {
 			// v is *(...*)T, ret-val of decFn (this lambda) is T.
 			// TODO: this is a lot of extra info that should probably be checked
 			// in decTypeInfo and cached in the typeInfo struct. candidate for
@@ -739,78 +739,4 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	}
 
 	return byteLen + readBytes, nil
-}
-
-func encWithIndirect[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) []byte {
-	if ti.Indir > 0 {
-		// we cannot directly encode, we must get at the reel value.
-		encodeTarget := reflect.ValueOf(value)
-		// encodeTarget is a *THING but we want a THING
-
-		nilLevel := -1
-		for i := 0; i < ti.Indir; i++ {
-			if encodeTarget.IsNil() {
-				// so if it were a *string we deal w, nil level can only be 0.
-				// if it were a **string we deal w, nil level can be 0 or 1.
-				// *string -> indir is 1 - nl 0
-				// **string -> indir is 2 - nl 0-1
-				nilLevel = i
-				break
-			}
-			encodeTarget = encodeTarget.Elem()
-		}
-		if nilLevel > -1 {
-			return encNil(nilLevel)
-		}
-		return encFn(convFn(encodeTarget))
-	} else {
-		return encFn(value.(E))
-	}
-}
-
-// if ti.Indir > 0, this will assign to the interface at the appropriate
-// indirection level. If ti.Indir == 0, this will not assign. Callers should use
-// that check to determine if it is safe to do their own assignment of the
-// decoded value this function returns.
-func decWithIndirectAssignment[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
-	var isNil bool
-	var nilLevel tNilLevel
-
-	if ti.Indir > 0 {
-		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
-		if err != nil {
-			return decoded, n, fmt.Errorf("check nil value: %w", err)
-		}
-	}
-
-	if !isNil {
-		decoded, n, err = decFn(data)
-		if err != nil {
-			return decoded, n, err
-		}
-		nilLevel = ti.Indir
-	}
-
-	if ti.Indir > 0 {
-		// the user has passed in a ptr-ptr-to. We cannot directly assign.
-		assignTarget := reflect.ValueOf(v)
-		// assignTarget is a **string but we want a *string
-
-		for i := 0; i < ti.Indir && i < nilLevel; i++ {
-			// *double indirection ALL THE WAY~*
-			// *acrosssss the sky*
-			// *what does it mean*
-
-			// **string     // *string  // string
-			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
-			assignTarget.Elem().Set(newTarget)
-			assignTarget = newTarget
-		}
-
-		if !isNil {
-			assignTarget.Elem().Set(reflect.ValueOf(decoded))
-		}
-	}
-
-	return decoded, n, nil
 }
