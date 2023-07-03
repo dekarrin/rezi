@@ -27,13 +27,12 @@ const (
 // typeInfo holds REZI-specific type info on types that can be encoded and
 // decoded.
 type typeInfo struct {
-	Main      mainType
-	Bits      int
-	Signed    bool
-	ViaNonPtr bool
-	Indir     int       // Indir is number of times that the value is deref'd. Used for encoding of ptr-to types.
-	KeyType   *typeInfo // only valid for maps
-	ValType   *typeInfo // valid for map and slice
+	Main    mainType
+	Bits    int
+	Signed  bool
+	Indir   int       // Indir is number of times that the value is deref'd. Used for encoding of ptr-to types.
+	KeyType *typeInfo // only valid for maps
+	ValType *typeInfo // valid for map and slice
 }
 
 func (ti typeInfo) Primitive() bool {
@@ -157,13 +156,9 @@ func canDecode(v interface{}) (typeInfo, error) {
 	}
 
 	checkType := reflect.TypeOf(v)
-	//origType := checkType
-
-	//var checkPtr bool
 
 	if checkType.Kind() == reflect.Pointer {
 		checkType = checkType.Elem()
-		//checkPtr = true
 	}
 
 	info, err := decTypeInfo(checkType)
@@ -171,12 +166,6 @@ func canDecode(v interface{}) (typeInfo, error) {
 		return info, err
 	}
 
-	// we do not allow a ref-to binaryUnmarshaler here
-	/*if info.Main == tBinary && checkPtr && info.ViaNonPtr {
-		// no, you pass in an implementor of encoding.BinaryUnmarshaler... not
-		// a ptr to *that*
-		return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for decoding", origType.String())
-	}*/
 	return info, nil
 }
 
@@ -189,36 +178,8 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	for trying {
 		trying = false
 
-		/*if t.Implements(refBinaryUnmarshalerType) {
-			// binary = the type that implements Marshaler
-			// (*binary) = the type that implements Unmarshaler
-			// canDecode     decTypeInfo
-			// *(*binary) -> (*binary)
-			// Here, ptr-to would fail. direct implementation would be implied.
-			//
-			//
-			// but also, the user can totally pass in just a pointer to a binary:
-			//
-			// canDecode	 decTypeInfo
-			// *binary   ->  binary
-			//
-			// in which case, we *do* want a ptr-to check. That's fine,
-			// decTypeInfo will grab it via the ptr-to. Normal decoding.
-			//
-			// but often, it will be due to a slice or map needing to get a
-			// level of indirection due to the actual container value being of
-			// type binary:
-			//
-			// (recursion)     decTypeInfo
-			// []binary    ->  binary
-			//
-			// that's fine, decTypeInfo will grab it via the ptr-to. Normal decoded.
-
-			// the 'via an embedded struct' way of getting a binary value
-			return typeInfo{Indir: indirCount, ViaNonPtr: true, Main: tBinary}, nil
-		} else*/if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
-			// the 'normal' way of getting a binary value
-			return typeInfo{Indir: indirCount, ViaNonPtr: false, Main: tBinary}, nil
+		if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
+			return typeInfo{Indir: indirCount, Main: tBinary}, nil
 		}
 
 		switch t.Kind() {

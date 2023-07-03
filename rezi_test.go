@@ -1309,78 +1309,77 @@ func Test_Dec_Binary(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	/*
-		t.Run("*BinaryUnmarshaler", func(t *testing.T) {
-			assert := assert.New(t)
+	t.Run("*BinaryUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var (
-				input = []byte{
-					0x01, 0x0a, // len=10
+		var (
+			input = []byte{
+				0x01, 0x0a, // len=10
 
-					0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
-					0x01, 0x08, // 8
-				}
-				expectVal      = testBinary{number: 8, data: "VRISKA"}
-				expect         = &expectVal
-				expectConsumed = 12
-			)
-
-			var actual *testBinary
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
 			}
+			expectVal      = testBinary{number: 8, data: "VRISKA"}
+			expect         = &expectVal
+			expectConsumed = 12
+		)
 
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
+		var actual *testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**BinaryUnmarshaler", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				input = []byte{
-					0x01, 0x0a, // len=10
+	t.Run("**BinaryUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
 
-					0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
-					0x01, 0x08, // 8
-				}
-				expectVal      = testBinary{number: 8, data: "VRISKA"}
-				expectValPtr   = &expectVal
-				expect         = &expectValPtr
-				expectConsumed = 12
-			)
+		var (
+			input = []byte{
+				0x01, 0x0a, // len=10
 
-			var actual **testBinary
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
 			}
+			expectVal      = testBinary{number: 8, data: "VRISKA"}
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 12
+		)
 
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
+		var actual **testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**BinaryUnmarshaler, but nil BinaryUnmarshaler part", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				input          = []byte{0xb0, 0x01, 0x01}
-				expectConsumed = 3
-			)
+	t.Run("**BinaryUnmarshaler, but nil BinaryUnmarshaler part", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var actual **testBinary
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
-			}
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
 
-			assert.Equal(expectConsumed, consumed)
+		var actual **testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-			assert.NotNil(actual) // actual should *itself* not be nil
-			assert.Nil(*actual)   // but the pointer it points to should be nil
-		})
-	*/
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
 }
 
 func Test_Dec_Map(t *testing.T) {

@@ -262,32 +262,13 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		bu, n, err := decWithIndirectAssignment(data, v, ti, func(b []byte) (interface{}, int, error) {
 			// v is *(...*)T, ret-val of decFn (this lambda) is T.
 			// TODO: this is a lot of extra info that should probably be checked
-			// in decTypeInfo and cached in the typeInfo struct.
+			// in decTypeInfo and cached in the typeInfo struct. candidate for
+			// benchmarking in the future.
 
-			// typical case!
-			// decPrim handed a *T, told to decode a T.
-			// atypical case!
-			// decPrim handed a T, told to decode a T. (not handled atm)
-			//
-			// fundamentally, the actual encoding remains the same.
-			// rly, the big question is, during the DECODING, whether it should
-			// be a ptr-to or the actual type that is sent as the receiver. it
-			// is probably correct to simply assume that v is a *T. the user and
-			// practically all decoding cases will.
-
-			// need a receiver of the correct type.
-
-			// TODO: might make sense to cache the result of the reflection
-			// check mainly for this part. as-is we must call into reflect
-			// again and start doing indirection simply to find the point at
-			// which we can decode.
 			receiverType := reflect.TypeOf(v)
 			// if v is a *T, we are done. but it could be a **T. check now.
 
-			// be able to handle possible future case of being handed a T as
-			// opposed to a *T - don't try our type deref'ing trick if so.
-			if receiverType.Kind() == reflect.Pointer {
-
+			if receiverType.Kind() == reflect.Pointer { // future-proofing - might be a T
 				// for every * in the (...*) part of *(...*)T up until the
 				// implementor, do a deref.
 				for i := 0; i < ti.Indir; i++ {
@@ -297,8 +278,6 @@ func decPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 			// receiverType should now be the exact type which implements
 			// encoding.BinaryUnmarshaler. Assert this for now.
-			//
-			// TODO: remove this check once we know for sure.
 			if !receiverType.Implements(refBinaryUnmarshalerType) {
 				// should never happen, assuming ti.Indir is valid.
 				panic("unwrapped binary type receiver does not implement encoding.BinaryUnmarshaler")
