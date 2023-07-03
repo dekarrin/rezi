@@ -1285,7 +1285,7 @@ func Test_Dec_Bool(t *testing.T) {
 func Test_Dec_Binary(t *testing.T) {
 	// cannot be table-driven easily due to trying different types
 
-	t.Run("normal binary result", func(t *testing.T) {
+	t.Run("normal BinaryUnmarshaler result", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 
@@ -1308,6 +1308,78 @@ func Test_Dec_Binary(t *testing.T) {
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
+
+	t.Run("*BinaryUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0a, // len=10
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+			expectVal      = testBinary{number: 8, data: "VRISKA"}
+			expect         = &expectVal
+			expectConsumed = 12
+		)
+
+		var actual *testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**BinaryUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0a, // len=10
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+			expectVal      = testBinary{number: 8, data: "VRISKA"}
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 12
+		)
+
+		var actual **testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**BinaryUnmarshaler, but nil BinaryUnmarshaler part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
 }
 
 func Test_Dec_Map(t *testing.T) {
