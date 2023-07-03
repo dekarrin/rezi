@@ -802,14 +802,21 @@ func Test_Enc_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**bool", func(t *testing.T) {
+	t.Run("**[]int", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputVal = false
+			inputVal = []int{1, 2, 8, 8}
 			inputPtr = &inputVal
 			input    = &inputPtr
-			expect   = []byte{0x00}
+			expect   = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
 		)
 
 		actual := Enc(input)
@@ -817,11 +824,11 @@ func Test_Enc_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**bool, but nil bool part", func(t *testing.T) {
+	t.Run("**[]int, but nil []int part", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			ptr    *bool
+			ptr    *[]int
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)

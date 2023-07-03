@@ -15,7 +15,7 @@ func encCheckedSlice(v interface{}, ti typeInfo) []byte {
 		panic("not a slice type")
 	}
 
-	return encSlice(v)
+	return encWithNilCheck(v, ti, encSlice, reflect.Value.Interface)
 }
 
 func encSlice(v interface{}) []byte {
