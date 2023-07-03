@@ -189,7 +189,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	for trying {
 		trying = false
 
-		if t.Implements(refBinaryUnmarshalerType) {
+		/*if t.Implements(refBinaryUnmarshalerType) {
 			// binary = the type that implements Marshaler
 			// (*binary) = the type that implements Unmarshaler
 			// canDecode     decTypeInfo
@@ -216,7 +216,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 			// the 'via an embedded struct' way of getting a binary value
 			return typeInfo{Indir: indirCount, ViaNonPtr: true, Main: tBinary}, nil
-		} else if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
+		} else*/if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
 			// the 'normal' way of getting a binary value
 			return typeInfo{Indir: indirCount, ViaNonPtr: false, Main: tBinary}, nil
 		}
