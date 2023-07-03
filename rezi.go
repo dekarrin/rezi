@@ -91,7 +91,7 @@ func Enc(v interface{}) []byte {
 	} else if info.Main == tNil {
 		return encNil(0)
 	} else if info.Main == tMap {
-		return encMap(v, info)
+		return encCheckedMap(v, info)
 	} else if info.Main == tSlice {
 		return encCheckedSlice(v, info)
 	} else {

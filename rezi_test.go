@@ -603,6 +603,65 @@ func Test_Enc_Map(t *testing.T) {
 		// assert
 		assert.Equal(expect, actual)
 	})
+
+	t.Run("*map[string]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = map[string]int{"ONE": 1, "EIGHT": 8}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x10,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0x01, 0x08,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**map[string]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = map[string]int{"ONE": 1, "EIGHT": 8}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x10,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0x01, 0x08,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**map[string]int, but nil map[string]int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *map[string]int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Enc_Slice(t *testing.T) {
