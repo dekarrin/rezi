@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+func ref[E any](v E) *E {
+	return &v
+}
+
 func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnmarshaler {
 	return marshaledBytesConsumer{fn: byteConsumer}
 }

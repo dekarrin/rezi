@@ -163,6 +163,8 @@ func Test_Enc_Int(t *testing.T) {
 		})
 	}
 
+	// TODO: make shore we are testing enc and dec of *nil* *int. same with *string and *bool.
+
 	t.Run("*int", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -739,6 +741,25 @@ func Test_Enc_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[]bool", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []bool{true, true, false, true}
+			expect = []byte{
+				0x01, 0x04,
+
+				0x01, 0x01, 0x00, 0x01,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]binary", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -894,6 +915,507 @@ func Test_Enc_Slice(t *testing.T) {
 
 		actual := Enc(input)
 
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*int{ref(1), ref(3), ref(4), ref(200), ref(281409)}
+			expect = []byte{
+				0x01, 0x0c,
+
+				0x01, 0x01,
+				0x01, 0x03,
+				0x01, 0x04,
+				0x01, 0xc8,
+				0x03, 0x04, 0x4b, 0x41,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*int{ref(1), ref(3), ref(4), ref(200), nil}
+			expect = []byte{
+				0x01, 0x09,
+
+				0x01, 0x01,
+				0x01, 0x03,
+				0x01, 0x04,
+				0x01, 0xc8,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*int{nil, nil}
+			expect = []byte{
+				0x01, 0x02,
+
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*uint{ref(uint(10004138888888800612)), ref(uint(10004138888888800613))}
+			expect = []byte{
+				0x01, 0x12,
+
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*uint{ref(uint(10004138888888800612)), nil}
+			expect = []byte{
+				0x01, 0x0a,
+
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*uint{nil, nil}
+			expect = []byte{
+				0x01, 0x02,
+
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*string, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*string{ref("VRISKA"), ref("NEPETA"), ref("TEREZI")}
+			expect = []byte{
+				0x01, 0x18,
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+				0x01, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*string, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*string{ref("VRISKA"), nil, ref("TEREZI")}
+			expect = []byte{
+				0x01, 0x11,
+
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+				0xa0,
+				0x01, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*string, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*string{nil, nil}
+			expect = []byte{
+				0x01, 0x02,
+
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*bool, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*bool{ref(true), ref(true), ref(false), ref(true)}
+			expect = []byte{
+				0x01, 0x04,
+
+				0x01, 0x01, 0x00, 0x01,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*bool, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*bool{ref(true), nil, ref(false), ref(true)}
+			expect = []byte{
+				0x01, 0x04,
+
+				0x01, 0xa0, 0x00, 0x01,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*bool, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*bool{nil, nil, nil, nil}
+			expect = []byte{
+				0x01, 0x04,
+
+				0xa0, 0xa0, 0xa0, 0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*binary, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*testBinary{
+				{data: "sup", number: 1},
+				{data: "VRISSY", number: 8},
+			}
+			expect = []byte{
+				0x01, 0x15,
+
+				0x01, 0x07,
+				0x01, 0x03, 0x73, 0x75, 0x70,
+				0x01, 0x01,
+
+				0x01, 0x0a,
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
+				0x01, 0x08,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*binary, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*testBinary{
+				{data: "sup", number: 1},
+				nil,
+			}
+			expect = []byte{
+				0x01, 0x0a,
+
+				0x01, 0x07,
+				0x01, 0x03, 0x73, 0x75, 0x70,
+				0x01, 0x01,
+
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*binary, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*testBinary{nil, nil}
+			expect = []byte{
+				0x01, 0x02,
+
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*map[string]bool, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*map[string]bool{
+				{
+					"VRISKA":   true,
+					"ARANEA":   false,
+					"MINDFANG": true,
+				},
+				{
+					"NEPETA": true,
+				},
+				{
+					"JOHN": true,
+					"JADE": true,
+				},
+			}
+			expect = []byte{
+				0x01, 0x3a, // len=58
+
+				0x01, 0x1d, // len=29
+				0x01, 0x06, 0x41, 0x52, 0x41, 0x4e, 0x45, 0x41, 0x00, // "ARANEA": false
+				0x01, 0x08, 0x4d, 0x49, 0x4e, 0x44, 0x46, 0x41, 0x4e, 0x47, 0x01, // "MINDFANG": true
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, // "VRISKA": true
+
+				0x01, 0x09, // len=9
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, // "NEPETA": true
+
+				0x01, 0x0e, // len=14
+				0x01, 0x04, 0x4a, 0x41, 0x44, 0x45, 0x01, // "JADE": true
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, 0x01, // "JOHN": true
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*map[string]bool, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*map[string]bool{
+				nil,
+				{
+					"NEPETA": true,
+				},
+				{
+					"JOHN": true,
+					"JADE": true,
+				},
+			}
+			expect = []byte{
+				0x01, 0x1c, // len=28
+
+				0xa0,
+
+				0x01, 0x09, // len=9
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, // "NEPETA": true
+
+				0x01, 0x0e, // len=14
+				0x01, 0x04, 0x4a, 0x41, 0x44, 0x45, 0x01, // "JADE": true
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, 0x01, // "JOHN": true
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*map[string]bool, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*map[string]bool{
+				nil, nil, nil,
+			}
+			expect = []byte{
+				0x01, 0x03, // len=3
+
+				0xa0, 0xa0, 0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[]int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[]int{{8, 8, 16, 24}, {1, 2, 3}, {10, 9, 8}}
+			expect = []byte{
+				0x01, 0x1a, // len=26
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0x01, 0x06, // len=6
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x06, // len=6
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[]int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[]int{{8, 8, 16, 24}, nil, {10, 9, 8}}
+			expect = []byte{
+				0x01, 0x13, // len=19
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0xa0, // nil
+
+				0x01, 0x06, // len=6
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[]int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[]int{nil, nil, nil}
+			expect = []byte{
+				0x01, 0x03,
+
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual := Enc(input)
+
+		// assert
 		assert.Equal(expect, actual)
 	})
 }
