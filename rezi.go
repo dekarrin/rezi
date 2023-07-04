@@ -112,7 +112,7 @@ func Dec(data []byte, v interface{}) (int, error) {
 	} else if info.Main == tMap {
 		return decMap(data, v, info)
 	} else if info.Main == tSlice {
-		return decSlice(data, v, info)
+		return decCheckedSlice(data, v, info)
 	} else {
 		panic("no possible decoding")
 	}
@@ -190,4 +190,99 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	}
 
 	return decoded, n, nil
+}
+func makeFuncDecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
+	return func(data []byte) (interface{}, int, error) {
+		// v is *(...*)T, ret-val of decFn (this lambda) is T.
+		receiverType := reflect.TypeOf(wrapped)
+
+		if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
+			// for every * in the (...*) part of *(...*)T up until the
+			// implementor/slice-ptr, do a deref.
+			for i := 0; i < ti.Indir; i++ {
+				receiverType = receiverType.Elem()
+			}
+		}
+
+		// receiverType should now be the exact type which needs to be sent to
+		// the reel decode func.
+		if !assertFn(receiverType) {
+			// should never happen, assuming ti.Indir is valid.
+			panic("unwrapped receiver is not compatible with encoded value")
+		}
+
+		var receiverValue reflect.Value
+		if receiverType.Kind() == reflect.Pointer {
+			// receiverType is *T
+			receiverValue = reflect.New(receiverType.Elem())
+		} else {
+			// receiverType is itself T (future-proofing)
+			receiverValue = reflect.Zero(receiverType)
+		}
+
+		var decoded interface{}
+
+		receiver := receiverValue.Interface()
+		decConsumed, decErr := decToUnwrappedFn(data, receiver)
+
+		if decErr != nil {
+			return nil, decConsumed, decErr
+		}
+
+		if receiverType.Kind() == reflect.Pointer {
+			decoded = reflect.ValueOf(receiver).Elem().Interface()
+		} else {
+			decoded = receiver
+		}
+
+		return decoded, decConsumed, decErr
+	}
+}
+
+func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
+	return func(data []byte) (interface{}, int, error) {
+		// v is *(...*)T, ret-val of decFn (this lambda) is T.
+		receiverType := reflect.TypeOf(wrapped)
+
+		if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
+			// for every * in the (...*) part of *(...*)T up until the
+			// implementor/slice-ptr, do a deref.
+			for i := 0; i < ti.Indir; i++ {
+				receiverType = receiverType.Elem()
+			}
+		}
+
+		// receiverType should now be the exact type which needs to be sent to
+		// the reel decode func.
+		if !assertFn(receiverType) {
+			// should never happen, assuming ti.Indir is valid.
+			panic("unwrapped receiver is not compatible with encoded value")
+		}
+
+		var receiverValue reflect.Value
+		if receiverType.Kind() == reflect.Pointer {
+			// receiverType is *T
+			receiverValue = reflect.New(receiverType.Elem())
+		} else {
+			// receiverType is itself T (future-proofing)
+			receiverValue = reflect.Zero(receiverType)
+		}
+
+		var decoded interface{}
+
+		receiver := receiverValue.Interface()
+		decConsumed, decErr := decToUnwrappedFn(data, receiver)
+
+		if decErr != nil {
+			return nil, decConsumed, decErr
+		}
+
+		if receiverType.Kind() == reflect.Pointer {
+			decoded = reflect.ValueOf(receiver).Elem().Interface()
+		} else {
+			decoded = receiver
+		}
+
+		return decoded, decConsumed, decErr
+	}
 }

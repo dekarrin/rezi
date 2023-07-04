@@ -254,7 +254,15 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case tBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithNilCheck(data, v, ti, func(b []byte) (interface{}, int, error) {
+		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+			func(t reflect.Type) bool {
+				return t.Implements(refBinaryUnmarshalerType)
+			},
+			func(b []byte, unwrapped interface{}) (int, error) {
+				recv := unwrapped.(encoding.BinaryUnmarshaler)
+				return decBinary(data, recv)
+			},
+		)) /*func(b []byte) (interface{}, int, error) {
 			// v is *(...*)T, ret-val of decFn (this lambda) is T.
 			// TODO: this is a lot of extra info that should probably be checked
 			// in decTypeInfo and cached in the typeInfo struct. candidate for
@@ -302,7 +310,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			}
 
 			return decoded, decConsumed, decErr
-		})
+		})*/
 		if ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 
