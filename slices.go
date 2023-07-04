@@ -41,90 +41,25 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		panic("not a slice type")
 	}
 
-	// TODO: adapting this code to slice.
+	sl, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		func(t reflect.Type) bool {
+			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Slice
+		},
+		decSlice,
+	))
+	if ti.Indir == 0 {
+		// assume v is a *T, no future-proofing here.
 
-	// sl, n, err := decWithNilCheck(data, v, ti, func(b []byte) (interface{}, int, error) {
-	// 	// v is *(...*)T, ret-val of decFn (this lambda) is T.
-	// 	// v is *(...*)[]T, ret-val of decFn is []T.
+		// due to complicated forcing of decBinary into the decFunc API,
+		// we do now have a T (as an interface{}). We must use reflection to
+		// assign it.
 
-	// 	receiverType := reflect.TypeOf(v)
-	// 	// if v is a *T, we are done. but it could be a **T. check now.
-	// 	// if v is a *[]T, we are done, but it could be a **[]T, check now.
-
-	// 	if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
-	// 		// for every * in the (...*) part of *(...*)T up until the
-	// 		// implementor/slice-ptr, do a deref.
-	// 		for i := 0; i < ti.Indir; i++ {
-	// 			receiverType = receiverType.Elem()
-	// 		}
-	// 	}
-
-	// 	/* CHOICE START { */
-	// 	// receiverType should now be the exact type which implements
-	// 	// encoding.BinaryUnmarshaler. Assert this for now.
-	// 	if !receiverType.Implements(refBinaryUnmarshalerType) {
-	// 		// should never happen, assuming ti.Indir is valid.
-	// 		panic("unwrapped binary type receiver does not implement encoding.BinaryUnmarshaler")
-	// 	}
-	// 	// receiverType should now be the exact ptr-to-slice type. Assert this
-	// 	// for now.
-	// 	if !(receiverType.Kind() == reflect.Pointer && receiverType.Elem().Kind() == reflect.Slice) {
-	// 		// should never happen, assuming ti.Indir is valid.
-	// 		panic("unwrapped receiver is not compatible with encoded value")
-	// 	}
-	// 	/* } CHOICE END */
-
-	// 	var receiverValue reflect.Value
-	// 	if receiverType.Kind() == reflect.Pointer {
-	// 		// receiverType is *T
-	// 		// receiverType is *[]T
-	// 		receiverValue = reflect.New(receiverType.Elem())
-	// 	} else {
-	// 		// receiverType is itself T (future-proofing)
-	// 		receiverValue = reflect.Zero(receiverType)
-	// 	}
-
-	// 	var decoded interface{}
-
-	// 	receiver := receiverValue.Interface()
-
-	// 	/* CHOICE START (ONLY BIN) { */
-	// 	binReceiver := receiver.(encoding.BinaryUnmarshaler)
-	// 	/* } */
-
-	// 	var decConsumed int
-	// 	var decErr error
-
-	// 	/* CHOICE START { */
-	// 	decConsumed, decErr = decBinary(data, binReceiver)
-	// 	decConsumed, decErr = decSlice(data, receiver, ti)
-	// 	/* CHOICE END } */
-
-	// 	if decErr != nil {
-	// 		return nil, decConsumed, decErr
-	// 	}
-
-	// 	if receiverType.Kind() == reflect.Pointer {
-	// 		decoded = reflect.ValueOf(receiver).Elem().Interface()
-	// 	} else {
-	// 		decoded = receiver
-	// 	}
-
-	// 	return decoded, decConsumed, decErr
-	// })
-	// if ti.Indir == 0 {
-	// 	// assume v is a *T, no future-proofing here.
-
-	// 	// due to complicated forcing of decBinary into the decFunc API,
-	// 	// we do now have a T (as an interface{}). We must use reflection to
-	// 	// assign it.
-
-	// 	refReceiver := reflect.ValueOf(v)
-	// 	refReceiver.Elem().Set(reflect.ValueOf(sl))
-	// }
-	// if err != nil {
-	// 	return n, err
-	// }
+		refReceiver := reflect.ValueOf(v)
+		refReceiver.Elem().Set(reflect.ValueOf(sl))
+	}
+	if err != nil {
+		return n, err
+	}
 	return decSlice(data, v, ti)
 }
 
