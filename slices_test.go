@@ -226,7 +226,7 @@ func Test_DecSliceBinary(t *testing.T) {
 	}
 }
 
-func Test_Enc_Slice(t *testing.T) {
+func Test_Enc_Slice_NoIndirection(t *testing.T) {
 	// different types, can't rly be table driven easily
 
 	t.Run("nil []int", func(t *testing.T) {
@@ -264,7 +264,7 @@ func Test_Enc_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("huge []uint64 numbers", func(t *testing.T) {
+	t.Run("[]uint64", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 		var (
@@ -420,7 +420,9 @@ func Test_Enc_Slice(t *testing.T) {
 		// assert
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Enc_Slice_SelfIndirection(t *testing.T) {
 	t.Run("*[]int (nil)", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -492,7 +494,9 @@ func Test_Enc_Slice(t *testing.T) {
 
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Enc_Slice_ValueIndirection(t *testing.T) {
 	t.Run("[]*int, all non-nil", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -995,9 +999,7 @@ func Test_Enc_Slice(t *testing.T) {
 	})
 }
 
-func Test_Dec_Slice(t *testing.T) {
-	// different types, can't rly be table driven easily
-
+func Test_Dec_Slice_NoIndirection(t *testing.T) {
 	t.Run("nil []int (implicit nil)", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1069,7 +1071,7 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("huge []uint64 numbers", func(t *testing.T) {
+	t.Run("[]uint64", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 		var (
@@ -1238,7 +1240,9 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Dec_Slice_SelfIndirection(t *testing.T) {
 	t.Run("*[]int (nil)", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -1336,6 +1340,9 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
+}
+
+func Test_Dec_Slice_ValueIndirection(t *testing.T) {
 
 	/*
 

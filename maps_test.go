@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Enc_Map(t *testing.T) {
-	// different types, can't easily be table-driven
-
+func Test_Enc_Map_NoIndirection(t *testing.T) {
 	t.Run("nil map[string]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -213,7 +211,9 @@ func Test_Enc_Map(t *testing.T) {
 		// assert
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Enc_Map_SelfIndirection(t *testing.T) {
 	t.Run("nil *map[string]int", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -287,7 +287,9 @@ func Test_Enc_Map(t *testing.T) {
 
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Enc_Map_ValueIndirection(t *testing.T) {
 	t.Run("map[string]*int, all non-nil", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -829,9 +831,7 @@ func Test_Enc_Map(t *testing.T) {
 	})
 }
 
-func Test_Dec_Map(t *testing.T) {
-	// different types, can't easily be table-driven
-
+func Test_Dec_Map_NoIndirection(t *testing.T) {
 	t.Run("nil map[string]int (implicit nil)", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1082,7 +1082,9 @@ func Test_Dec_Map(t *testing.T) {
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
+}
 
+func Test_Dec_Map_SelfIndirection(t *testing.T) {
 	t.Run("*map[string]int (nil)", func(t *testing.T) {
 		assert := assert.New(t)
 
