@@ -101,11 +101,17 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 		keyData, err := Enc(k.Interface())
 		if err != nil {
-			return nil, fmt.Errorf("map[%v]: key: %w", k.Interface(), err)
+			return nil, DecodingError{
+				msg:   fmt.Sprintf("map[%v]: key: %s", k.Interface(), err.Error()),
+				cause: []error{err},
+			}
 		}
 		valData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, fmt.Errorf("map[%v]: value: %w", k.Interface(), err)
+			return nil, DecodingError{
+				msg:   fmt.Sprintf("map[%v]: value: %s", k.Interface(), err.Error()),
+				cause: []error{err},
+			}
 		}
 
 		enc = append(enc, keyData...)

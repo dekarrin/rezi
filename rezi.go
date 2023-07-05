@@ -12,7 +12,6 @@ package rezi
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"reflect"
 )
@@ -30,11 +29,6 @@ func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
 		return fn(e), nil
 	}
 }
-
-var (
-	ErrInvalidType   = errors.New("data is not the correct type")
-	ErrMalformedData = errors.New("data cannot be interpretered")
-)
 
 // NewBinaryEncoder creates an Encoder that can encode to bytes and uses an
 // object's MarshalBinary method to encode non-trivial types.
