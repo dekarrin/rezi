@@ -119,6 +119,9 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		},
 		decMap,
 	))
+	if err != nil {
+		return n, err
+	}
 	if ti.Indir == 0 {
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(m))

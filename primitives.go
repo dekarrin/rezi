@@ -263,6 +263,9 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return decBinary(b, recv)
 			},
 		))
+		if err != nil {
+			return n, err
+		}
 		if ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 
@@ -272,9 +275,6 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 			refReceiver := reflect.ValueOf(v)
 			refReceiver.Elem().Set(reflect.ValueOf(bu))
-		}
-		if err != nil {
-			return n, err
 		}
 		return n, nil
 	default:
