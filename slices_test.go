@@ -1251,7 +1251,7 @@ func Test_Dec_Slice(t *testing.T) {
 			expectConsumed = 1
 		)
 
-		var actual *[]int
+		var actual *[]int = &[]int{1, 2}
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return

@@ -57,10 +57,7 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(sl))
 	}
-	if err != nil {
-		return n, err
-	}
-	return decSlice(data, v)
+	return n, err
 }
 
 func decSlice(data []byte, v interface{}) (int, error) {
