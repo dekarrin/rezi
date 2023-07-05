@@ -1104,14 +1104,11 @@ func Test_Dec_Map(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	/*
+	t.Run("*map[string]int", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("*[]int", func(t *testing.T) {
-			assert := assert.New(t)
-
-
-			var (
-				input = []byte{
+		var (
+			input = []byte{
 				0x01, 0x10,
 
 				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
@@ -1120,69 +1117,69 @@ func Test_Dec_Map(t *testing.T) {
 				0x01, 0x03, 0x4f, 0x4e, 0x45,
 				0x01, 0x01,
 			}
-				expectVal      = map[string]int{"ONE": 1, "EIGHT": 8}
-				expect         = &expectVal
-				expectConsumed = 10
-			)
+			expectVal      = map[string]int{"ONE": 1, "EIGHT": 8}
+			expect         = &expectVal
+			expectConsumed = 18
+		)
 
-			var actual *[]int
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
+		var actual *map[string]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**map[string]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x10,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0x01, 0x08,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
 			}
+			expectVal      = map[string]int{"ONE": 1, "EIGHT": 8}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 18
+		)
 
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
+		var actual **map[string]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**[]int", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				input = []byte{
-					0x01, 0x08, // len=8s
+	t.Run("**map[string]int, but nil map[string]int part", func(t *testing.T) {
+		assert := assert.New(t)
 
-					0x01, 0x01, // 1
-					0x01, 0x02, // 2
-					0x01, 0x08, // 8
-					0x01, 0x08, // 8
-				}
-				expectVal      = []int{1, 2, 8, 8}
-				expectPtr      = &expectVal
-				expect         = &expectPtr
-				expectConsumed = 10
-			)
-
-			var actual **[]int
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
 			}
+			expectPtr      *map[string]int
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
 
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
+		var actual **map[string]int = ref(&map[string]int{"OTHER": 1})
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**[]int, but nil []int part", func(t *testing.T) {
-			assert := assert.New(t)
-
-			var (
-				input = []byte{
-					0xb0, 0x01, 0x01,
-				}
-				expectPtr      *[]int
-				expect         = &expectPtr
-				expectConsumed = 3
-			)
-
-			var actual **[]int = ref(&[]int{1, 2, 3})
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
-			}
-
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
-	*/
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 }
