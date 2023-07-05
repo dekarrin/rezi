@@ -186,6 +186,9 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 
 		if !isNil {
 			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+		} else {
+			zeroVal := reflect.Zero(assignTarget.Elem().Type())
+			assignTarget.Elem().Set(zeroVal)
 		}
 	}
 
