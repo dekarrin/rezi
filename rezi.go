@@ -110,7 +110,7 @@ func Dec(data []byte, v interface{}) (int, error) {
 	if info.Primitive() {
 		return decCheckedPrim(data, v, info)
 	} else if info.Main == tMap {
-		return decMap(data, v, info)
+		return decCheckedMap(data, v, info)
 	} else if info.Main == tSlice {
 		return decCheckedSlice(data, v, info)
 	} else {

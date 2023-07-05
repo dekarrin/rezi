@@ -107,12 +107,26 @@ func encMap(v interface{}, keyType typeInfo) []byte {
 	return enc
 }
 
-// decMap decodes a REZI map as a compatible map type.
-func decMap(data []byte, v interface{}, ti typeInfo) (int, error) {
+// decCheckedMap decodes a REZI map as a compatible map type.
+func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if ti.Main != tMap {
 		panic("not a map type")
 	}
 
+	m, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		func(t reflect.Type) bool {
+			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
+		},
+		decMap,
+	))
+	if ti.Indir == 0 {
+		refReceiver := reflect.ValueOf(v)
+		refReceiver.Elem().Set(reflect.ValueOf(m))
+	}
+	return n, err
+}
+
+func decMap(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
 	toConsume, n, err := decInt[tLen](data)
