@@ -1284,3 +1284,672 @@ func Test_Dec_Map_SelfIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 }
+
+func Test_Dec_Map_ValueIndirection(t *testing.T) {
+
+	t.Run("map[string]*int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x10,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0x01, 0x08,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
+			}
+			expect         = map[string]*int{"ONE": ref(1), "EIGHT": ref(8)}
+			expectConsumed = 18
+		)
+
+		// execute
+		var actual map[string]*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[string]*int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0xa0,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0x01, 0x01,
+			}
+			expect         = map[string]*int{"ONE": ref(1), "EIGHT": nil}
+			expectConsumed = 17
+		)
+
+		// execute
+		var actual map[string]*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[string]*int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0e,
+
+				0x01, 0x05, 0x45, 0x49, 0x47, 0x48, 0x54,
+				0xa0,
+
+				0x01, 0x03, 0x4f, 0x4e, 0x45,
+				0xa0,
+			}
+			expect         = map[string]*int{"ONE": nil, "EIGHT": nil}
+			expectConsumed = 16
+		)
+
+		// execute
+		var actual map[string]*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*uint64, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x12,
+
+				0x01, 0x01,
+				0x04, 0x05, 0x4c, 0x56, 0x38,
+
+				0x01, 0x08,
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
+			}
+			expect         = map[int]*uint64{8: ref(uint64(10004138888888800612)), 1: ref(uint64(88888888))}
+			expectConsumed = 20
+		)
+
+		// execute
+		var actual map[int]*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*uint64, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0a,
+
+				0x01, 0x01,
+				0x04, 0x05, 0x4c, 0x56, 0x38,
+
+				0x01, 0x08,
+				0xa0,
+			}
+			expect         = map[int]*uint64{8: nil, 1: ref(uint64(88888888))}
+			expectConsumed = 12
+		)
+
+		// execute
+		var actual map[int]*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*uint64, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x06,
+
+				0x01, 0x01,
+				0xa0,
+
+				0x01, 0x08,
+				0xa0,
+			}
+			expect         = map[int]*uint64{8: nil, 1: nil}
+			expectConsumed = 8
+		)
+
+		// execute
+		var actual map[int]*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[bool]*string, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x14,
+
+				0x00,
+				0x01, 0x03, 0x54, 0x41, 0x56,
+
+				0x01,
+				0x01, 0x0b, 0x43, 0x4f, 0x4f, 0x4c, 0x20, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+			expect         = map[bool]*string{true: ref("COOL VRISKA"), false: ref("TAV")}
+			expectConsumed = 22
+		)
+
+		// execute
+		var actual map[bool]*string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[bool]*string, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x10,
+
+				0x00,
+				0xa0,
+
+				0x01,
+				0x01, 0x0b, 0x43, 0x4f, 0x4f, 0x4c, 0x20, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+			expect         = map[bool]*string{true: ref("COOL VRISKA"), false: nil}
+			expectConsumed = 18
+		)
+
+		// execute
+		var actual map[bool]*string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[bool]*string, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x04,
+
+				0x00,
+				0xa0,
+
+				0x01,
+				0xa0,
+			}
+			expect         = map[bool]*string{true: nil, false: nil}
+			expectConsumed = 6
+		)
+
+		// execute
+		var actual map[bool]*string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*bool, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0b, // len=11
+
+				0x01, 0x64, 0x00, // 100: false
+				0x02, 0x01, 0x9d, 0x01, // 413: true
+				0x02, 0x02, 0x64, 0x01, // 612: true
+			}
+			expect = map[int]*bool{
+				413: ref(true),
+				612: ref(true),
+				100: ref(false),
+			}
+			expectConsumed = 13
+		)
+
+		// execute
+		var actual map[int]*bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*bool, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0b, // len=11
+
+				0x01, 0x64, 0x00, // 100: false
+				0x02, 0x01, 0x9d, 0x01, // 413: true
+				0x02, 0x02, 0x64, 0xa0, // 612: nil
+			}
+			expect = map[int]*bool{
+				413: ref(true),
+				612: nil,
+				100: ref(false),
+			}
+			expectConsumed = 13
+		)
+
+		// execute
+		var actual map[int]*bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*bool, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0b, // len=11
+
+				0x01, 0x64, 0xa0, // 100: nil
+				0x02, 0x01, 0x9d, 0xa0, // 413: nil
+				0x02, 0x02, 0x64, 0xa0, // 612: nil
+			}
+			expect = map[int]*bool{
+				413: nil,
+				612: nil,
+				100: nil,
+			}
+			expectConsumed = 13
+		)
+
+		// execute
+		var actual map[int]*bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*binary, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x1c, // len=28
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x08, // len=8
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+				0x01, 0x01, // 1
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x0a, // len=10
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+			expect = map[int]*testBinary{
+				413: {data: "JOHN", number: 1},
+				612: {data: "VRISKA", number: 8},
+			}
+			expectConsumed = 30
+		)
+
+		// execute
+		var actual map[int]*testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*binary, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x13, // len=19
+
+				0x02, 0x01, 0x9d, // 413:
+				0xa0, // nil
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x0a, // len=10
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x01, 0x08, // 8
+			}
+			expect = map[int]*testBinary{
+				413: nil,
+				612: {data: "VRISKA", number: 8},
+			}
+			expectConsumed = 21
+		)
+
+		// execute
+		var actual map[int]*testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*binary, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x08, // len=08
+
+				0x02, 0x01, 0x9d, // 413:
+				0xa0, // nil
+
+				0x02, 0x02, 0x64, // 612:
+				0xa0, // nil
+			}
+			expect = map[int]*testBinary{
+				413: nil,
+				612: nil,
+			}
+			expectConsumed = 10
+		)
+
+		// execute
+		var actual map[int]*testBinary
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*[]int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x16, // len=22
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x06, // len=6
+				0x01, 0x04, 0x01, 0x01, 0x01, 0x03, // {4, 1, 3}
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x06, // len=6
+				0x01, 0x06, 0x01, 0x01, 0x01, 0x02, // {6, 1, 2}
+			}
+			expect = map[int]*[]int{
+				413: {4, 1, 3},
+				612: {6, 1, 2},
+			}
+			expectConsumed = 24
+		)
+
+		// execute
+		var actual map[int]*[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*[]int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x02, 0x01, 0x9d, // 413:
+				0xa0, // nil
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x06, // len=6
+				0x01, 0x06, 0x01, 0x01, 0x01, 0x02, // {6, 1, 2}
+			}
+			expect = map[int]*[]int{
+				413: nil,
+				612: {6, 1, 2},
+			}
+			expectConsumed = 17
+		)
+
+		// execute
+		var actual map[int]*[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*[]int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8
+
+				0x02, 0x01, 0x9d, // 413:
+				0xa0, // nil
+
+				0x02, 0x02, 0x64, // 612:
+				0xa0, // nil
+			}
+			expect = map[int]*[]int{
+				413: nil,
+				612: nil,
+			}
+			expectConsumed = 10
+		)
+
+		// execute
+		var actual map[int]*[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*map[int]string, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x2e, // len=46
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x10, // len=16
+				0x01, 0x02, 0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // 2: "JOHN"
+				0x01, 0x04, 0x01, 0x04, 0x52, 0x4f, 0x53, 0x45, // 4: "ROSE"
+
+				0x02, 0x02, 0x64, // 612:
+				0x01, 0x14, // len=20
+				0x01, 0x04, 0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // 4: "NEPETA"
+				0x01, 0x08, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // 8: "VRISKA"
+			}
+			expect = map[int]*map[int]string{
+				413: {
+					2: "JOHN",
+					4: "ROSE",
+				},
+				612: {
+					8: "VRISKA",
+					4: "NEPETA",
+				},
+			}
+			expectConsumed = 48
+		)
+
+		// execute
+		var actual map[int]*map[int]string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*map[int]string, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x19, // len=25
+
+				0x02, 0x01, 0x9d, // 413:
+				0x01, 0x10, // len=16
+				0x01, 0x02, 0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // 2: "JOHN"
+				0x01, 0x04, 0x01, 0x04, 0x52, 0x4f, 0x53, 0x45, // 4: "ROSE"
+
+				0x02, 0x02, 0x64, // 612:
+				0xa0, // nil
+			}
+			expect = map[int]*map[int]string{
+				413: {
+					2: "JOHN",
+					4: "ROSE",
+				},
+				612: nil,
+			}
+			expectConsumed = 27
+		)
+
+		// execute
+		var actual map[int]*map[int]string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*map[int]string, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8
+
+				0x02, 0x01, 0x9d, // 413:
+				0xa0, // nil
+
+				0x02, 0x02, 0x64, // 612:
+				0xa0, // nil
+			}
+			expect = map[int]*map[int]string{
+				413: nil,
+				612: nil,
+			}
+			expectConsumed = 10
+		)
+
+		// execute
+		var actual map[int]*map[int]string
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+}
