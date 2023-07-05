@@ -192,7 +192,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	return decoded, n, nil
 }
 
-func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}, typeInfo) (int, error)) decFunc[interface{}] {
+func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
 	return func(data []byte) (interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		receiverType := reflect.TypeOf(wrapped)
@@ -224,7 +224,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 		var decoded interface{}
 
 		receiver := receiverValue.Interface()
-		decConsumed, decErr := decToUnwrappedFn(data, receiver, ti)
+		decConsumed, decErr := decToUnwrappedFn(data, receiver)
 
 		if decErr != nil {
 			return nil, decConsumed, decErr

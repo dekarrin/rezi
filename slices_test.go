@@ -1260,34 +1260,34 @@ func Test_Dec_Slice(t *testing.T) {
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
-	/*
-		t.Run("*[]int", func(t *testing.T) {
-			assert := assert.New(t)
 
-			var (
-				input = []byte{
-					0x01, 0x08, // len=8s
+	t.Run("*[]int", func(t *testing.T) {
+		assert := assert.New(t)
 
-					0x01, 0x01, // 1
-					0x01, 0x02, // 2
-					0x01, 0x08, // 8
-					0x01, 0x08, // 8
-				}
-				expectVal      = []int{1, 2, 8, 8}
-				expect         = &expectVal
-				expectConsumed = 10
-			)
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8s
 
-			var actual *[]int
-			consumed, err := Dec(input, &actual)
-			if !assert.NoError(err) {
-				return
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
 			}
+			expectVal      = []int{1, 2, 8, 8}
+			expect         = &expectVal
+			expectConsumed = 10
+		)
 
-			assert.Equal(expectConsumed, consumed)
-			assert.Equal(expect, actual)
-		})
+		var actual *[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+	/*
 		t.Run("**[]int", func(t *testing.T) {
 			assert := assert.New(t)
 

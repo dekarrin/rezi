@@ -60,10 +60,10 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	return decSlice(data, v, ti)
+	return decSlice(data, v)
 }
 
-func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
+func decSlice(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
 	toConsume, n, err := decInt[tLen](data)

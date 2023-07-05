@@ -258,7 +258,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}, _ typeInfo) (int, error) {
+			func(b []byte, unwrapped interface{}) (int, error) {
 				recv := unwrapped.(encoding.BinaryUnmarshaler)
 				return decBinary(b, recv)
 			},
