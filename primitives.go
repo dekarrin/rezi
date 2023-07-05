@@ -254,55 +254,15 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case tBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithNilCheck(data, v, ti, func(b []byte) (interface{}, int, error) {
-			// v is *(...*)T, ret-val of decFn (this lambda) is T.
-			// TODO: this is a lot of extra info that should probably be checked
-			// in decTypeInfo and cached in the typeInfo struct. candidate for
-			// benchmarking in the future.
-
-			receiverType := reflect.TypeOf(v)
-			// if v is a *T, we are done. but it could be a **T. check now.
-
-			if receiverType.Kind() == reflect.Pointer { // future-proofing - might be a T
-				// for every * in the (...*) part of *(...*)T up until the
-				// implementor, do a deref.
-				for i := 0; i < ti.Indir; i++ {
-					receiverType = receiverType.Elem()
-				}
-			}
-
-			// receiverType should now be the exact type which implements
-			// encoding.BinaryUnmarshaler. Assert this for now.
-			if !receiverType.Implements(refBinaryUnmarshalerType) {
-				// should never happen, assuming ti.Indir is valid.
-				panic("unwrapped binary type receiver does not implement encoding.BinaryUnmarshaler")
-			}
-
-			var receiverValue reflect.Value
-			if receiverType.Kind() == reflect.Pointer {
-				// receiverType is *T
-				receiverValue = reflect.New(receiverType.Elem())
-			} else {
-				// receiverType is itself T (future-proofing)
-				receiverValue = reflect.Zero(receiverType)
-			}
-
-			receiver := receiverValue.Interface().(encoding.BinaryUnmarshaler)
-			decConsumed, decErr := decBinary(data, receiver)
-			if decErr != nil {
-				return nil, decConsumed, decErr
-			}
-
-			var decoded interface{}
-
-			if receiverType.Kind() == reflect.Pointer {
-				decoded = reflect.ValueOf(receiver).Elem().Interface()
-			} else {
-				decoded = receiver
-			}
-
-			return decoded, decConsumed, decErr
-		})
+		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+			func(t reflect.Type) bool {
+				return t.Implements(refBinaryUnmarshalerType)
+			},
+			func(b []byte, unwrapped interface{}) (int, error) {
+				recv := unwrapped.(encoding.BinaryUnmarshaler)
+				return decBinary(b, recv)
+			},
+		))
 		if ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 

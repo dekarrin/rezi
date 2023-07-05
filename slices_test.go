@@ -421,6 +421,22 @@ func Test_Enc_Slice(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	// TODO: enshore map is running this check as well on enc
+	t.Run("*[]int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *[]int
+			expect = []byte{
+				0xa0,
+			}
+		)
+
+		actual := Enc(input)
+
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*[]int", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -1216,6 +1232,104 @@ func Test_Dec_Slice(t *testing.T) {
 		consumed, err := Dec(input, &actual)
 
 		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*[]int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xa0,
+			}
+			expect         *[]int
+			expectConsumed = 1
+		)
+
+		var actual *[]int = &[]int{1, 2}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*[]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+			expectVal      = []int{1, 2, 8, 8}
+			expect         = &expectVal
+			expectConsumed = 10
+		)
+
+		var actual *[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+			expectVal      = []int{1, 2, 8, 8}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 10
+		)
+
+		var actual **[]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[]int, but nil []int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
+			}
+			expectPtr      *[]int
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		var actual **[]int = ref(&[]int{1, 2, 3})
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}

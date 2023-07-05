@@ -36,10 +36,31 @@ func encSlice(v interface{}) []byte {
 	return enc
 }
 
-func decSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
+func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if ti.Main != tSlice {
 		panic("not a slice type")
 	}
+
+	sl, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		func(t reflect.Type) bool {
+			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Slice
+		},
+		decSlice,
+	))
+	if ti.Indir == 0 {
+		// assume v is a *T, no future-proofing here.
+
+		// due to complicated forcing of decBinary into the decFunc API,
+		// we do now have a T (as an interface{}). We must use reflection to
+		// assign it.
+
+		refReceiver := reflect.ValueOf(v)
+		refReceiver.Elem().Set(reflect.ValueOf(sl))
+	}
+	return n, err
+}
+
+func decSlice(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
 	toConsume, n, err := decInt[tLen](data)
