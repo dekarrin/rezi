@@ -48,12 +48,6 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		decSlice,
 	))
 	if ti.Indir == 0 {
-		// assume v is a *T, no future-proofing here.
-
-		// due to complicated forcing of decBinary into the decFunc API,
-		// we do now have a T (as an interface{}). We must use reflection to
-		// assign it.
-
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(sl))
 	}
