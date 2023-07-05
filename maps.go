@@ -68,21 +68,21 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 }
 
 // encCheckedMap encodes a compatible map as a REZI map.
-func encCheckedMap(v interface{}, ti typeInfo) []byte {
+func encCheckedMap(v interface{}, ti typeInfo) ([]byte, error) {
 	if ti.Main != tMap {
 		panic("not a map type")
 	}
 
-	return encWithNilCheck(v, ti, func(val interface{}) []byte {
+	return encWithNilCheck(v, ti, func(val interface{}) ([]byte, error) {
 		return encMap(val, *ti.KeyType)
 	}, reflect.Value.Interface)
 }
 
-func encMap(v interface{}, keyType typeInfo) []byte {
+func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0)
+		return encNil(0), nil
 	}
 
 	mapKeys := refVal.MapKeys()
@@ -99,12 +99,27 @@ func encMap(v interface{}, keyType typeInfo) []byte {
 		k := mapKeys[i]
 		v := refVal.MapIndex(k)
 
-		enc = append(enc, Enc(k.Interface())...)
-		enc = append(enc, Enc(v.Interface())...)
+		keyData, err := Enc(k.Interface())
+		if err != nil {
+			return nil, DecodingError{
+				msg:   fmt.Sprintf("map[%v]: key: %s", k.Interface(), err.Error()),
+				cause: []error{err},
+			}
+		}
+		valData, err := Enc(v.Interface())
+		if err != nil {
+			return nil, DecodingError{
+				msg:   fmt.Sprintf("map[%v]: value: %s", k.Interface(), err.Error()),
+				cause: []error{err},
+			}
+		}
+
+		enc = append(enc, keyData...)
+		enc = append(enc, valData...)
 	}
 
 	enc = append(encInt(tLen(len(enc))), enc...)
-	return enc
+	return enc, nil
 }
 
 // decCheckedMap decodes a REZI map as a compatible map type.
@@ -119,6 +134,9 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		},
 		decMap,
 	))
+	if err != nil {
+		return n, err
+	}
 	if ti.Indir == 0 {
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(m))

@@ -12,7 +12,6 @@ package rezi
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"reflect"
 )
@@ -22,16 +21,19 @@ type (
 	tNilLevel = int
 
 	decFunc[E any] func([]byte) (E, int, error)
-	encFunc[E any] func(E) []byte
+	encFunc[E any] func(E) ([]byte, error)
 )
 
-var (
-	ErrInvalidType   = errors.New("data is not the correct type")
-	ErrMalformedData = errors.New("data cannot be interpretered")
-)
+func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
+	return func(e E) ([]byte, error) {
+		return fn(e), nil
+	}
+}
 
 // NewBinaryEncoder creates an Encoder that can encode to bytes and uses an
 // object's MarshalBinary method to encode non-trivial types.
+//
+// Deprecated: Use [NewWriter] instead.
 func NewBinaryEncoder() Encoder[encoding.BinaryMarshaler] {
 	enc := &simpleBinaryEncoder{}
 	return enc
@@ -39,6 +41,8 @@ func NewBinaryEncoder() Encoder[encoding.BinaryMarshaler] {
 
 // NewBinaryDecoder creates a Decoder that can decode bytes and uses an object's
 // UnmarshalBinary method to decode non-trivial types.
+//
+// Deprecated: Use [NewReader] instead.
 func NewBinaryDecoder() Decoder[encoding.BinaryUnmarshaler] {
 	dec := &simpleBinaryDecoder{}
 	return dec
@@ -70,6 +74,15 @@ func initType[E any]() E {
 	return v
 }
 
+// MustEnc is identitical to Enc, but panics if an error would be returned.
+func MustEnc(v interface{}) []byte {
+	enc, err := Enc(v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return enc
+}
+
 // Enc encodes the value as rezi-format bytes. The type of the value is
 // examined to determine how to encode it. No type information is included in
 // the returned bytes so it is up to the caller to keep track of it.
@@ -79,8 +92,8 @@ func initType[E any]() E {
 // any implementor of encoding.BinaryMarshaler. Map and slice types are also
 // supported, as long as their contents are REZI-supported.
 //
-// This function will panic if the type is not rezi supported.
-func Enc(v interface{}) []byte {
+// TODO: during docs, add note on returned error types and using errors.Is.
+func Enc(v interface{}) ([]byte, error) {
 	info, err := canEncode(v)
 	if err != nil {
 		panic(err.Error())
@@ -89,7 +102,7 @@ func Enc(v interface{}) []byte {
 	if info.Primitive() {
 		return encCheckedPrim(v, info)
 	} else if info.Main == tNil {
-		return encNil(0)
+		return encNil(0), nil
 	} else if info.Main == tMap {
 		return encCheckedMap(v, info)
 	} else if info.Main == tSlice {
@@ -118,7 +131,7 @@ func Dec(data []byte, v interface{}) (int, error) {
 	}
 }
 
-func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) []byte {
+func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
 	if ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
 		encodeTarget := reflect.ValueOf(value)
@@ -137,7 +150,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 			encodeTarget = encodeTarget.Elem()
 		}
 		if nilLevel > -1 {
-			return encNil(nilLevel)
+			return encNil(nilLevel), nil
 		}
 		return encFn(convFn(encodeTarget))
 	} else {

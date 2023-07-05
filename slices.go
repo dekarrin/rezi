@@ -10,7 +10,7 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encCheckedSlice(v interface{}, ti typeInfo) []byte {
+func encCheckedSlice(v interface{}, ti typeInfo) ([]byte, error) {
 	if ti.Main != tSlice {
 		panic("not a slice type")
 	}
@@ -18,22 +18,26 @@ func encCheckedSlice(v interface{}, ti typeInfo) []byte {
 	return encWithNilCheck(v, ti, encSlice, reflect.Value.Interface)
 }
 
-func encSlice(v interface{}) []byte {
+func encSlice(v interface{}) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0)
+		return encNil(0), nil
 	}
 
 	enc := make([]byte, 0)
 
 	for i := 0; i < refVal.Len(); i++ {
 		v := refVal.Index(i)
-		enc = append(enc, Enc(v.Interface())...)
+		encData, err := Enc(v.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("slice[%d]: %w", i, err)
+		}
+		enc = append(enc, encData...)
 	}
 
 	enc = append(encInt(tLen(len(enc))), enc...)
-	return enc
+	return enc, nil
 }
 
 func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
@@ -47,6 +51,9 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		},
 		decSlice,
 	))
+	if err != nil {
+		return n, err
+	}
 	if ti.Indir == 0 {
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(sl))
@@ -59,7 +66,10 @@ func decSlice(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, fmt.Errorf("decode byte count: %w", err)
+		return 0, DecodingError{
+			msg:   fmt.Sprintf("decode byte count: %s", err.Error()),
+			cause: []error{err},
+		}
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -79,7 +89,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, io.ErrUnexpectedEOF
+		return totalConsumed, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 
 	sl := reflect.MakeSlice(refSliceType, 0, 0)
@@ -90,7 +100,10 @@ func decSlice(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, fmt.Errorf("decode item: %w", err)
+			return totalConsumed, DecodingError{
+				msg:   fmt.Sprintf("slice item: %s", err.Error()),
+				cause: []error{err},
+			}
 		}
 		totalConsumed += n
 		i += n
@@ -174,7 +187,7 @@ func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	enc := make([]byte, 0)
 
 	for i := range sl {
-		enc = append(enc, encBinary(sl[i])...)
+		enc = append(enc, EncBinary(sl[i])...)
 	}
 
 	enc = append(encInt(len(enc)), enc...)

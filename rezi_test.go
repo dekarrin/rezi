@@ -17,10 +17,10 @@ type testNontrivial struct {
 func (tn testNontrivial) MarshalBinary() ([]byte, error) {
 	var enc []byte
 
-	enc = append(enc, Enc(tn.ptr)...)
-	enc = append(enc, Enc(tn.goodNums)...)
-	enc = append(enc, Enc(tn.actions)...)
-	enc = append(enc, Enc(tn.friend)...)
+	enc = append(enc, MustEnc(tn.ptr)...)
+	enc = append(enc, MustEnc(tn.goodNums)...)
+	enc = append(enc, MustEnc(tn.actions)...)
+	enc = append(enc, MustEnc(tn.friend)...)
 
 	return enc, nil
 }
@@ -95,11 +95,14 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 	}
 
 	// we should be able to *encode* it
-	data := Enc(original)
+	data, err := Enc(original)
+	if !assert.NoError(err) {
+		return
+	}
 
 	// and then, we should be able to get the original back without error
 	var rebuilt testNontrivial
-	_, err := Dec(data, &rebuilt)
+	_, err = Dec(data, &rebuilt)
 	if !assert.NoError(err) {
 		return
 	}

@@ -46,56 +46,56 @@ type integral interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value interface{}, ti typeInfo) []byte {
+func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 	switch ti.Main {
 	case tString:
-		return encWithNilCheck(value, ti, encString, reflect.Value.String)
+		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
 	case tBool:
-		return encWithNilCheck(value, ti, encBool, reflect.Value.Bool)
+		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, encInt[int8], func(r reflect.Value) int8 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
 					return int8(r.Int())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, encInt[int16], func(r reflect.Value) int16 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
 					return int16(r.Int())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, encInt[int32], func(r reflect.Value) int32 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, encInt[int64], func(r reflect.Value) int64 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), func(r reflect.Value) int64 {
 					return int64(r.Int())
 				})
 			default:
-				return encWithNilCheck(value, ti, encInt[int], func(r reflect.Value) int {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
 				})
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, encInt[uint8], func(r reflect.Value) uint8 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
 					return uint8(r.Uint())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, encInt[uint16], func(r reflect.Value) uint16 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
 					return uint16(r.Uint())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, encInt[uint32], func(r reflect.Value) uint32 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, encInt[uint64], func(r reflect.Value) uint64 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), func(r reflect.Value) uint64 {
 					return uint64(r.Uint())
 				})
 			default:
-				return encWithNilCheck(value, ti, encInt[uint], func(r reflect.Value) uint {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
 				})
 			}
@@ -263,6 +263,9 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return decBinary(b, recv)
 			},
 		))
+		if err != nil {
+			return n, err
+		}
 		if ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 
@@ -273,57 +276,9 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			refReceiver := reflect.ValueOf(v)
 			refReceiver.Elem().Set(reflect.ValueOf(bu))
 		}
-		if err != nil {
-			return n, err
-		}
 		return n, nil
 	default:
 		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
-	}
-}
-
-// encBool encodes the bool value as a slice of bytes. The value can later
-// be decoded with DecBool. No type indicator is included in the output;
-// it is up to the caller to add this if they so wish it.
-//
-// The output will always contain exactly 1 byte.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncBool(b bool) []byte {
-	return encBool(b)
-}
-
-func encBool(b bool) []byte {
-	enc := make([]byte, 1)
-
-	if b {
-		enc[0] = 1
-	} else {
-		enc[0] = 0
-	}
-
-	return enc
-}
-
-// DecBool decodes a bool value at the start of the given bytes and
-// returns the value and the number of bytes read.
-//
-// Deprecated: This function has been replaced by [Dec].
-func DecBool(data []byte) (bool, int, error) {
-	return decBool(data)
-}
-
-func decBool(data []byte) (bool, int, error) {
-	if len(data) < 1 {
-		return false, 0, io.ErrUnexpectedEOF
-	}
-
-	if data[0] == 0 {
-		return false, 1, nil
-	} else if data[0] == 1 {
-		return true, 1, nil
-	} else {
-		return false, 0, ErrInvalidType
 	}
 }
 
@@ -358,96 +313,6 @@ func encNil(indirLevels int) []byte {
 
 	enc = append(enc, encInt(tNilLevel(indirLevels))...)
 	return enc
-}
-
-// encInt is similar to EncInt but performs specific behavior based on the
-// type of int it is given. This allows, for example, the largest value that can
-// be held by a uint64 to be properly represented where casting would have
-// converted it to a negative integer.
-func encInt[E integral](v E) []byte {
-	if v == 0 {
-		return []byte{0x00}
-	}
-
-	negative := v < 0
-
-	i := int64(v)
-
-	b1 := byte((i >> 56) & 0xff)
-	b2 := byte((i >> 48) & 0xff)
-	b3 := byte((i >> 40) & 0xff)
-	b4 := byte((i >> 32) & 0xff)
-	b5 := byte((i >> 24) & 0xff)
-	b6 := byte((i >> 16) & 0xff)
-	b7 := byte((i >> 8) & 0xff)
-	b8 := byte(i & 0xff)
-
-	parts := []byte{b1, b2, b3, b4, b5, b6, b7, b8}
-
-	enc := []byte{}
-	var hitMSB bool
-	for i := range parts {
-		if hitMSB {
-			enc = append(enc, parts[i])
-		} else if (!negative && parts[i] != 0x00) || (negative && parts[i] != 0xff) {
-			enc = append(enc, parts[i])
-			hitMSB = true
-		}
-	}
-
-	byteCount := uint8(len(enc))
-
-	// byteCount will never be more than 8 so we can encode sign info in most
-	// significant bit
-	if negative {
-		byteCount |= infoBitsSign
-	}
-
-	enc = append([]byte{byteCount}, enc...)
-
-	return enc
-}
-
-// EncInt encodes the int value as a slice of bytes. The value can later
-// be decoded with DecInt. No type indicator is included in the output;
-// it is up to the caller to add this if they so wish it. Integers up to 64 bits
-// are supported with this encoding scheme.
-//
-// The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
-// will result in longer slices; only 0 is encoded as a single byte.
-//
-// Encoded integers start with an info byte that packs the sign and the number
-// of following bytes needed to represent the value together. The sign is
-// encoded as the most significant bit (the first/leftmost bit) of the byte,
-// with 0 being positive and 1 being negative. The next significant 3 bits are
-// unused. The least significant 4 bits contain the number of bytes that are
-// used to encode the integer value. The bits in the info byte can be
-// represented as `SXXXLLLL`, where S is the sign bit, X are unused bits, and L
-// are the bits that encode the remaining length.
-//
-// The remaining bytes give the value being encoded as a 2's complement 64-bit
-// big-endian integer, omitting any leading bytes that would be encoded as 0x00
-// if the integer is positive, or 0xff if the integer is negative. The value 0
-// is special and is encoded as with infobyte 0x00 with no additional bytes.
-// Because two's complement is used and as a result of the rules, -1 also
-// requires no bytes besides the info byte (because it would simply be a series
-// of eight 0xff bytes), and is therefore encoded as 0x80.
-//
-// Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
-// 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
-// [0x82 0xfe 0x0c], etc.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncInt(i int) []byte {
-	return encInt(i)
-}
-
-// DecInt decodes an integer value at the start of the given bytes and
-// returns the value and the number of bytes read.
-//
-// Deprecated: this function has been replaced by [Dec].
-func DecInt(data []byte) (int, int, error) {
-	return decInt[int](data)
 }
 
 // decNilable decodes a value that could also represent a nil value. If it's not
@@ -500,11 +365,146 @@ func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLev
 	return true, indir, val, consumed, nil
 }
 
+// encBool encodes the bool value as a slice of bytes. The value can later
+// be decoded with DecBool. No type indicator is included in the output;
+// it is up to the caller to add this if they so wish it.
+//
+// The output will always contain exactly 1 byte.
+//
+// Deprecated: This function has been replaced by [Enc].
+func EncBool(b bool) []byte {
+	return encBool(b)
+}
+
+func encBool(b bool) []byte {
+	enc := make([]byte, 1)
+
+	if b {
+		enc[0] = 1
+	} else {
+		enc[0] = 0
+	}
+
+	return enc
+}
+
+// DecBool decodes a bool value at the start of the given bytes and
+// returns the value and the number of bytes read.
+//
+// Deprecated: This function has been replaced by [Dec].
+func DecBool(data []byte) (bool, int, error) {
+	return decBool(data)
+}
+
+func decBool(data []byte) (bool, int, error) {
+	if len(data) < 1 {
+		return false, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
+	}
+
+	if data[0] == 0 {
+		return false, 1, nil
+	} else if data[0] == 1 {
+		return true, 1, nil
+	} else {
+		return false, 0, wrapDecErr(ErrInvalidType, nil)
+	}
+}
+
+// EncInt encodes the int value as a slice of bytes. The value can later
+// be decoded with DecInt. No type indicator is included in the output;
+// it is up to the caller to add this if they so wish it. Integers up to 64 bits
+// are supported with this encoding scheme.
+//
+// The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
+// will result in longer slices; only 0 is encoded as a single byte.
+//
+// Encoded integers start with an info byte that packs the sign and the number
+// of following bytes needed to represent the value together. The sign is
+// encoded as the most significant bit (the first/leftmost bit) of the byte,
+// with 0 being positive and 1 being negative. The next significant 3 bits are
+// unused. The least significant 4 bits contain the number of bytes that are
+// used to encode the integer value. The bits in the info byte can be
+// represented as `SXXXLLLL`, where S is the sign bit, X are unused bits, and L
+// are the bits that encode the remaining length.
+//
+// The remaining bytes give the value being encoded as a 2's complement 64-bit
+// big-endian integer, omitting any leading bytes that would be encoded as 0x00
+// if the integer is positive, or 0xff if the integer is negative. The value 0
+// is special and is encoded as with infobyte 0x00 with no additional bytes.
+// Because two's complement is used and as a result of the rules, -1 also
+// requires no bytes besides the info byte (because it would simply be a series
+// of eight 0xff bytes), and is therefore encoded as 0x80.
+//
+// Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
+// 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
+// [0x82 0xfe 0x0c], etc.
+//
+// Deprecated: This function has been replaced by [Enc].
+func EncInt(i int) []byte {
+	return encInt(i)
+}
+
+// encInt is similar to EncInt but performs specific behavior based on the
+// type of int it is given. This allows, for example, the largest value that can
+// be held by a uint64 to be properly represented where casting would have
+// converted it to a negative integer.
+func encInt[E integral](v E) []byte {
+	if v == 0 {
+		return []byte{0x00}
+	}
+
+	negative := v < 0
+
+	i := int64(v)
+
+	b1 := byte((i >> 56) & 0xff)
+	b2 := byte((i >> 48) & 0xff)
+	b3 := byte((i >> 40) & 0xff)
+	b4 := byte((i >> 32) & 0xff)
+	b5 := byte((i >> 24) & 0xff)
+	b6 := byte((i >> 16) & 0xff)
+	b7 := byte((i >> 8) & 0xff)
+	b8 := byte(i & 0xff)
+
+	parts := []byte{b1, b2, b3, b4, b5, b6, b7, b8}
+
+	enc := []byte{}
+	var hitMSB bool
+	for i := range parts {
+		if hitMSB {
+			enc = append(enc, parts[i])
+		} else if (!negative && parts[i] != 0x00) || (negative && parts[i] != 0xff) {
+			enc = append(enc, parts[i])
+			hitMSB = true
+		}
+	}
+
+	byteCount := uint8(len(enc))
+
+	// byteCount will never be more than 8 so we can encode sign info in most
+	// significant bit
+	if negative {
+		byteCount |= infoBitsSign
+	}
+
+	enc = append([]byte{byteCount}, enc...)
+
+	return enc
+}
+
+// DecInt decodes an integer value at the start of the given bytes and
+// returns the value and the number of bytes read.
+//
+// Deprecated: this function has been replaced by [Dec].
+func DecInt(data []byte) (int, int, error) {
+	return decInt[int](data)
+}
+
 // decInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
 func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
-		return 0, 0, io.ErrUnexpectedEOF
+		return 0, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 
 	byteCount := data[0]
@@ -522,7 +522,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 	// for future use
 
 	if len(data) < int(byteCount) {
-		return 0, 0, io.ErrUnexpectedEOF
+		return 0, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 
 	intData := data[:byteCount]
@@ -595,16 +595,22 @@ func DecString(data []byte) (string, int, error) {
 
 func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, io.ErrUnexpectedEOF
+		return "", 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 	runeCount, n, err := decInt[int](data)
 	if err != nil {
-		return "", 0, fmt.Errorf("decoding string rune count: %w", err)
+		return "", 0, DecodingError{
+			msg:   fmt.Sprintf("decoding string rune count: %s", err.Error()),
+			cause: []error{err},
+		}
 	}
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", 0, fmt.Errorf("string rune count < 0: %w", ErrMalformedData)
+		return "", 0, DecodingError{
+			msg:   "string rune count < 0",
+			cause: []error{ErrMalformedData},
+		}
 	}
 
 	readBytes := n
@@ -617,9 +623,15 @@ func decString(data []byte) (string, int, error) {
 			if charBytesRead == 0 {
 				return "", 0, io.ErrUnexpectedEOF
 			} else if charBytesRead == 1 {
-				return "", 0, fmt.Errorf("invalid UTF-8 encoding in string: %w", ErrMalformedData)
+				return "", 0, DecodingError{
+					msg:   "invalid UTF-8 encoding in string",
+					cause: []error{ErrMalformedData},
+				}
 			} else {
-				return "", 0, fmt.Errorf("invalid unicode replacement character in rune: %w", ErrMalformedData)
+				return "", 0, DecodingError{
+					msg:   "invalid unicode replacement character in rune",
+					cause: []error{ErrMalformedData},
+				}
 			}
 		}
 
@@ -641,19 +653,26 @@ func decString(data []byte) (string, int, error) {
 //
 // Deprecated: This function has been replaced by [Enc].
 func EncBinary(b encoding.BinaryMarshaler) []byte {
-	return encBinary(b)
+
+	// intentionally swallowing error for compatibility with v1 API. Will be
+	// removed on update to v2.
+	data, _ := encBinary(b)
+	return data
 }
 
-func encBinary(b encoding.BinaryMarshaler) []byte {
+func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	if b == nil {
-		return encNil(0)
+		return encNil(0), nil
 	}
 
-	enc, _ := b.MarshalBinary()
+	enc, marshalErr := b.MarshalBinary()
+	if marshalErr != nil {
+		return nil, wrapEncErr(marshalErr, ErrMarshalBinary)
+	}
 
 	enc = append(encInt(len(enc)), enc...)
 
-	return enc
+	return enc, nil
 }
 
 // decBinary decodes a value at the start of the given bytes and calls
@@ -680,7 +699,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	data = data[readBytes:]
 
 	if len(data) < byteLen {
-		return readBytes, io.ErrUnexpectedEOF
+		return readBytes, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 	var binData []byte
 
@@ -690,7 +709,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return readBytes, err
+		return readBytes, wrapDecErr(err, ErrUnmarshalBinary)
 	}
 
 	return byteLen + readBytes, nil

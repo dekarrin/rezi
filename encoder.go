@@ -49,7 +49,7 @@ func (sbe *simpleBinaryEncoder) EncodeString(s string) {
 
 func (sbe *simpleBinaryEncoder) Encode(o encoding.BinaryMarshaler) {
 	sbe.checkInit()
-	val := encBinary(o)
+	val := EncBinary(o)
 	sbe.b.Write(val)
 }
 

@@ -24,8 +24,8 @@ type testBinary struct {
 
 func (tbv testBinary) MarshalBinary() ([]byte, error) {
 	var b []byte
-	b = append(b, Enc(tbv.data)...)
-	b = append(b, Enc(tbv.number)...)
+	b = append(b, MustEnc(tbv.data)...)
+	b = append(b, MustEnc(tbv.number)...)
 	return b, nil
 }
 
