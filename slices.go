@@ -92,6 +92,9 @@ func decSlice(data []byte, v interface{}) (int, error) {
 		return totalConsumed, wrapDecErr(io.ErrUnexpectedEOF, nil)
 	}
 
+	// clamp values we are allowed to read so we don't try to read other data
+	data = data[:toConsume]
+
 	sl := reflect.MakeSlice(refSliceType, 0, 0)
 
 	var i int

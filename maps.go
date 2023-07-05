@@ -177,6 +177,9 @@ func decMap(data []byte, v interface{}) (int, error) {
 		return totalConsumed, io.ErrUnexpectedEOF
 	}
 
+	// clamp values we are allowed to read so we don't try to read other data
+	data = data[:toConsume]
+
 	// create the map we will be populating
 	m := reflect.MakeMap(refMapType)
 
