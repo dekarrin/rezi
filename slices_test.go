@@ -1344,134 +1344,172 @@ func Test_Dec_Slice_SelfIndirection(t *testing.T) {
 
 func Test_Dec_Slice_ValueIndirection(t *testing.T) {
 
+	t.Run("[]*int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0c,
+
+				0x01, 0x01,
+				0x01, 0x03,
+				0x01, 0x04,
+				0x01, 0xc8,
+				0x03, 0x04, 0x4b, 0x41,
+			}
+			expect         = []*int{ref(1), ref(3), ref(4), ref(200), ref(281409)}
+			expectConsumed = 14
+		)
+
+		// execute
+		var actual []*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0b,
+
+				0x01, 0x01,
+				0xa0,
+				0x01, 0x04,
+				0x01, 0xc8,
+				0x03, 0x04, 0x4b, 0x41,
+			}
+			expect         = []*int{ref(1), nil, ref(4), ref(200), ref(281409)}
+			expectConsumed = 13
+		)
+
+		// execute
+		var actual []*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x05,
+
+				0xa0,
+				0xa0,
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+			expect         = []*int{nil, nil, nil, nil, nil}
+			expectConsumed = 7
+		)
+
+		// execute
+		var actual []*int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint64, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x12,
+
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+			expect         = []*uint64{ref(uint64(10004138888888800612)), ref(uint64(10004138888888800613))}
+			expectConsumed = 20
+		)
+
+		// execute
+		var actual []*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint64, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0a,
+
+				0xa0,
+				0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+			expect         = []*uint64{nil, ref(uint64(10004138888888800613))}
+			expectConsumed = 12
+		)
+
+		// execute
+		var actual []*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*uint64, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x02,
+
+				0xa0,
+				0xa0,
+			}
+			expect         = []*uint64{nil, nil}
+			expectConsumed = 4
+		)
+
+		// execute
+		var actual []*uint64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	/*
-
-
-		t.Run("[]*int, all non-nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*int{ref(1), ref(3), ref(4), ref(200), ref(281409)}
-				expect = []byte{
-					0x01, 0x0c,
-
-					0x01, 0x01,
-					0x01, 0x03,
-					0x01, 0x04,
-					0x01, 0xc8,
-					0x03, 0x04, 0x4b, 0x41,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]*int, one nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*int{ref(1), ref(3), ref(4), ref(200), nil}
-				expect = []byte{
-					0x01, 0x09,
-
-					0x01, 0x01,
-					0x01, 0x03,
-					0x01, 0x04,
-					0x01, 0xc8,
-					0xa0,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]*int, all nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*int{nil, nil}
-				expect = []byte{
-					0x01, 0x02,
-
-					0xa0,
-					0xa0,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]*uint64, all non-nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*uint64{ref(uint64(10004138888888800612)), ref(uint64(10004138888888800613))}
-				expect = []byte{
-					0x01, 0x12,
-
-					0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
-					0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]*uint64, one nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*uint64{ref(uint64(10004138888888800612)), nil}
-				expect = []byte{
-					0x01, 0x0a,
-
-					0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x64,
-					0xa0,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
-
-		t.Run("[]*uint64, all nil", func(t *testing.T) {
-			// setup
-			assert := assert.New(t)
-			var (
-				input  = []*uint64{nil, nil}
-				expect = []byte{
-					0x01, 0x02,
-
-					0xa0,
-					0xa0,
-				}
-			)
-
-			// execute
-			actual := Enc(input)
-
-			// assert
-			assert.Equal(expect, actual)
-		})
 
 		t.Run("[]*string, all non-nil", func(t *testing.T) {
 			// setup
