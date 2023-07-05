@@ -46,56 +46,56 @@ type integral interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value interface{}, ti typeInfo) []byte {
+func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 	switch ti.Main {
 	case tString:
-		return encWithNilCheck(value, ti, encString, reflect.Value.String)
+		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
 	case tBool:
-		return encWithNilCheck(value, ti, encBool, reflect.Value.Bool)
+		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
 	case tIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, encInt[int8], func(r reflect.Value) int8 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
 					return int8(r.Int())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, encInt[int16], func(r reflect.Value) int16 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
 					return int16(r.Int())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, encInt[int32], func(r reflect.Value) int32 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, encInt[int64], func(r reflect.Value) int64 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), func(r reflect.Value) int64 {
 					return int64(r.Int())
 				})
 			default:
-				return encWithNilCheck(value, ti, encInt[int], func(r reflect.Value) int {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
 				})
 			}
 		} else {
 			switch ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, encInt[uint8], func(r reflect.Value) uint8 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
 					return uint8(r.Uint())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, encInt[uint16], func(r reflect.Value) uint16 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
 					return uint16(r.Uint())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, encInt[uint32], func(r reflect.Value) uint32 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, encInt[uint64], func(r reflect.Value) uint64 {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), func(r reflect.Value) uint64 {
 					return uint64(r.Uint())
 				})
 			default:
-				return encWithNilCheck(value, ti, encInt[uint], func(r reflect.Value) uint {
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
 				})
 			}
@@ -641,19 +641,26 @@ func decString(data []byte) (string, int, error) {
 //
 // Deprecated: This function has been replaced by [Enc].
 func EncBinary(b encoding.BinaryMarshaler) []byte {
-	return encBinary(b)
+
+	// intentionally swallowing error for compatibility with v1 API. Will be
+	// removed on update to v2.
+	data, _ := encBinary(b)
+	return data
 }
 
-func encBinary(b encoding.BinaryMarshaler) []byte {
+func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	if b == nil {
-		return encNil(0)
+		return encNil(0), nil
 	}
 
-	enc, _ := b.MarshalBinary()
+	enc, marshalErr := b.MarshalBinary()
+	if marshalErr != nil {
+		return nil, wrapEncErr(marshalErr, ErrMarshalBinary)
+	}
 
 	enc = append(encInt(len(enc)), enc...)
 
-	return enc
+	return enc, nil
 }
 
 // decBinary decodes a value at the start of the given bytes and calls

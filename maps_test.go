@@ -18,7 +18,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -41,7 +44,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -64,7 +70,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -87,7 +96,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -117,7 +129,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -142,7 +157,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -170,7 +188,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -206,7 +227,10 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -224,7 +248,10 @@ func Test_Enc_Map_SelfIndirection(t *testing.T) {
 			}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -246,7 +273,10 @@ func Test_Enc_Map_SelfIndirection(t *testing.T) {
 			}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -269,7 +299,10 @@ func Test_Enc_Map_SelfIndirection(t *testing.T) {
 			}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -283,7 +316,10 @@ func Test_Enc_Map_SelfIndirection(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -307,7 +343,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -330,7 +369,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -353,7 +395,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -376,7 +421,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -399,7 +447,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -422,7 +473,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -445,7 +499,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -468,7 +525,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -491,7 +551,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -521,7 +584,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -549,7 +615,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -575,7 +644,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -600,7 +672,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -625,7 +700,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -650,7 +728,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -678,7 +759,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -705,7 +789,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -731,7 +818,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -767,7 +857,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -798,7 +891,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)
@@ -824,7 +920,10 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		// assert
 		assert.Equal(expect, actual)

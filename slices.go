@@ -10,7 +10,7 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encCheckedSlice(v interface{}, ti typeInfo) []byte {
+func encCheckedSlice(v interface{}, ti typeInfo) ([]byte, error) {
 	if ti.Main != tSlice {
 		panic("not a slice type")
 	}
@@ -18,22 +18,26 @@ func encCheckedSlice(v interface{}, ti typeInfo) []byte {
 	return encWithNilCheck(v, ti, encSlice, reflect.Value.Interface)
 }
 
-func encSlice(v interface{}) []byte {
+func encSlice(v interface{}) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0)
+		return encNil(0), nil
 	}
 
 	enc := make([]byte, 0)
 
 	for i := 0; i < refVal.Len(); i++ {
 		v := refVal.Index(i)
-		enc = append(enc, Enc(v.Interface())...)
+		encData, err := Enc(v.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("slice[%d]: %w", i, err)
+		}
+		enc = append(enc, encData...)
 	}
 
 	enc = append(encInt(tLen(len(enc))), enc...)
-	return enc
+	return enc, nil
 }
 
 func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
@@ -177,7 +181,7 @@ func EncSliceBinary[E encoding.BinaryMarshaler](sl []E) []byte {
 	enc := make([]byte, 0)
 
 	for i := range sl {
-		enc = append(enc, encBinary(sl[i])...)
+		enc = append(enc, EncBinary(sl[i])...)
 	}
 
 	enc = append(encInt(len(enc)), enc...)

@@ -355,7 +355,7 @@ func Test_EncBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encBinary(tc.input)
+			actual := EncBinary(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -473,7 +473,10 @@ func Test_Enc_String(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
-			actual := Enc(tc.input)
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
 			assert.Equal(tc.expect, actual)
 		})
 	}
@@ -487,7 +490,10 @@ func Test_Enc_String(t *testing.T) {
 			expect   = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -502,7 +508,10 @@ func Test_Enc_String(t *testing.T) {
 			expect   = []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -516,7 +525,10 @@ func Test_Enc_String(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -587,7 +599,10 @@ func Test_Enc_Int(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := Enc(tc.input)
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -604,7 +619,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect   = []byte{0x01, 0x08}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -619,7 +637,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect   = []byte{0x01, 0x08}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -633,7 +654,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -647,7 +671,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect   = []byte{0x01, 0x08}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -662,7 +689,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect   = []byte{0x01, 0x08}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -676,7 +706,10 @@ func Test_Enc_Int(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -704,7 +737,10 @@ func Test_Enc_Bool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := Enc(tc.input)
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -719,7 +755,10 @@ func Test_Enc_Bool(t *testing.T) {
 			expect   = []byte{0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -734,7 +773,10 @@ func Test_Enc_Bool(t *testing.T) {
 			expect   = []byte{0x00}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -748,7 +790,10 @@ func Test_Enc_Bool(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -792,7 +837,10 @@ func Test_Enc_Binary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := Enc(tc.input)
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -812,7 +860,10 @@ func Test_Enc_Binary(t *testing.T) {
 			}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -832,7 +883,10 @@ func Test_Enc_Binary(t *testing.T) {
 			}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})
@@ -846,7 +900,10 @@ func Test_Enc_Binary(t *testing.T) {
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
 
-		actual := Enc(input)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
 		assert.Equal(expect, actual)
 	})

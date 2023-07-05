@@ -103,8 +103,8 @@ func EncMapStringToBinary[E encoding.BinaryMarshaler](m map[string]E) []byte {
 	}
 	sort.Strings(keys)
 	for i := range keys {
-		enc = append(enc, encString(keys[i])...)
-		enc = append(enc, encBinary(m[keys[i]])...)
+		enc = append(enc, EncString(keys[i])...)
+		enc = append(enc, EncBinary(m[keys[i]])...)
 	}
 
 	enc = append(encInt(tLen(len(enc))), enc...)
