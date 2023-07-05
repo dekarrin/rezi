@@ -920,6 +920,25 @@ func Test_Dec_String(t *testing.T) {
 		})
 	}
 
+	t.Run("nil *string", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *string
+			expectConsumed = 1
+		)
+
+		var actual *string = ref("somefin")
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*string", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -1112,6 +1131,25 @@ func Test_Dec_Int(t *testing.T) {
 		})
 	}
 
+	t.Run("nil *int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *int
+			expectConsumed = 1
+		)
+
+		var actual *int = ref(12)
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*int", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -1283,6 +1321,25 @@ func Test_Dec_Bool(t *testing.T) {
 		})
 	}
 
+	t.Run("nil *bool", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *bool
+			expectConsumed = 1
+		)
+
+		var actual *bool = ref(true)
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*bool", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -1375,6 +1432,25 @@ func Test_Dec_Binary(t *testing.T) {
 		}
 
 		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("nil *BinaryUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *testBinary
+			expectConsumed = 1
+		)
+
+		var actual *testBinary = &testBinary{data: "Test", number: 1}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
