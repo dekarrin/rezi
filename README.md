@@ -64,6 +64,12 @@ functions outside of the library's control; it is up to the user to ensure that,
 for instance, calling MarshalBinary on a user-defined type passed to REZI for
 encoding gives a determinstic result.
 
+The REZI format was originally created for structs in the
+[Ictiobus](https://github.com/dekarrin/ictiobus) project and eventually grew
+into its own library for use with other projects.
+
+### Supported Types
+
 At this time REZI supports the built-in types `bool`, `int`, `uint`, `int8`,
 `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, and `string`.
 Additionally, any type that implements `encoding.BinaryMarshaler` can be
@@ -79,6 +85,7 @@ integer types listed above.
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.
 
-The REZI format was originally created for structs in the
-[Ictiobus](https://github.com/dekarrin/ictiobus) project and eventually grew
-into its own library for use with other projects.
+### Compression
+
+REZI does not currently support compression itself but its results can be
+compressed. Automatic compression will come in a future release.
