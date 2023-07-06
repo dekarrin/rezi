@@ -222,7 +222,7 @@ func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
 // NewBinaryEncoder creates an Encoder that can encode to bytes and uses an
 // object's MarshalBinary method to encode non-trivial types.
 //
-// Deprecated: Use [NewWriter] instead.
+// Deprecated: Do not use.
 func NewBinaryEncoder() Encoder[encoding.BinaryMarshaler] {
 	enc := &simpleBinaryEncoder{}
 	return enc
@@ -231,7 +231,7 @@ func NewBinaryEncoder() Encoder[encoding.BinaryMarshaler] {
 // NewBinaryDecoder creates a Decoder that can decode bytes and uses an object's
 // UnmarshalBinary method to decode non-trivial types.
 //
-// Deprecated: Use [NewReader] instead.
+// Deprecated: Do not use.
 func NewBinaryDecoder() Decoder[encoding.BinaryUnmarshaler] {
 	dec := &simpleBinaryDecoder{}
 	return dec
@@ -263,7 +263,7 @@ func initType[E any]() E {
 	return v
 }
 
-// MustEnc is identitical to Enc, but panics if an error would be returned.
+// MustEnc is identical to Enc, but panics if an error would be returned.
 func MustEnc(v interface{}) []byte {
 	enc, err := Enc(v)
 	if err != nil {
@@ -282,7 +282,15 @@ func MustEnc(v interface{}) []byte {
 // supported, as long as their contents are REZI-supported.
 //
 // TODO: during docs, add note on returned error types and using errors.Is.
-func Enc(v interface{}) ([]byte, error) {
+func Enc(v interface{}) (data []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = EncodingError{
+				msg: fmt.Sprintf("%v", r),
+			}
+		}
+	}()
+
 	info, err := canEncode(v)
 	if err != nil {
 		panic(err.Error())
@@ -301,9 +309,26 @@ func Enc(v interface{}) ([]byte, error) {
 	}
 }
 
+// MustDec is identical to Dec, but panics if an error would be returned.
+func MustDec(data []byte, v interface{}) int {
+	n, err := Dec(data, v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
+}
+
 // Dec decodes a value as rezi-format bytes. The argument v must be a pointer to
 // a supported type (or directly implement binary.BinaryMarshaler).
-func Dec(data []byte, v interface{}) (int, error) {
+func Dec(data []byte, v interface{}) (n int, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = DecodingError{
+				msg: fmt.Sprintf("%v", r),
+			}
+		}
+	}()
+
 	info, err := canDecode(v)
 	if err != nil {
 		panic(err.Error())
