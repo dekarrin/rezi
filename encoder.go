@@ -8,6 +8,8 @@ import (
 // Encoder encodes the primitive types bool, int, and string, as well as a type
 // that is specified by its type parameter (usually an interface of some
 // XMarshaler type, such as BinaryMarshaler).
+//
+// Deprecated: Does not function as intended.
 type Encoder[E any] interface {
 	EncodeBool(b bool)
 	EncodeInt(i int)
