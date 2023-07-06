@@ -1,10 +1,12 @@
 // Package rezi provides the ability to encode and decode data in Rarefied
 // Encoding (Compressible) Interchange format. It allows types that implement
 // encoding.BinaryUnmarshaler and encoding.BinaryMarshaler to be easily read
-// from and written to encoded bytes.
+// from and written to byte slices. It has an interface similar to the json
+// package, where one function is used to encode all supported types, and
+// another function receives bytes and a receiver for decoded data and infers
+// how to decode the bytes based on the receiver.
 //
-// It is generally used in a fashion similar to the json package. The [Enc]
-// function is to encode any supported type to bytes.
+// The [Enc] function is to encode any supported type to REZI bytes:
 //
 //	import "github.com/dekarrin/rezi"
 //
@@ -28,7 +30,7 @@
 //	}
 //
 // Data from multiple calls to Enc() can be combined into a single block of data
-// by appending them together.
+// by appending them together:
 //
 //	var allData []byte
 //	allData = append(allData, numData...)
@@ -56,18 +58,19 @@
 //
 // # Supported Data Types
 //
-// REZI supports several built-in Go types: int and all of its unsigned and
-// specific-bitsize varieties, string, bool, and any type that implements
-// encoding.BinaryMarshaler (for encoding) or whose pointer type implements
-// encoding.BinaryUnmarshaler (for decoding).
+// REZI supports several built-in basic Go types: int (as well as all of its
+// unsigned and specific-bitsize varieties), string, bool, and any type that
+// implements encoding.BinaryMarshaler (for encoding) or whose pointer type
+// implements encoding.BinaryUnmarshaler (for decoding).
 //
 // Floating point types and complex types are not supported at this time,
 // although they may be added in a future release.
 //
-// Slices and maps are supported with some simulations. Slices must contain only
-// other supported types (or pointers to them). Maps have the same restrictions
-// on their values, but only maps with a key type of string, int (or any of its
-// unsigned and specific-bitsize varieties), or bool are supported.
+// Slices and maps are supported with some stipulations. Slices must contain
+// only other supported types (or pointers to them). Maps have the same
+// restrictions on their values, but only maps with a key type of string, int
+// (or any of its unsigned and specific-bitsize varieties), or bool are
+// supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -92,7 +95,11 @@
 //
 //	The INFO Byte
 //
+//	Layout:
+//
 //	SXNILLLL
+//	|      |
+//	MSB  LSB
 //
 // The info byte has information coded into its bits represented as SXNILLLL,
 // where each letter stands for a particular bit, from most signficant to the
@@ -247,6 +254,27 @@
 //
 // Encoded nil values are *not* typed; they will be interpreted as the same type
 // as the pointed-to value of the receiver passed to REZI during decoding.
+//
+//	Pointer Values
+//
+//	Layout:
+//
+//	(either encoded value type, or encoded nil)
+//
+// A pointer is not encoded in a special manner. Instead, the value they point
+// to is encoded as though it were not pointer, and when decoding to a pointer,
+// the value is first decoded, then a pointer to the decoded value is used as
+// the value of the pointer.
+//
+// If a pointer is nil, it is instead encoded as a nil value.
+//
+// Pointers that have multiple levels of indirection before arriving at the
+// pointed-to value are not treated any differently when non-nil; i.e. an **int
+// which points to an *int which points to an int with value 413 would be
+// encoded as an integer value representing 413. If a pointer with multiple
+// levels of indirection has a nil somewhere in the indirection chain, it is
+// encoded as a nil value; see the section on nil value encodings for a
+// description of how this information is captured.
 //
 // Compatibility:
 //
