@@ -10,10 +10,10 @@
 //
 //	func main() {
 //		specialNumber := 413
-//		person := "TEREZI"
+//		name := "TEREZI"
 //
 //		var numData []byte
-//		var personData []byte
+//		var nameData []byte
 //		var err error
 //
 //		numData, err = rezi.Enc(specialNumber)
@@ -21,7 +21,7 @@
 //			panic(err.Error())
 //		}
 //
-//		personData, err = rezi.Enc(person)
+//		nameData, err = rezi.Enc(name)
 //		if err != nil {
 //			panic(err.Error())
 //		}
@@ -32,12 +32,12 @@
 //
 //	var allData []byte
 //	allData = append(allData, numData...)
-//	allData = append(allData, personData...)
+//	allData = append(allData, nameData...)
 //
 // The [Dec] function is used to decode data from REZI bytes:
 //
 //	var readNumber int
-//	var readPerson string
+//	var readName string
 //
 //	var n int
 //	var err error
@@ -48,7 +48,7 @@
 //	}
 //	allData = allData[n:]
 //
-//	n, err := rezi.Dec(allData, &readPerson)
+//	n, err := rezi.Dec(allData, &readName)
 //	if err != nil {
 //		panic(err.Error())
 //	}
@@ -75,7 +75,7 @@
 // not have any concept of two different pointer variables pointing to the same
 // data.
 //
-// # Data Format
+// # Binary Data Format
 //
 // REZI uses a binary format for all supported types. Other than bool, which is
 // encoded as simply one of two byte values, an encoded value will start with
@@ -225,9 +225,35 @@
 //	Layout:
 //
 //	[ INFO ] [ INT VALUE ]
+//	 1 byte    0..8 bytes
 //
-// Nil values are all encoded as the same way regardless of their pointed-to
-// type. WIP.
+// Nil values are encoded similarly to integers, with one major exception: the
+// nil bit in the info byte is set to true. This allows a nil to be stored in
+// the same place as a length count, so when interpreting data, a length count
+// can be checked for nil and if nil, instead of the normal value being decoded,
+// a nil value is decoded.
+//
+// Nil pointers to a non-pointer type of any kind are encoded as a single info
+// byte with the nil bit set and the indirection bit unset.
+//
+// Pointers that are themselves not nil but point to another pointer which is
+// nil are encoded slightly differently. In this case, the info byte will have
+// both the nil bit and the indirection bit set, and its length bits will be
+// non-zero and give the number of bytes which follow that make up an encoded
+// integer. The encoded integer gives the number of indirections that are done
+// before a nil pointer is arrived at. For instance, a ***int that points to a
+// valid **int that itself points to a valid *int which is nil would be encoded
+// as a nil with indirection level of 2.
+//
+// Encoded nil values are *not* typed; they will be interpreted as the same type
+// as the pointed-to value of the receiver passed to REZI during decoding.
+//
+// Compatibility:
+//
+// Older versions of the REZI encoding indicated nil by giving -1 as the byte
+// count. This version of REZI will read this as well and can interpret it
+// correctly, however do note that it will only be able to handle a single level
+// of indirection, i.e. a nil pointer-to-type, with no additional indirections.
 package rezi
 
 import (
