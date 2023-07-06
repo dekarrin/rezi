@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Error              = errors.New("a problem related to the binary \"REZI\" format has occurred")
+	Error              = errors.New("a problem related to the binary REZI format has occurred")
 	ErrMarshalBinary   = errors.New("MarshalBinary() returned an error")
 	ErrUnmarshalBinary = errors.New("UnmarshalBinary() returned an error")
 	ErrInvalidType     = errors.New("data is not the correct type")

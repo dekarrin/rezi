@@ -56,6 +56,35 @@
 //	}
 //	allData = allData[n:]
 //
+// # Error Checking
+//
+// Errors in REZI have specific types that can be checked in order to determine
+// the cause of an error. These errors conform to the [errors] interface and
+// must be checked by using [errors.Is].
+//
+// As mentioned in that library's documentation, errors should not be checked
+// with simple equality checks. REZI enforces this fully; non-nil errors that
+// are checked with `==` will never return true.
+//
+// That is
+//
+//	if err == rezi.Error
+//
+// is not only the non-preferred way of checking an error, but will always
+// return false. Instead, do:
+//
+//	if errors.Is(err, rezi.Error)
+//
+// There are several error types defined for checking non-nil errors. [Error] is
+// the type that all non-nil errors from REZI will match. It may be caused by
+// some other underlying error; again, use errors.Is to check this, even if a
+// non-rezi error is being checked. For instance, to check if an error was
+// caused due to the supplied bytes being shorter than expected, use
+// errors.Is(err, io.UnexpectedEOF).
+//
+// See the individual functions for a list of error types that non-nil returned
+// errors may be checked against.
+//
 // # Supported Data Types
 //
 // REZI supports several built-in basic Go types: int (as well as all of its
