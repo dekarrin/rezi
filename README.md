@@ -257,8 +257,8 @@ func (p *Person) UnamrshalBinary(data []byte) error {
 }
 ```
 
-For a type that has both of these methods defined, it can be encoded and decoded
-the same as any other type:
+When a type has both of these methods defined, it can be encoded and decoded
+with Enc and Dec just like any other type:
 
 ```golang
 import (
