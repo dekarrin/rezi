@@ -31,7 +31,10 @@ func encSlice(v interface{}) ([]byte, error) {
 		v := refVal.Index(i)
 		encData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, fmt.Errorf("slice[%d]: %w", i, err)
+			return nil, reziError{
+				msg:   fmt.Sprintf("slice[%d]: %s", i, err.Error()),
+				cause: []error{err},
+			}
 		}
 		enc = append(enc, encData...)
 	}
@@ -66,7 +69,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, DecodingError{
+		return 0, reziError{
 			msg:   fmt.Sprintf("decode byte count: %s", err.Error()),
 			cause: []error{err},
 		}
@@ -89,7 +92,9 @@ func decSlice(data []byte, v interface{}) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return totalConsumed, reziError{
+			cause: []error{io.ErrUnexpectedEOF},
+		}
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -103,7 +108,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, DecodingError{
+			return totalConsumed, reziError{
 				msg:   fmt.Sprintf("slice item: %s", err.Error()),
 				cause: []error{err},
 			}

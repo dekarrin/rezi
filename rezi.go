@@ -370,7 +370,7 @@ func MustEnc(v interface{}) []byte {
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = EncodingError{
+			err = reziError{
 				msg: fmt.Sprintf("%v", r),
 			}
 		}
@@ -408,7 +408,7 @@ func MustDec(data []byte, v interface{}) int {
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = DecodingError{
+			err = reziError{
 				msg: fmt.Sprintf("%v", r),
 			}
 		}

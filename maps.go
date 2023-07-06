@@ -101,14 +101,14 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 		keyData, err := Enc(k.Interface())
 		if err != nil {
-			return nil, DecodingError{
+			return nil, reziError{
 				msg:   fmt.Sprintf("map[%v]: key: %s", k.Interface(), err.Error()),
 				cause: []error{err},
 			}
 		}
 		valData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, DecodingError{
+			return nil, reziError{
 				msg:   fmt.Sprintf("map[%v]: value: %s", k.Interface(), err.Error()),
 				cause: []error{err},
 			}
@@ -149,7 +149,10 @@ func decMap(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, fmt.Errorf("decode byte count: %w", err)
+		return 0, reziError{
+			msg:   fmt.Sprintf("decode byte count: %s", err.Error()),
+			cause: []error{err},
+		}
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -174,7 +177,9 @@ func decMap(data []byte, v interface{}) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, io.ErrUnexpectedEOF
+		return totalConsumed, reziError{
+			cause: []error{io.ErrUnexpectedEOF},
+		}
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -189,7 +194,10 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refKey := reflect.New(refMapType.Key())
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return totalConsumed, fmt.Errorf("decode key: %w", err)
+			return totalConsumed, reziError{
+				msg:   fmt.Sprintf("decode key: %s", err.Error()),
+				cause: []error{err},
+			}
 		}
 		totalConsumed += n
 		i += n
@@ -199,7 +207,10 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, fmt.Errorf("decode value: %w", err)
+			return totalConsumed, reziError{
+				msg:   fmt.Sprintf("decode value: %s", err.Error()),
+				cause: []error{err},
+			}
 		}
 		totalConsumed += n
 		i += n
