@@ -71,7 +71,7 @@ by appending the results of `Enc()` together.
 // A new value to encode:
 number := 612
 
-numData, err := rezi.Enc(name)
+numData, err := rezi.Enc(number)
 if err != nil {
     panic(err)
 }
