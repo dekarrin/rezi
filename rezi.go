@@ -124,6 +124,8 @@
 //
 //	Bool Values
 //
+//	Layout:
+//
 //	[ VALUE ]
 //	 1 byte
 //
@@ -134,8 +136,10 @@
 //
 //	Integer Values
 //
+//	Layout:
+//
 //	[ INFO ] [ INT VALUE ]
-//	 1 byte    0-8 bytes
+//	 1 byte    0..8 bytes
 //
 // Integer values begin with the info byte. Assuming that it is not nil, the 4
 // L bits of the info byte give the number of bytes that are in the value
@@ -159,19 +163,26 @@
 //
 //	String Values
 //
-//	{   CODEPOINT COUNT  } [ CODEPOINTS ]
-//	[ INFO ] [ INT VALUE ] [ CODEPOINTS ]
+//	Layout:
+//
+//	[ INFO ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
+//	<---CODEPOINT COUNT--> <------------CODEPOINTS----------->
+//	      1..9 bytes               COUNT..COUNT*4 bytes
 //
 // String values are encoded as a count of codepoints (which is itself encoded
-// as an integer value), followed by the unicode codepoints that make up the
-// string in UTF-8.
-//
-// By starting with an integer, strings begin with an info byte automatically.
+// as an integer value), followed by the Unicode codepoints that make up the
+// string encoded with UTF-8. Due to the count being of Unicode codepoints
+// rather than bytes, the actual number of bytes in an encoded string will be
+// between the minimum and maximum number of bytes needed to encode a codepoint
+// in UTF-8, multiplied by the number of codepoints.
 //
 //	encoding.BinaryMarshaler Values
 //
-//	{     BYTE COUNT     } [ MARSHALED BYTES ]
+//	Layout:
+//
 //	[ INFO ] [ INT VALUE ] [ MARSHALED BYTES ]
+//	<-------COUNT--------> <-MARSHALED BYTES->
+//	      1..9 bytes           COUNT bytes
 //
 // Any type that implements [encoding.BinaryMarshaler] is encoded by taking the
 // result of calling its MarshalBinary() method and prepending it with an
@@ -179,19 +190,39 @@
 //
 //	Slice Values
 //
-//	{     BYTE COUNT     } [ ITEM 1 ] ... [ ITEM N ]
-//	[ INFO ] [ INT VALUE ] [ ITEM 1 ] ... [ ITEM N ]
+//	Layout:
 //
-// Slices are encoded. WIP.
+//	[ INFO ] [ INT VALUE ] [ ITEM 1 ] ... [ ITEM N ]
+//	<-------COUNT--------> <--------VALUES--------->
+//	      1..9 bytes              COUNT bytes
+//
+// Slices are encoded as a count of bytes that make up the entire slice,
+// followed by the encoded value of each element in the slice. There is no
+// special delimiter between the encoded elements; when one ends, the next one
+// begins.
 //
 //	Map Values
 //
-//	{     BYTE COUNT     } [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
-//	[ INFO ] [ INT VALUE ] [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
+//	Layout:
 //
-// Map values are encoded. WIP.
+//	[ INFO ] [ INT VALUE ] [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
+//	<-------COUNT--------> <-------------------VALUES-------------------->
+//	      1..9 bytes                         COUNT bytes
+//
+// Map values are encoded as a count of all bytes that make up the entire map,
+// followed by pairs of the encoded keys and associated values for each element
+// of the map. Each pair consistes of the encoded key, followed immediately by
+// the encoded value that the key maps to. There is no special delimiter between
+// key-value pairs or between the key and value in a pair; where one ends, the
+// next one begins.
+//
+// The encoded keys are placed in a consistent order; encoding the same map will
+// result in the same encoding regardless of the order of keys encountered
+// during iteration over the keys.
 //
 //	Nil Values
+//
+//	Layout:
 //
 //	[ INFO ] [ INT VALUE ]
 //
