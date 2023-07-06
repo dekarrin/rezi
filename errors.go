@@ -12,6 +12,8 @@ var (
 	ErrMalformedData   = errors.New("data cannot be interpretered")
 )
 
+// TODO: Unify all errors, and stop exporting the stup8d types!!!!!!!!
+
 // EncodingError is the type of error returned by Enc when there is an issue
 // with encoding the provided value, due to the value type being unsupported,
 // the value being an implementor of encoding.BinaryMarshaler and its
