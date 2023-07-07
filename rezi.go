@@ -314,7 +314,6 @@
 package rezi
 
 import (
-	"encoding"
 	"fmt"
 	"reflect"
 )
@@ -331,24 +330,6 @@ func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
 	return func(e E) ([]byte, error) {
 		return fn(e), nil
 	}
-}
-
-// NewBinaryEncoder creates an Encoder that can encode to bytes and uses an
-// object's MarshalBinary method to encode non-trivial types.
-//
-// Deprecated: Do not use.
-func NewBinaryEncoder() Encoder[encoding.BinaryMarshaler] {
-	enc := &simpleBinaryEncoder{}
-	return enc
-}
-
-// NewBinaryDecoder creates a Decoder that can decode bytes and uses an object's
-// UnmarshalBinary method to decode non-trivial types.
-//
-// Deprecated: Do not use.
-func NewBinaryDecoder() Decoder[encoding.BinaryUnmarshaler] {
-	dec := &simpleBinaryDecoder{}
-	return dec
 }
 
 // get zero value for a type if not a pointer, or a pointer to a valid 0 value
