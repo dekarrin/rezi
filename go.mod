@@ -1,3 +1,4 @@
+// Deprecated: use github.com/dekarrin/rezi/v2 instead.
 module github.com/dekarrin/rezi
 
 go 1.19
