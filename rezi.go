@@ -394,7 +394,15 @@ func MustEnc(v interface{}) []byte {
 // If a problem occurrs while encoding, the returned error will be non-nil and
 // will return true for errors.Is(err, rezi.Error). Additionally, the same
 // expression will return true for other error types, depending on the cause of
-// the error:
+// the error. Do not check error types with the equality operator ==; this will
+// always return false.
+//
+// Non-nil errors from this function can match the following error types: Error
+// in all cases. ErrInvalidType if the type of v is not supported.
+// ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
+// error from its MarshalBinary() function (additionally, the returned error
+// will match the same types that the error returned from MarshalBinary() would
+// match).
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
