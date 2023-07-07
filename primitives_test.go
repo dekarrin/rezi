@@ -1268,6 +1268,25 @@ func Test_Dec_Int(t *testing.T) {
 		assert.Nil(*actual)   // but the pointer it points to should be nil
 	})
 
+	t.Run("nil *uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *uint
+			expectConsumed = 1
+		)
+
+		var actual *uint = ref(uint(12))
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*uint", func(t *testing.T) {
 		assert := assert.New(t)
 
