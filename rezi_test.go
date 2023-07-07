@@ -53,15 +53,6 @@ func Test_Enc_Errors(t *testing.T) {
 
 			_, actual := Enc(tc.input)
 
-			if !assert.True(errors.Is(actual, tc.expectErr)) {
-				return // no point in checking the next one
-			}
-
-			// SHOULD be the same as above check, but technically assert lib
-			// has slightly different checks it seems to be doing glub.
-			//
-			// TODO: remove this check or make it the only one if CI passes all
-			// with it intact for all versions down to 1.18.
 			assert.ErrorIs(actual, tc.expectErr)
 		})
 	}
@@ -162,15 +153,6 @@ func Test_Dec_Errors(t *testing.T) {
 
 			_, actual := Dec(tc.data, tc.recv)
 
-			if !assert.Truef(errors.Is(actual, tc.expectErr), "actual error: %s", actual.Error()) {
-				return // no point in checking the next one
-			}
-
-			// SHOULD be the same as above check, but technically assert lib
-			// has slightly different checks it seems to be doing glub.
-			//
-			// TODO: remove this check or make it the only one if CI passes all
-			// with it intact for all versions down to 1.18.
 			assert.ErrorIs(actual, tc.expectErr)
 		})
 	}
