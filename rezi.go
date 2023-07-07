@@ -8,7 +8,7 @@
 //
 // The [Enc] function is to encode any supported type to REZI bytes:
 //
-//	import "github.com/dekarrin/rezi"
+//	import "github.com/dekarrin/rezi/v2"
 //
 //	func main() {
 //		specialNumber := 413

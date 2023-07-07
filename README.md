@@ -3,13 +3,6 @@
 ![Tests Status Badge](https://github.com/dekarrin/rezi/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
 [![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi.svg)](https://pkg.go.dev/github.com/dekarrin/rezi)
 
----
-
-**Version 1.x of rezi is deprecated and will not be receiving any further
-patches or updates. Use module "github.com/dekarrin/rezi/v2" instead.**
-
----
-
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode several
 built-in Go types to bytes, and automatically handles decoding and encoding of
@@ -31,13 +24,13 @@ into a separate library for use with other projects.
 Install REZI into your project using standard Go tools:
 
 ```bash
-go get -u github.com/dekarrin/rezi@latest
+go get -u github.com/dekarrin/rezi/v2@latest
 ```
 
 And import the REZI library to use it:
 
 ```golang
-import "github.com/dekarrin/rezi"
+import "github.com/dekarrin/rezi/v2"
 ```
 
 ### Usage
@@ -57,7 +50,7 @@ bytes holding the encoded value.
 import (
     "fmt"
 
-    "github.com/dekarrin/rezi"
+    "github.com/dekarrin/rezi/v2"
 )
 
 ...
@@ -107,7 +100,7 @@ at the start of the slice, and return the number of bytes it decoded.
 import (
     "fmt"
 
-    "github.com/dekarrin/rezi"
+    "github.com/dekarrin/rezi/v2"
 )
 
 ...
@@ -272,7 +265,7 @@ with Enc and Dec just like any other type:
 import (
     "fmt"
 
-    "github.com/dekarrin/rezi"
+    "github.com/dekarrin/rezi/v2"
 )
 
 ...
