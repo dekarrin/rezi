@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,8 +70,6 @@ func Test_Enc_Errors(t *testing.T) {
 func Test_Dec_Errors(t *testing.T) {
 	type dummyType struct{}
 
-	//	ErrFakeMarshal := errors.New("fake marshal error")
-
 	testCases := []struct {
 		name      string
 		data      []byte
@@ -96,6 +95,64 @@ func Test_Dec_Errors(t *testing.T) {
 			name:      "receiver is typed nil - ErrInvalidType",
 			recv:      nilRef[int](),
 			expectErr: ErrInvalidType,
+		},
+		{
+			name:      "receiver is unsupported type - Error",
+			recv:      ref(dummyType{}),
+			expectErr: Error,
+		},
+		{
+			name:      "receiver is unsupported type - ErrInvalidType",
+			recv:      ref(dummyType{}),
+			expectErr: ErrInvalidType,
+		},
+		{
+			name:      "unmarshal failure - Error",
+			data:      []byte{0x01, 0x01, 0x00},
+			recv:      &errUnmarshaler{},
+			expectErr: Error,
+		},
+		{
+			name:      "unmarshal failure - ErrUnmarshalBinary",
+			data:      []byte{0x01, 0x01, 0x00},
+			recv:      &errUnmarshaler{},
+			expectErr: ErrUnmarshalBinary,
+		},
+		{
+			name:      "unmarshal failure - wrapped error",
+			data:      []byte{0x01, 0x01, 0x00},
+			recv:      &errUnmarshaler{},
+			expectErr: errTestError,
+		},
+		{
+			name:      "not enough bytes - Error",
+			data:      []byte{0x01},
+			recv:      ref(0),
+			expectErr: Error,
+		},
+		{
+			name:      "not enough bytes - io.ErrUnexpectedEOF",
+			data:      []byte{0x01},
+			recv:      ref(0),
+			expectErr: io.ErrUnexpectedEOF,
+		},
+		{
+			name:      "not enough bytes - ErrMalformedData",
+			data:      []byte{0x01},
+			recv:      ref(0),
+			expectErr: ErrMalformedData,
+		},
+		{
+			name:      "incorrect bytes - Error",
+			data:      []byte{0x02},
+			recv:      ref(true),
+			expectErr: Error,
+		},
+		{
+			name:      "incorrect bytes - ErrMalformedData",
+			data:      []byte{0x02},
+			recv:      ref(true),
+			expectErr: ErrMalformedData,
 		},
 	}
 
@@ -197,9 +254,20 @@ func ref[E any](v E) *E {
 	return &v
 }
 
-type marshaler func() ([]byte, error)
+var errTestError = errors.New("test error")
 
-func (m marshaler) MarshalBinary() ([]byte, error) {
+type errUnmarshaler struct{}
+
+func (eu *errUnmarshaler) UnmarshalBinary([]byte) error {
+	return errTestError
+}
+
+type testMarshaler func() ([]byte, error)
+
+func marshaler(fn testMarshaler) encoding.BinaryMarshaler {
+	return fn
+}
+func (m testMarshaler) MarshalBinary() ([]byte, error) {
 	return m()
 }
 

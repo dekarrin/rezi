@@ -229,7 +229,7 @@ UnmarshalBinary to be defined with a pointer receiver.
 ```golang
 // UnmarshalBinary takes in bytes and decodes them into a new Person object,
 // which it assigns as the value of its receiver.
-func (p *Person) UnamrshalBinary(data []byte) error {
+func (p *Person) UnmarshalBinary(data []byte) error {
     var n int
     var err error
 

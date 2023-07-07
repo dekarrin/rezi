@@ -178,7 +178,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 
 	if len(data) < toConsume {
 		return totalConsumed, reziError{
-			cause: []error{io.ErrUnexpectedEOF},
+			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
 		}
 	}
 

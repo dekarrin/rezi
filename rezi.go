@@ -80,7 +80,7 @@
 // some other underlying error; again, use errors.Is to check this, even if a
 // non-rezi error is being checked. For instance, to check if an error was
 // caused due to the supplied bytes being shorter than expected, use
-// errors.Is(err, io.UnexpectedEOF).
+// errors.Is(err, io.ErrUnexpectedEOF).
 //
 // See the individual functions for a list of error types that non-nil returned
 // errors may be checked against.
@@ -461,9 +461,10 @@ func MustDec(data []byte, v interface{}) int {
 // if v is a nil pointer. ErrUnmarshalBinary if an implementor of
 // encoding.BinaryUnmarshaler returns an error from its UnmarshalBinary method
 // (additionally, the returned error will match the same types that the error
-// returned from UnmarshalBinary would match). io.UnexpectedEOF if there are
+// returned from UnmarshalBinary would match). io.ErrUnexpectedEOF if there are
 // fewer bytes than necessary to decode the value. ErrMalformedData if there is
-// any other problem with the data itself.
+// any problem with the data itself (including there being fewer bytes than
+// necessary to decode the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -591,6 +592,14 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 
 		var receiverValue reflect.Value
 		if receiverType.Kind() == reflect.Pointer {
+			if receiverType.Elem().Kind() == reflect.Func {
+				// if we have been given a *function* pointer, reject it, we
+				// cannot do this.
+				return nil, 0, reziError{
+					msg:   "function pointer type receiver is not supported",
+					cause: []error{ErrInvalidType},
+				}
+			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
 		} else {
