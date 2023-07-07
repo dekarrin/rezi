@@ -386,16 +386,15 @@ func MustEnc(v interface{}) []byte {
 	return enc
 }
 
-// Enc encodes the value as rezi-format bytes. The type of the value is
-// examined to determine how to encode it. No type information is included in
-// the returned bytes so it is up to the caller to keep track of it.
+// Enc encodes a value to REZI-format bytes. The type of the value is examined
+// to determine how to encode it. No type information is included in the
+// returned bytes, so it is up to the caller to keep track of it and use a
+// receiver of a compatible type when decoding.
 //
-// The value must be one of the supported REZI types. The supported types are:
-// string, bool, uint and its sized variants, int and its sized variants, and
-// any implementor of encoding.BinaryMarshaler. Map and slice types are also
-// supported, as long as their contents are REZI-supported.
-//
-// TODO: during docs, add note on returned error types and using errors.Is.
+// If a problem occurrs while encoding, the returned error will be non-nil and
+// will return true for errors.Is(err, rezi.Error). Additionally, the same
+// expression will return true for other error types, depending on the cause of
+// the error:
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -407,7 +406,7 @@ func Enc(v interface{}) (data []byte, err error) {
 
 	info, err := canEncode(v)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	if info.Primitive() {
@@ -497,7 +496,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	if ti.Indir > 0 {
 		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
 		if err != nil {
-			return decoded, n, fmt.Errorf("check nil value: %w", err)
+			return decoded, n, reziError{
+				msg:   fmt.Sprintf("check nil value: %s", err.Error()),
+				cause: []error{err},
+			}
 		}
 	}
 

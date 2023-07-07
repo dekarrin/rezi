@@ -114,18 +114,27 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 			mValInfo, err := encTypeInfo(mValType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("map value type is not encodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("map value type is not encodable: %s", err.Error()),
+					cause: []error{err, ErrInvalidType},
+				}
 			}
 			mKeyInfo, err := encTypeInfo(mKeyType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("map key type is not encodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("map key type is not encodable: %s", err.Error()),
+					cause: []error{err, ErrInvalidType},
+				}
 			}
 
 			// maps in general are not supported; the key type MUST be comparable
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == tBinary {
-				return typeInfo{}, fmt.Errorf("map key type must be bool, string, or castable to int")
+				return typeInfo{}, reziError{
+					msg:   "map key type must be bool, string, or castable to int",
+					cause: []error{ErrInvalidType},
+				}
 			}
 
 			return typeInfo{Indir: indirCount, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
@@ -134,7 +143,10 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			slValType := t.Elem()
 			slValInfo, err := encTypeInfo(slValType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("slice value is not encodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("slice value is not encodable: %s", err.Error()),
+					cause: []error{ErrInvalidType, err},
+				}
 			}
 			return typeInfo{Indir: indirCount, Main: tSlice, ValType: &slValInfo}, nil
 		case reflect.Pointer:
@@ -143,7 +155,10 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			trying = true
 			indirCount++
 		default:
-			return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for encoding", origType.String())
+			return typeInfo{}, reziError{
+				msg:   fmt.Sprintf("%q is not a REZI-compatible type for encoding", origType.String()),
+				cause: []error{ErrInvalidType},
+			}
 		}
 	}
 
@@ -152,7 +167,10 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 func canDecode(v interface{}) (typeInfo, error) {
 	if v == nil {
-		return typeInfo{}, fmt.Errorf("receiver is nil")
+		return typeInfo{}, reziError{
+			msg:   "receiver is nil",
+			cause: []error{ErrInvalidType},
+		}
 	}
 
 	checkType := reflect.TypeOf(v)
@@ -214,18 +232,27 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 			mValInfo, err := decTypeInfo(mValType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("map value type is not decodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("map value type is not decodable: %s", err.Error()),
+					cause: []error{err, ErrInvalidType},
+				}
 			}
 			mKeyInfo, err := decTypeInfo(mKeyType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("map key type is not decodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("map key type is not decodable: %s", err.Error()),
+					cause: []error{err, ErrInvalidType},
+				}
 			}
 
 			// maps in general are not supported; the key type MUST be comparable
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == tBinary {
-				return typeInfo{}, fmt.Errorf("map key type must be bool, string, or castable to int")
+				return typeInfo{}, reziError{
+					msg:   "map key type must be bool, string, or castable to int",
+					cause: []error{ErrInvalidType},
+				}
 			}
 
 			return typeInfo{Indir: indirCount, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
@@ -234,7 +261,10 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			slValType := t.Elem()
 			slValInfo, err := decTypeInfo(slValType)
 			if err != nil {
-				return typeInfo{}, fmt.Errorf("slice value is not decodable: %w", err)
+				return typeInfo{}, reziError{
+					msg:   fmt.Sprintf("slice value is not decodable: %s", err.Error()),
+					cause: []error{ErrInvalidType, err},
+				}
 			}
 			return typeInfo{Indir: indirCount, Main: tSlice, ValType: &slValInfo}, nil
 		case reflect.Pointer:
@@ -243,7 +273,10 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			trying = true
 			indirCount++
 		default:
-			return typeInfo{}, fmt.Errorf("%q is not a REZI-compatible type for decoding", origType.String())
+			return typeInfo{}, reziError{
+				msg:   fmt.Sprintf("%q is not a REZI-compatible type for decoding", origType.String()),
+				cause: []error{ErrInvalidType},
+			}
 		}
 	}
 	panic("should not be possible to escape check loop")
