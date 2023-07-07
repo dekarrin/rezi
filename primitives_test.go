@@ -481,6 +481,22 @@ func Test_Enc_String(t *testing.T) {
 		})
 	}
 
+	t.Run("*string (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *string
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("*string", func(t *testing.T) {
 		assert := assert.New(t)
 
@@ -608,7 +624,21 @@ func Test_Enc_Int(t *testing.T) {
 		})
 	}
 
-	// TODO: make shore we are testing enc and dec of *nil* *int. same with *string and *bool.
+	t.Run("*int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *int
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
 
 	t.Run("*int", func(t *testing.T) {
 		assert := assert.New(t)
@@ -652,6 +682,22 @@ func Test_Enc_Int(t *testing.T) {
 			ptr    *int
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*uint (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *uint
+			expect = []byte{0xa0}
 		)
 
 		actual, err := Enc(input)
@@ -745,6 +791,22 @@ func Test_Enc_Bool(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*bool (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *bool
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
 
 	t.Run("*bool", func(t *testing.T) {
 		assert := assert.New(t)
@@ -845,6 +907,22 @@ func Test_Enc_Binary(t *testing.T) {
 			assert.Equal(tc.expect, actual)
 		})
 	}
+
+	t.Run("*binary (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *testBinary
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
 
 	t.Run("*binary", func(t *testing.T) {
 		assert := assert.New(t)
