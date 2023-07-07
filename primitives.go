@@ -393,10 +393,6 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
-// encInt is similar to EncInt but performs specific behavior based on the
-// type of int it is given. This allows, for example, the largest value that can
-// be held by a uint64 to be properly represented where casting would have
-// converted it to a negative integer.
 func encInt[E integral](v E) []byte {
 	if v == 0 {
 		return []byte{0x00}
