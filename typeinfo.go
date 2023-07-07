@@ -173,9 +173,17 @@ func canDecode(v interface{}) (typeInfo, error) {
 		}
 	}
 
-	checkType := reflect.TypeOf(v)
+	checkVal := reflect.ValueOf(v)
+	checkType := checkVal.Type()
 
 	if checkType.Kind() == reflect.Pointer {
+		// make shore it's a not a pointer to nil
+		if checkVal.Elem().Kind() == reflect.Invalid {
+			return typeInfo{}, reziError{
+				msg:   "receiver is nil",
+				cause: []error{ErrInvalidType},
+			}
+		}
 		checkType = checkType.Elem()
 	}
 

@@ -2,11 +2,122 @@ package rezi
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_Enc_Errors(t *testing.T) {
+	type dummyType struct{}
+
+	ErrFakeMarshal := errors.New("fake marshal error")
+
+	testCases := []struct {
+		name      string
+		input     interface{}
+		expectErr error
+	}{
+		{
+			name:      "unknown type - Error",
+			input:     dummyType{},
+			expectErr: Error,
+		},
+		{
+			name:      "unknown type - ErrInvalidType",
+			input:     dummyType{},
+			expectErr: ErrInvalidType,
+		},
+		{
+			name:      "marshal failure - Error",
+			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			expectErr: Error,
+		},
+		{
+			name:      "marshal failure - ErrMarshalBinary",
+			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			expectErr: ErrMarshalBinary,
+		},
+		{
+			name:      "marshal failure - wrapped error",
+			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			expectErr: ErrFakeMarshal,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			_, actual := Enc(tc.input)
+
+			if !assert.True(errors.Is(actual, tc.expectErr)) {
+				return // no point in checking the next one
+			}
+
+			// SHOULD be the same as above check, but technically assert lib
+			// has slightly different checks it seems to be doing glub.
+			//
+			// TODO: remove this check or make it the only one if CI passes all
+			// with it intact for all versions down to 1.18.
+			assert.ErrorIs(actual, tc.expectErr)
+		})
+	}
+}
+
+func Test_Dec_Errors(t *testing.T) {
+	type dummyType struct{}
+
+	//	ErrFakeMarshal := errors.New("fake marshal error")
+
+	testCases := []struct {
+		name      string
+		data      []byte
+		recv      interface{}
+		expectErr error
+	}{
+		{
+			name:      "receiver is nil - Error",
+			recv:      nil,
+			expectErr: Error,
+		},
+		{
+			name:      "receiver is nil - ErrInvalidType",
+			recv:      nil,
+			expectErr: ErrInvalidType,
+		},
+		{
+			name:      "receiver is typed nil - Error",
+			recv:      nilRef[int](),
+			expectErr: Error,
+		},
+		{
+			name:      "receiver is typed nil - ErrInvalidType",
+			recv:      nilRef[int](),
+			expectErr: ErrInvalidType,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			_, actual := Dec(tc.data, tc.recv)
+
+			if !assert.Truef(errors.Is(actual, tc.expectErr), "actual error: %s", actual.Error()) {
+				return // no point in checking the next one
+			}
+
+			// SHOULD be the same as above check, but technically assert lib
+			// has slightly different checks it seems to be doing glub.
+			//
+			// TODO: remove this check or make it the only one if CI passes all
+			// with it intact for all versions down to 1.18.
+			assert.ErrorIs(actual, tc.expectErr)
+		})
+	}
+}
 
 func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 	assert := assert.New(t)
@@ -77,8 +188,19 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 	assert.Equal(original, rebuilt, "mismatch of rebuilt struct at level 1")
 }
 
+func nilRef[E any]() *E {
+	var ref *E
+	return ref
+}
+
 func ref[E any](v E) *E {
 	return &v
+}
+
+type marshaler func() ([]byte, error)
+
+func (m marshaler) MarshalBinary() ([]byte, error) {
+	return m()
 }
 
 func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnmarshaler {

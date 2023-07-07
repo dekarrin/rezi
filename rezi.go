@@ -447,9 +447,10 @@ func MustDec(data []byte, v interface{}) int {
 // V must be a non-nil pointer to a type supported by REZI. The type of v is
 // examined to determine how to decode the value. The data itself is not
 // examined for type inference, therefore v must be a pointer to a compatible
-// type.
+// type. V is only assigned to on successful decoding; if this function returns
+// a non-nil error, v will not have been assigned to.
 //
-// If a problem occurs while encoding, the returned error will be non-nil and
+// If a problem occurs while decoding, the returned error will be non-nil and
 // will return true for errors.Is(err, rezi.Error). Additionally, the same
 // expression will return true for other error types, depending on the cause of
 // the error. Do not check error types with the equality operator ==; this will
@@ -474,7 +475,7 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 
 	info, err := canDecode(v)
 	if err != nil {
-		panic(err.Error())
+		return 0, err
 	}
 
 	if info.Primitive() {
