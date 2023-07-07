@@ -367,17 +367,6 @@ func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLev
 	return true, indir, val, consumed, nil
 }
 
-// encBool encodes the bool value as a slice of bytes. The value can later
-// be decoded with DecBool. No type indicator is included in the output;
-// it is up to the caller to add this if they so wish it.
-//
-// The output will always contain exactly 1 byte.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncBool(b bool) []byte {
-	return encBool(b)
-}
-
 func encBool(b bool) []byte {
 	enc := make([]byte, 1)
 
@@ -388,14 +377,6 @@ func encBool(b bool) []byte {
 	}
 
 	return enc
-}
-
-// DecBool decodes a bool value at the start of the given bytes and
-// returns the value and the number of bytes read.
-//
-// Deprecated: This function has been replaced by [Dec].
-func DecBool(data []byte) (bool, int, error) {
-	return decBool(data)
 }
 
 func decBool(data []byte) (bool, int, error) {
@@ -410,40 +391,6 @@ func decBool(data []byte) (bool, int, error) {
 	} else {
 		return false, 0, reziError{cause: []error{ErrMalformedData}}
 	}
-}
-
-// EncInt encodes the int value as a slice of bytes. The value can later
-// be decoded with DecInt. No type indicator is included in the output;
-// it is up to the caller to add this if they so wish it. Integers up to 64 bits
-// are supported with this encoding scheme.
-//
-// The returned slice will be 1 to 9 bytes long. Integers larger in magnitude
-// will result in longer slices; only 0 is encoded as a single byte.
-//
-// Encoded integers start with an info byte that packs the sign and the number
-// of following bytes needed to represent the value together. The sign is
-// encoded as the most significant bit (the first/leftmost bit) of the byte,
-// with 0 being positive and 1 being negative. The next significant 3 bits are
-// unused. The least significant 4 bits contain the number of bytes that are
-// used to encode the integer value. The bits in the info byte can be
-// represented as `SXXXLLLL`, where S is the sign bit, X are unused bits, and L
-// are the bits that encode the remaining length.
-//
-// The remaining bytes give the value being encoded as a 2's complement 64-bit
-// big-endian integer, omitting any leading bytes that would be encoded as 0x00
-// if the integer is positive, or 0xff if the integer is negative. The value 0
-// is special and is encoded as with infobyte 0x00 with no additional bytes.
-// Because two's complement is used and as a result of the rules, -1 also
-// requires no bytes besides the info byte (because it would simply be a series
-// of eight 0xff bytes), and is therefore encoded as 0x80.
-//
-// Additional examples: 1 would be encoded as [0x01 0x01], 2 as [0x01 0x02],
-// 500 as [0x02 0x01 0xf4], etc. -2 would be encoded as [0x81 0xfe], -500 as
-// [0x82 0xfe 0x0c], etc.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncInt(i int) []byte {
-	return encInt(i)
 }
 
 // encInt is similar to EncInt but performs specific behavior based on the
@@ -492,14 +439,6 @@ func encInt[E integral](v E) []byte {
 	enc = append([]byte{byteCount}, enc...)
 
 	return enc
-}
-
-// DecInt decodes an integer value at the start of the given bytes and
-// returns the value and the number of bytes read.
-//
-// Deprecated: this function has been replaced by [Dec].
-func DecInt(data []byte) (int, int, error) {
-	return decInt[int](data)
 }
 
 // decInt decodes an integer value at the start of the given bytes and
@@ -554,22 +493,6 @@ func decInt[E integral](data []byte) (E, int, error) {
 	return E(iVal), int(byteCount + 1), nil
 }
 
-// encString encodes a string value as a slice of bytes. The value can
-// later be decoded with DecString. Encoded string output starts with an
-// integer (as encoded by EncInt) indicating the number of bytes following
-// that make up the string, followed by that many bytes containing the string
-// encoded as UTF-8.
-//
-// The output will be variable length; it will contain 8 bytes followed by the
-// bytes that make up X characters, where X is the int value contained in the
-// first 8 bytes. Due to the specifics of how UTF-8 strings are encoded, this
-// may or may not be the actual number of bytes used.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncString(s string) []byte {
-	return encString(s)
-}
-
 func encString(s string) []byte {
 	enc := make([]byte, 0)
 
@@ -585,14 +508,6 @@ func encString(s string) []byte {
 	enc = append(countBytes, enc...)
 
 	return enc
-}
-
-// DecString decodes a string value at the start of the given bytes and
-// returns the value and the number of bytes read.
-//
-// Deprecated: This function has been replaced by [Dec].
-func DecString(data []byte) (string, int, error) {
-	return decString(data)
 }
 
 func decString(data []byte) (string, int, error) {
@@ -645,23 +560,6 @@ func decString(data []byte) (string, int, error) {
 	return sb.String(), readBytes, nil
 }
 
-// encBinary encodes a BinaryMarshaler as a slice of bytes. The value can later
-// be decoded with DecBinary. Encoded output starts with an integer (as encoded
-// by EncBinaryInt) indicating the number of bytes following that make up the
-// object, followed by that many bytes containing the encoded value.
-//
-// The output will be variable length; it will contain 8 bytes followed by the
-// number of bytes encoded in those 8 bytes.
-//
-// Deprecated: This function has been replaced by [Enc].
-func EncBinary(b encoding.BinaryMarshaler) []byte {
-
-	// intentionally swallowing error for compatibility with v1 API. Will be
-	// removed on update to v2.
-	data, _ := encBinary(b)
-	return data
-}
-
 func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	if b == nil {
 		return encNil(0), nil
@@ -678,17 +576,6 @@ func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	enc = append(encInt(len(enc)), enc...)
 
 	return enc, nil
-}
-
-// decBinary decodes a value at the start of the given bytes and calls
-// UnmarshalBinary on the provided object with those bytes. If a nil value was
-// encoded, then a nil byte slice is passed to the UnmarshalBinary func.
-//
-// It returns the total number of bytes read from the data bytes.
-//
-// Deprecated: this function has been replaced by [Dec].
-func DecBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
-	return decBinary(data, b)
 }
 
 func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {

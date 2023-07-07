@@ -355,7 +355,7 @@ func Test_EncBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := EncBinary(tc.input)
+			actual, _ := encBinary(tc.input)
 
 			assert.Equal(tc.expect, actual)
 		})

@@ -291,22 +291,14 @@ func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// TODO: see if we can't eliminate marshaledBytesConsumer and marsaledBytesProducer in tests
+// at some point; feels like there's a lot of duplication in these fixtures.
 type marshaledBytesConsumer struct {
 	fn func([]byte) error
 }
 
 func (mv marshaledBytesConsumer) UnmarshalBinary(b []byte) error {
 	return mv.fn(b)
-}
-
-type marshaledBytesReceiver struct {
-	received []byte
-}
-
-func (recv *marshaledBytesReceiver) UnmarshalBinary(b []byte) error {
-	recv.received = make([]byte, len(b))
-	copy(recv.received, b)
-	return nil
 }
 
 type marshaledBytesProducer struct {
