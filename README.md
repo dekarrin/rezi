@@ -3,6 +3,13 @@
 ![Tests Status Badge](https://github.com/dekarrin/rezi/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
 [![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi.svg)](https://pkg.go.dev/github.com/dekarrin/rezi)
 
+---
+
+**Version 1.x of rezi is deprecated and will not be receiving any further
+patches or updates. Use module "github.com/dekarrin/rezi/v2" instead.**
+
+---
+
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode several
 built-in Go types to bytes, and automatically handles decoding and encoding of
