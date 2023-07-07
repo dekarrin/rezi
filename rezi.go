@@ -1,19 +1,21 @@
 // Package rezi provides the ability to encode and decode data in Rarefied
 // Encoding (Compressible) Interchange format. It allows types that implement
 // encoding.BinaryUnmarshaler and encoding.BinaryMarshaler to be easily read
-// from and written to encoded bytes.
+// from and written to byte slices. It has an interface similar to the json
+// package, where one function is used to encode all supported types, and
+// another function receives bytes and a receiver for decoded data and infers
+// how to decode the bytes based on the receiver.
 //
-// It is generally used in a fashion similar to the json package. The [Enc]
-// function is to encode any supported type to bytes.
+// The [Enc] function is to encode any supported type to REZI bytes:
 //
 //	import "github.com/dekarrin/rezi"
 //
 //	func main() {
 //		specialNumber := 413
-//		person := "TEREZI"
+//		name := "TEREZI"
 //
 //		var numData []byte
-//		var personData []byte
+//		var nameData []byte
 //		var err error
 //
 //		numData, err = rezi.Enc(specialNumber)
@@ -21,23 +23,23 @@
 //			panic(err.Error())
 //		}
 //
-//		personData, err = rezi.Enc(person)
+//		nameData, err = rezi.Enc(name)
 //		if err != nil {
 //			panic(err.Error())
 //		}
 //	}
 //
 // Data from multiple calls to Enc() can be combined into a single block of data
-// by appending them together.
+// by appending them together:
 //
 //	var allData []byte
 //	allData = append(allData, numData...)
-//	allData = append(allData, personData...)
+//	allData = append(allData, nameData...)
 //
 // The [Dec] function is used to decode data from REZI bytes:
 //
 //	var readNumber int
-//	var readPerson string
+//	var readName string
 //
 //	var n int
 //	var err error
@@ -48,26 +50,56 @@
 //	}
 //	allData = allData[n:]
 //
-//	n, err := rezi.Dec(allData, &readPerson)
+//	n, err := rezi.Dec(allData, &readName)
 //	if err != nil {
 //		panic(err.Error())
 //	}
 //	allData = allData[n:]
 //
+// # Error Checking
+//
+// Errors in REZI have specific types that can be checked in order to determine
+// the cause of an error. These errors conform to the [errors] interface and
+// must be checked by using [errors.Is].
+//
+// As mentioned in that library's documentation, errors should not be checked
+// with simple equality checks. REZI enforces this fully; non-nil errors that
+// are checked with `==` will never return true.
+//
+// That is
+//
+//	if err == rezi.Error
+//
+// is not only the non-preferred way of checking an error, but will always
+// return false. Instead, do:
+//
+//	if errors.Is(err, rezi.Error)
+//
+// There are several error types defined for checking non-nil errors. [Error] is
+// the type that all non-nil errors from REZI will match. It may be caused by
+// some other underlying error; again, use errors.Is to check this, even if a
+// non-rezi error is being checked. For instance, to check if an error was
+// caused due to the supplied bytes being shorter than expected, use
+// errors.Is(err, io.ErrUnexpectedEOF).
+//
+// See the individual functions for a list of error types that non-nil returned
+// errors may be checked against.
+//
 // # Supported Data Types
 //
-// REZI supports several built-in Go types: int and all of its unsigned and
-// specific-bitsize varieties, string, bool, and any type that implements
-// encoding.BinaryMarshaler (for encoding) or whose pointer type implements
-// encoding.BinaryUnmarshaler (for decoding).
+// REZI supports several built-in basic Go types: int (as well as all of its
+// unsigned and specific-bitsize varieties), string, bool, and any type that
+// implements encoding.BinaryMarshaler (for encoding) or whose pointer type
+// implements encoding.BinaryUnmarshaler (for decoding).
 //
 // Floating point types and complex types are not supported at this time,
 // although they may be added in a future release.
 //
-// Slices and maps are supported with some simulations. Slices must contain only
-// other supported types (or pointers to them). Maps have the same restrictions
-// on their values, but only maps with a key type of string, int (or any of its
-// unsigned and specific-bitsize varieties), or bool are supported.
+// Slices and maps are supported with some stipulations. Slices must contain
+// only other supported types (or pointers to them). Maps have the same
+// restrictions on their values, but only maps with a key type of string, int
+// (or any of its unsigned and specific-bitsize varieties), or bool are
+// supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -75,7 +107,7 @@
 // not have any concept of two different pointer variables pointing to the same
 // data.
 //
-// # Data Format
+// # Binary Data Format
 //
 // REZI uses a binary format for all supported types. Other than bool, which is
 // encoded as simply one of two byte values, an encoded value will start with
@@ -92,7 +124,11 @@
 //
 //	The INFO Byte
 //
+//	Layout:
+//
 //	SXNILLLL
+//	|      |
+//	MSB  LSB
 //
 // The info byte has information coded into its bits represented as SXNILLLL,
 // where each letter stands for a particular bit, from most signficant to the
@@ -124,6 +160,8 @@
 //
 //	Bool Values
 //
+//	Layout:
+//
 //	[ VALUE ]
 //	 1 byte
 //
@@ -134,8 +172,10 @@
 //
 //	Integer Values
 //
+//	Layout:
+//
 //	[ INFO ] [ INT VALUE ]
-//	 1 byte    0-8 bytes
+//	 1 byte    0..8 bytes
 //
 // Integer values begin with the info byte. Assuming that it is not nil, the 4
 // L bits of the info byte give the number of bytes that are in the value
@@ -159,19 +199,26 @@
 //
 //	String Values
 //
-//	{   CODEPOINT COUNT  } [ CODEPOINTS ]
-//	[ INFO ] [ INT VALUE ] [ CODEPOINTS ]
+//	Layout:
+//
+//	[ INFO ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
+//	<---CODEPOINT COUNT--> <------------CODEPOINTS----------->
+//	      1..9 bytes               COUNT..COUNT*4 bytes
 //
 // String values are encoded as a count of codepoints (which is itself encoded
-// as an integer value), followed by the unicode codepoints that make up the
-// string in UTF-8.
-//
-// By starting with an integer, strings begin with an info byte automatically.
+// as an integer value), followed by the Unicode codepoints that make up the
+// string encoded with UTF-8. Due to the count being of Unicode codepoints
+// rather than bytes, the actual number of bytes in an encoded string will be
+// between the minimum and maximum number of bytes needed to encode a codepoint
+// in UTF-8, multiplied by the number of codepoints.
 //
 //	encoding.BinaryMarshaler Values
 //
-//	{     BYTE COUNT     } [ MARSHALED BYTES ]
+//	Layout:
+//
 //	[ INFO ] [ INT VALUE ] [ MARSHALED BYTES ]
+//	<-------COUNT--------> <-MARSHALED BYTES->
+//	      1..9 bytes           COUNT bytes
 //
 // Any type that implements [encoding.BinaryMarshaler] is encoded by taking the
 // result of calling its MarshalBinary() method and prepending it with an
@@ -179,24 +226,91 @@
 //
 //	Slice Values
 //
-//	{     BYTE COUNT     } [ ITEM 1 ] ... [ ITEM N ]
-//	[ INFO ] [ INT VALUE ] [ ITEM 1 ] ... [ ITEM N ]
+//	Layout:
 //
-// Slices are encoded. WIP.
+//	[ INFO ] [ INT VALUE ] [ ITEM 1 ] ... [ ITEM N ]
+//	<-------COUNT--------> <--------VALUES--------->
+//	      1..9 bytes              COUNT bytes
+//
+// Slices are encoded as a count of bytes that make up the entire slice,
+// followed by the encoded value of each element in the slice. There is no
+// special delimiter between the encoded elements; when one ends, the next one
+// begins.
 //
 //	Map Values
 //
-//	{     BYTE COUNT     } [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
-//	[ INFO ] [ INT VALUE ] [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
+//	Layout:
 //
-// Map values are encoded. WIP.
+//	[ INFO ] [ INT VALUE ] [ KEY 1 ] [ VALUE 1 ] ... [ KEY N ] [ VALUE N ]
+//	<-------COUNT--------> <-------------------VALUES-------------------->
+//	      1..9 bytes                         COUNT bytes
+//
+// Map values are encoded as a count of all bytes that make up the entire map,
+// followed by pairs of the encoded keys and associated values for each element
+// of the map. Each pair consistes of the encoded key, followed immediately by
+// the encoded value that the key maps to. There is no special delimiter between
+// key-value pairs or between the key and value in a pair; where one ends, the
+// next one begins.
+//
+// The encoded keys are placed in a consistent order; encoding the same map will
+// result in the same encoding regardless of the order of keys encountered
+// during iteration over the keys.
 //
 //	Nil Values
 //
-//	[ INFO ] [ INT VALUE ]
+//	Layout:
 //
-// Nil values are all encoded as the same way regardless of their pointed-to
-// type. WIP.
+//	[ INFO ] [ INT VALUE ]
+//	 1 byte    0..8 bytes
+//
+// Nil values are encoded similarly to integers, with one major exception: the
+// nil bit in the info byte is set to true. This allows a nil to be stored in
+// the same place as a length count, so when interpreting data, a length count
+// can be checked for nil and if nil, instead of the normal value being decoded,
+// a nil value is decoded.
+//
+// Nil pointers to a non-pointer type of any kind are encoded as a single info
+// byte with the nil bit set and the indirection bit unset.
+//
+// Pointers that are themselves not nil but point to another pointer which is
+// nil are encoded slightly differently. In this case, the info byte will have
+// both the nil bit and the indirection bit set, and its length bits will be
+// non-zero and give the number of bytes which follow that make up an encoded
+// integer. The encoded integer gives the number of indirections that are done
+// before a nil pointer is arrived at. For instance, a ***int that points to a
+// valid **int that itself points to a valid *int which is nil would be encoded
+// as a nil with indirection level of 2.
+//
+// Encoded nil values are *not* typed; they will be interpreted as the same type
+// as the pointed-to value of the receiver passed to REZI during decoding.
+//
+//	Pointer Values
+//
+//	Layout:
+//
+//	(either encoded value type, or encoded nil)
+//
+// A pointer is not encoded in a special manner. Instead, the value they point
+// to is encoded as though it were not pointer, and when decoding to a pointer,
+// the value is first decoded, then a pointer to the decoded value is used as
+// the value of the pointer.
+//
+// If a pointer is nil, it is instead encoded as a nil value.
+//
+// Pointers that have multiple levels of indirection before arriving at the
+// pointed-to value are not treated any differently when non-nil; i.e. an **int
+// which points to an *int which points to an int with value 413 would be
+// encoded as an integer value representing 413. If a pointer with multiple
+// levels of indirection has a nil somewhere in the indirection chain, it is
+// encoded as a nil value; see the section on nil value encodings for a
+// description of how this information is captured.
+//
+// Compatibility:
+//
+// Older versions of the REZI encoding indicated nil by giving -1 as the byte
+// count. This version of REZI will read this as well and can interpret it
+// correctly, however do note that it will only be able to handle a single level
+// of indirection, i.e. a nil pointer-to-type, with no additional indirections.
 package rezi
 
 import (
@@ -272,20 +386,26 @@ func MustEnc(v interface{}) []byte {
 	return enc
 }
 
-// Enc encodes the value as rezi-format bytes. The type of the value is
-// examined to determine how to encode it. No type information is included in
-// the returned bytes so it is up to the caller to keep track of it.
+// Enc encodes a value to REZI-format bytes. The type of the value is examined
+// to determine how to encode it. No type information is included in the
+// returned bytes, so it is up to the caller to keep track of it and use a
+// receiver of a compatible type when decoding.
 //
-// The value must be one of the supported REZI types. The supported types are:
-// string, bool, uint and its sized variants, int and its sized variants, and
-// any implementor of encoding.BinaryMarshaler. Map and slice types are also
-// supported, as long as their contents are REZI-supported.
+// If a problem occurs while encoding, the returned error will be non-nil and
+// will return true for errors.Is(err, rezi.Error). Additionally, the same
+// expression will return true for other error types, depending on the cause of
+// the error. Do not check error types with the equality operator ==; this will
+// always return false.
 //
-// TODO: during docs, add note on returned error types and using errors.Is.
+// Non-nil errors from this function can match the following error types: Error
+// in all cases. ErrInvalidType if the type of v is not supported.
+// ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
+// error from its MarshalBinary method (additionally, the returned error will
+// match the same types that the error returned from MarshalBinary would match).
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = EncodingError{
+			err = reziError{
 				msg: fmt.Sprintf("%v", r),
 			}
 		}
@@ -293,7 +413,7 @@ func Enc(v interface{}) (data []byte, err error) {
 
 	info, err := canEncode(v)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	if info.Primitive() {
@@ -318,12 +438,37 @@ func MustDec(data []byte, v interface{}) int {
 	return n
 }
 
-// Dec decodes a value as rezi-format bytes. The argument v must be a pointer to
-// a supported type (or directly implement binary.BinaryMarshaler).
+// Dec decodes a value from REZI-format bytes in data, starting with the first
+// byte in it. Returns the number of bytes consumed in order to read the
+// complete value. If the data slice was constructed by appending encoded values
+// together, then skipping over n bytes after a successful call to Dec will
+// result in the next call to Dec reading the next subsequent value.
+//
+// V must be a non-nil pointer to a type supported by REZI. The type of v is
+// examined to determine how to decode the value. The data itself is not
+// examined for type inference, therefore v must be a pointer to a compatible
+// type. V is only assigned to on successful decoding; if this function returns
+// a non-nil error, v will not have been assigned to.
+//
+// If a problem occurs while decoding, the returned error will be non-nil and
+// will return true for errors.Is(err, rezi.Error). Additionally, the same
+// expression will return true for other error types, depending on the cause of
+// the error. Do not check error types with the equality operator ==; this will
+// always return false.
+//
+// Non-nil errors from this function can match the following error types: Error
+// in all cases. ErrInvalidType if the type pointed to by v is not supported or
+// if v is a nil pointer. ErrUnmarshalBinary if an implementor of
+// encoding.BinaryUnmarshaler returns an error from its UnmarshalBinary method
+// (additionally, the returned error will match the same types that the error
+// returned from UnmarshalBinary would match). io.ErrUnexpectedEOF if there are
+// fewer bytes than necessary to decode the value. ErrMalformedData if there is
+// any problem with the data itself (including there being fewer bytes than
+// necessary to decode the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = DecodingError{
+			err = reziError{
 				msg: fmt.Sprintf("%v", r),
 			}
 		}
@@ -331,7 +476,7 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 
 	info, err := canDecode(v)
 	if err != nil {
-		panic(err.Error())
+		return 0, err
 	}
 
 	if info.Primitive() {
@@ -383,7 +528,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	if ti.Indir > 0 {
 		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
 		if err != nil {
-			return decoded, n, fmt.Errorf("check nil value: %w", err)
+			return decoded, n, reziError{
+				msg:   fmt.Sprintf("check nil value: %s", err.Error()),
+				cause: []error{err},
+			}
 		}
 	}
 
@@ -444,6 +592,14 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 
 		var receiverValue reflect.Value
 		if receiverType.Kind() == reflect.Pointer {
+			if receiverType.Elem().Kind() == reflect.Func {
+				// if we have been given a *function* pointer, reject it, we
+				// cannot do this.
+				return nil, 0, reziError{
+					msg:   "function pointer type receiver is not supported",
+					cause: []error{ErrInvalidType},
+				}
+			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
 		} else {

@@ -325,7 +325,9 @@ func encNil(indirLevels int) []byte {
 // nil.
 func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
 	if len(data) < 1 {
-		return false, tNilLevel(0), val, 0, io.ErrUnexpectedEOF
+		return false, tNilLevel(0), val, 0, reziError{
+			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
+		}
 	}
 
 	infoByte := data[0]
@@ -398,7 +400,7 @@ func DecBool(data []byte) (bool, int, error) {
 
 func decBool(data []byte) (bool, int, error) {
 	if len(data) < 1 {
-		return false, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return false, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 
 	if data[0] == 0 {
@@ -406,7 +408,7 @@ func decBool(data []byte) (bool, int, error) {
 	} else if data[0] == 1 {
 		return true, 1, nil
 	} else {
-		return false, 0, wrapDecErr(ErrInvalidType, nil)
+		return false, 0, reziError{cause: []error{ErrMalformedData}}
 	}
 }
 
@@ -504,7 +506,7 @@ func DecInt(data []byte) (int, int, error) {
 // returns the value and the number of bytes read.
 func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
-		return 0, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 
 	byteCount := data[0]
@@ -522,7 +524,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 	// for future use
 
 	if len(data) < int(byteCount) {
-		return 0, 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 
 	intData := data[:byteCount]
@@ -595,11 +597,11 @@ func DecString(data []byte) (string, int, error) {
 
 func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 	runeCount, n, err := decInt[int](data)
 	if err != nil {
-		return "", 0, DecodingError{
+		return "", 0, reziError{
 			msg:   fmt.Sprintf("decoding string rune count: %s", err.Error()),
 			cause: []error{err},
 		}
@@ -607,7 +609,7 @@ func decString(data []byte) (string, int, error) {
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", 0, DecodingError{
+		return "", 0, reziError{
 			msg:   "string rune count < 0",
 			cause: []error{ErrMalformedData},
 		}
@@ -621,14 +623,14 @@ func decString(data []byte) (string, int, error) {
 		ch, charBytesRead := utf8.DecodeRune(data)
 		if ch == utf8.RuneError {
 			if charBytesRead == 0 {
-				return "", 0, io.ErrUnexpectedEOF
+				return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 			} else if charBytesRead == 1 {
-				return "", 0, DecodingError{
+				return "", 0, reziError{
 					msg:   "invalid UTF-8 encoding in string",
 					cause: []error{ErrMalformedData},
 				}
 			} else {
-				return "", 0, DecodingError{
+				return "", 0, reziError{
 					msg:   "invalid unicode replacement character in rune",
 					cause: []error{ErrMalformedData},
 				}
@@ -667,7 +669,10 @@ func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 
 	enc, marshalErr := b.MarshalBinary()
 	if marshalErr != nil {
-		return nil, wrapEncErr(marshalErr, ErrMarshalBinary)
+		return nil, reziError{
+			msg:   fmt.Sprintf("%s: %s", marshalErr.Error(), ErrMarshalBinary.Error()),
+			cause: []error{marshalErr, ErrMarshalBinary},
+		}
 	}
 
 	enc = append(encInt(len(enc)), enc...)
@@ -699,7 +704,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	data = data[readBytes:]
 
 	if len(data) < byteLen {
-		return readBytes, wrapDecErr(io.ErrUnexpectedEOF, nil)
+		return readBytes, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 	var binData []byte
 
@@ -709,7 +714,10 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return readBytes, wrapDecErr(err, ErrUnmarshalBinary)
+		return readBytes, reziError{
+			msg:   fmt.Sprintf("%s: %s", ErrUnmarshalBinary.Error(), err.Error()),
+			cause: []error{err, ErrUnmarshalBinary},
+		}
 	}
 
 	return byteLen + readBytes, nil
