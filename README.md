@@ -1,5 +1,6 @@
 # REZI
 
+![Tests Status Badge](https://github.com/dekarrin/rezi/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
 [![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi.svg)](https://pkg.go.dev/github.com/dekarrin/rezi)
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
