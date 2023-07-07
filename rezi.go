@@ -391,7 +391,7 @@ func MustEnc(v interface{}) []byte {
 // returned bytes, so it is up to the caller to keep track of it and use a
 // receiver of a compatible type when decoding.
 //
-// If a problem occurrs while encoding, the returned error will be non-nil and
+// If a problem occurs while encoding, the returned error will be non-nil and
 // will return true for errors.Is(err, rezi.Error). Additionally, the same
 // expression will return true for other error types, depending on the cause of
 // the error. Do not check error types with the equality operator ==; this will
@@ -400,8 +400,8 @@ func MustEnc(v interface{}) []byte {
 // Non-nil errors from this function can match the following error types: Error
 // in all cases. ErrInvalidType if the type of v is not supported.
 // ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
-// error from its MarshalBinary() function (additionally, the returned error
-// will match the same types that the error returned from MarshalBinary() would
+// error from its MarshalBinary() method (additionally, the returned error will
+// match the same types that the error returned from MarshalBinary() would
 // match).
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
@@ -439,8 +439,31 @@ func MustDec(data []byte, v interface{}) int {
 	return n
 }
 
-// Dec decodes a value as rezi-format bytes. The argument v must be a pointer to
-// a supported type (or directly implement binary.BinaryMarshaler).
+// Dec decodes a value from REZI-format bytes in data, starting with the first
+// byte in it. Returns the number of bytes consumed in order to read the
+// complete value. If the data slice was constructed by appending encoded values
+// together, then skipping over n bytes after a successful call to Dec will
+// result in the next call to Dec reading the next subsequent value.
+//
+// V must be a non-nil pointer to a type supported by REZI. The type of v is
+// examined to determine how to decode the value. The data itself is not
+// examined for type inference, therefore v must be a pointer to a compatible
+// type.
+//
+// If a problem occurs while encoding, the returned error will be non-nil and
+// will return true for errors.Is(err, rezi.Error). Additionally, the same
+// expression will return true for other error types, depending on the cause of
+// the error. Do not check error types with the equality operator ==; this will
+// always return false.
+//
+// Non-nil errors from this function can match the following error types: Error
+// in all cases. ErrInvalidType if the type pointed to by v is not supported or
+// if v is a nil pointer. ErrUnmarshalBinary if an implementor of
+// encoding.BinaryUnmarshaler returns an error from its UnmarshalBinary method
+// (additionally, the returned error will match the same types that the error
+// returned from UnmarshalBinary() would match). io.UnexpectedEOF if there are
+// fewer bytes than necessary to decode the value. ErrMalformedData if there is
+// any other problem with the data itself.
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
