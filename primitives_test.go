@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_EncBool(t *testing.T) {
+func Test_encBool(t *testing.T) {
 	testCases := []struct {
 		name   string
 		input  bool
@@ -37,7 +37,7 @@ func Test_EncBool(t *testing.T) {
 	}
 }
 
-func Test_DecBool(t *testing.T) {
+func Test_decBool(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
@@ -104,7 +104,7 @@ func Test_DecBool(t *testing.T) {
 	}
 }
 
-func Test_EncInt(t *testing.T) {
+func Test_encInt(t *testing.T) {
 	testCases := []struct {
 		name   string
 		input  int
@@ -158,7 +158,7 @@ func Test_EncInt(t *testing.T) {
 	}
 }
 
-func Test_DecInt(t *testing.T) {
+func Test_decInt(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
@@ -222,7 +222,7 @@ func Test_DecInt(t *testing.T) {
 	}
 }
 
-func Test_EncString(t *testing.T) {
+func Test_encString(t *testing.T) {
 	testCases := []struct {
 		name   string
 		input  string
@@ -261,7 +261,7 @@ func Test_EncString(t *testing.T) {
 	}
 }
 
-func Test_DecString(t *testing.T) {
+func Test_decString(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
@@ -315,7 +315,7 @@ func Test_DecString(t *testing.T) {
 	}
 }
 
-func Test_EncBinary(t *testing.T) {
+func Test_encBinary(t *testing.T) {
 	testCases := []struct {
 		name   string
 		input  encoding.BinaryMarshaler
@@ -362,7 +362,7 @@ func Test_EncBinary(t *testing.T) {
 	}
 }
 
-func Test_DecBinary(t *testing.T) {
+func Test_decBinary(t *testing.T) {
 	var received []byte
 
 	sendToReceived := func(b []byte) error {
