@@ -444,6 +444,10 @@ func encInt[E integral](v E) []byte {
 
 // decInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
+//
+// assumes that first byte specifies a non-nil integer whose L field gives
+// number of bytes to decode after all count header bytes and interprets it as
+// such. does not do further checks on count header.
 func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
 		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
@@ -454,14 +458,26 @@ func decInt[E integral](data []byte) (E, int, error) {
 	if byteCount == 0 {
 		return 0, 1, nil
 	}
-	data = data[1:]
 
 	// pull count and sign out of byteCount
 	negative := byteCount&infoBitsSign != 0
 	byteCount &= infoBitsLen
 
-	// do not examine the 2nd, 3rd, and 4th left-most bits; they are reserved
-	// for future use
+	// interpretation of other parts of the count header is handled in different
+	// functions. skip over all extension bytes
+	numHeaderBytes := 0
+	for data[0]&infoBitsExt != 0 {
+		if len(data) < 1 {
+			return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		}
+		data = data[1:]
+		numHeaderBytes++
+	}
+
+	// done reading count header info; move past the last byte of it and
+	// interpret data bytes
+	data = data[1:]
+	numHeaderBytes++
 
 	if len(data) < int(byteCount) {
 		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
@@ -491,7 +507,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 	iVal |= (uint64(intData[6]) << 8)
 	iVal |= (uint64(intData[7]))
 
-	return E(iVal), int(byteCount + 1), nil
+	return E(iVal), int(byteCount) + numHeaderBytes, nil
 }
 
 func encString(s string) []byte {

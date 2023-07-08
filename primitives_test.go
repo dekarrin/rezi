@@ -184,7 +184,6 @@ func Test_decInt(t *testing.T) {
 			expectValue: -1,
 			expectRead:  1,
 		},
-
 		{
 			name:        "413 from exact value",
 			input:       []byte{0x02, 0x01, 0x9d},
