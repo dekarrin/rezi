@@ -1065,38 +1065,68 @@ func Test_Dec_String(t *testing.T) {
 		expect result
 	}{
 		{
-			name:   "empty",
+			name:   "empty (v1 and v2)",
 			input:  []byte{0x00},
 			expect: result{val: "", consumed: 1},
 		},
 		{
-			name:   "one char",
+			name:   "one char (v1)",
 			input:  []byte{0x01, 0x01, 0x56},
 			expect: result{val: "V", consumed: 3},
 		},
 		{
-			name:   "several chars",
+			name:   "several chars (v1)",
 			input:  []byte{0x01, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61},
 			expect: result{val: "Vriska", consumed: 8},
 		},
 		{
-			name:   "pre-composed char seq",
+			name:   "pre-composed char seq (v1)",
 			input:  []byte{0x01, 0x09, 0x68, 0x6f, 0x6d, 0x65, 0xc3, 0xa7, 0x74, 0x75, 0x63, 0x6b},
 			expect: result{val: "homeçtuck", consumed: 12},
 		},
 		{
-			name:   "decomposed char seq",
+			name:   "decomposed char seq (v1)",
 			input:  []byte{0x01, 0x0a, 0x68, 0x6f, 0x6d, 0x65, 0x63, 0xcc, 0xa7, 0x74, 0x75, 0x63, 0x6b},
 			expect: result{val: "homec\u0327tuck", consumed: 13},
 		},
 		{
-			name:   "err count too big",
+			name:   "err count too big (v1)",
 			input:  []byte{0x01, 0x08, 0x68, 0x6f},
 			expect: result{err: true},
 		},
 		{
-			name:   "err invalid sequence",
+			name:   "err invalid sequence (v1)",
 			input:  []byte{0x01, 0x01, 0xc3, 0x28},
+			expect: result{err: true},
+		},
+		{
+			name:   "one char (v2)",
+			input:  []byte{0x41, 0x80, 0x01, 0x56},
+			expect: result{val: "V", consumed: 4},
+		},
+		{
+			name:   "several chars (v2)",
+			input:  []byte{0x41, 0x80, 0x06, 0x56, 0x72, 0x69, 0x73, 0x6b, 0x61},
+			expect: result{val: "Vriska", consumed: 9},
+		},
+		{
+			name:   "pre-composed char seq (v2)",
+			input:  []byte{0x41, 0x80, 0x0a, 0x68, 0x6f, 0x6d, 0x65, 0xc3, 0xa7, 0x74, 0x75, 0x63, 0x6b},
+			expect: result{val: "homeçtuck", consumed: 13},
+		},
+		{
+			name:   "decomposed char seq (v2)",
+			input:  []byte{0x41, 0x80, 0x0b, 0x68, 0x6f, 0x6d, 0x65, 0x63, 0xcc, 0xa7, 0x74, 0x75, 0x63, 0x6b},
+			expect: result{val: "homec\u0327tuck", consumed: 14},
+		},
+		{
+			name:   "err count too big (v2)",
+			input:  []byte{0x41, 0x80, 0x08, 0x68, 0x6f},
+			expect: result{err: true},
+		},
+		{
+			name:   "err invalid sequence (v2)",
+			input:  []byte{0x41, 0x80, 0x02, 0xc3, 0x28},
 			expect: result{err: true},
 		},
 	}

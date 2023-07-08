@@ -499,6 +499,11 @@ func decString(data []byte) (string, int, error) {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
 
+	// special case; 0x00 is the empty string in all variants
+	if data[0] == 0 {
+		return "", 1, nil
+	}
+
 	hdr, _, err := decCountHeader(data)
 	if err != nil {
 		return "", 0, err
@@ -519,7 +524,7 @@ func decStringV2(data []byte) (string, int, error) {
 	strLength, countLen, err := decInt[int](data)
 	if err != nil {
 		return "", 0, reziError{
-			msg:   fmt.Sprintf("decoding string rune count: %s", err.Error()),
+			msg:   fmt.Sprintf("decoding string byte count: %s", err.Error()),
 			cause: []error{err},
 		}
 	}
@@ -527,7 +532,7 @@ func decStringV2(data []byte) (string, int, error) {
 
 	if strLength < 0 {
 		return "", 0, reziError{
-			msg:   "string rune count < 0",
+			msg:   "string byte count < 0",
 			cause: []error{ErrMalformedData},
 		}
 	}
