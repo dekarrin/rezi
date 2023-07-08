@@ -124,7 +124,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case mtString:
-		s, n, err := decWithNilCheck(data, v, ti, decStringV1)
+		s, n, err := decWithNilCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
 		}
