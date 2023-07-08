@@ -82,7 +82,7 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	mapKeys := refVal.MapKeys()
@@ -128,7 +128,7 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		panic("not a map type")
 	}
 
-	m, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+	m, n, err := decWithHeaderCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},

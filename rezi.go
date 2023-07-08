@@ -375,7 +375,7 @@ func Enc(v interface{}) (data []byte, err error) {
 	if info.Primitive() {
 		return encCheckedPrim(v, info)
 	} else if info.Main == mtNil {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	} else if info.Main == mtMap {
 		return encCheckedMap(v, info)
 	} else if info.Main == mtSlice {
@@ -465,7 +465,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 			encodeTarget = encodeTarget.Elem()
 		}
 		if nilLevel > -1 {
-			return encNil(nilLevel), nil
+			return encNilHeader(nilLevel), nil
 		}
 		return encFn(convFn(encodeTarget))
 	} else {
@@ -477,26 +477,27 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
-func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
-	var isNil bool
-	var nilLevel tNilLevel
+func decWithHeaderCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+	var hdr countHeader
 
 	if ti.Indir > 0 {
-		isNil, nilLevel, _, n, err = decWithHeader[E](nil, data)
+		hdr, n, err = decCountHeader(data)
 		if err != nil {
 			return decoded, n, reziError{
-				msg:   fmt.Sprintf("check nil value: %s", err.Error()),
+				msg:   fmt.Sprintf("check count header: %s", err.Error()),
 				cause: []error{err},
 			}
 		}
 	}
 
-	if !isNil {
+	effectiveExtraIndirs := hdr.ExtraNilIndirections()
+
+	if !hdr.IsNil() {
 		decoded, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, err
 		}
-		nilLevel = ti.Indir
+		effectiveExtraIndirs = ti.Indir
 	}
 
 	if ti.Indir > 0 {
@@ -504,7 +505,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		assignTarget := reflect.ValueOf(v)
 		// assignTarget is a **string but we want a *string
 
-		for i := 0; i < ti.Indir && i < nilLevel; i++ {
+		for i := 0; i < ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
 			// *what does it mean*
@@ -515,7 +516,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 			assignTarget = newTarget
 		}
 
-		if !isNil {
+		if !hdr.IsNil() {
 			assignTarget.Elem().Set(reflect.ValueOf(decoded))
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
@@ -630,6 +631,14 @@ type countHeader struct {
 	// bytes that make up the "content" of an int that is started by the count
 	// header, as that data is not included in a countHeader and is not parsed.
 	DecodedCount int
+}
+
+func (hdr countHeader) IsNil() bool {
+	return hdr.NilAt > 0
+}
+
+func (hdr countHeader) ExtraNilIndirections() int {
+	return hdr.NilAt - 1
 }
 
 // encode the header info as valid bytes.

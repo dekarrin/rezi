@@ -21,7 +21,7 @@ func encSlice(v interface{}) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	enc := make([]byte, 0)
@@ -47,7 +47,7 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		panic("not a slice type")
 	}
 
-	sl, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+	sl, n, err := decWithHeaderCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Slice
 		},

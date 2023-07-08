@@ -124,7 +124,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case mtString:
-		s, n, err := decWithNilCheck(data, v, ti, decString)
+		s, n, err := decWithHeaderCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
 		}
@@ -134,7 +134,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		return n, nil
 	case mtBool:
-		b, n, err := decWithNilCheck(data, v, ti, decBool)
+		b, n, err := decWithHeaderCheck(data, v, ti, decBool)
 		if err != nil {
 			return n, err
 		}
@@ -151,7 +151,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i int64
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int64])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int64])
 				if err != nil {
 					return n, err
 				}
@@ -161,7 +161,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i int32
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int32])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int32])
 				if err != nil {
 					return n, err
 				}
@@ -171,7 +171,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i int16
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int16])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int16])
 				if err != nil {
 					return n, err
 				}
@@ -181,7 +181,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i int8
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int8])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int8])
 				if err != nil {
 					return n, err
 				}
@@ -191,7 +191,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i int
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int])
 				if err != nil {
 					return n, err
 				}
@@ -204,7 +204,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i uint64
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint64])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
@@ -214,7 +214,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i uint32
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint32])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
@@ -224,7 +224,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i uint16
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint16])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
@@ -234,7 +234,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i uint8
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint8])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
@@ -244,7 +244,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i uint
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint])
+				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint])
 				if err != nil {
 					return n, err
 				}
@@ -259,7 +259,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		bu, n, err := decWithHeaderCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
@@ -287,7 +287,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 }
 
-func encNil(indirLevels int) []byte {
+func encNilHeader(indirLevels int) []byte {
 	// nils are encoded as a special negative that is distinct from others,
 	// should it be checked.
 	//
@@ -323,54 +323,19 @@ func encNil(indirLevels int) []byte {
 	return enc
 }
 
-// decWithHeader decodes a value that has a count header. It could represent a
-// nil value. If it's not nil, it is decoded by passing it to decFn and val is
-// valid.
-//
-// To only interpret the nil and skip interpretation when it's not a nil, set
-// decFn to nil.
-func decWithHeader[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
+// decCountHeader decodes a count header. It could represent a nil value. It
+// will *not* decode the actual count, if in fact the count is present.
+func decCountHeader(data []byte) (countHeader, int, error) {
+	var hdr countHeader
+
 	if len(data) < 1 {
-		return false, tNilLevel(0), val, 0, reziError{
+		return hdr, 0, reziError{
 			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
 		}
 	}
 
-	infoByte := data[0]
-	if infoByte&infoBitsNil != infoBitsNil {
-		// not a nil, regular number, do no more manipulation of data and
-		// interpret as a regular value if ffunc to do so is provided
-
-		if decFn != nil {
-			val, consumed, err = decFn(data)
-		}
-
-		return false, tNilLevel(0), val, consumed, err
-	}
-
-	// it is a nil. do other checks.
-
-	// skip over any extension bytes in the info header
-	for data[0]&infoBitsExt == infoBitsExt {
-		data = data[1:]
-		consumed++
-	}
-
-	// data now starts with the last info byte, skip it.
-	data = data[1:]
-	consumed++
-
-	if infoByte&infoBitsIndir == infoBitsIndir {
-		// the level of indirection is encoded in following bytes
-		var n int
-		indir, n, err = decInt[tNilLevel](data)
-		consumed += n
-		if err != nil {
-			return true, indir, val, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
-		}
-	}
-
-	return true, indir, val, consumed, nil
+	err := hdr.UnmarshalBinary(data)
+	return hdr, hdr.DecodedCount, err
 }
 
 func encBool(b bool) []byte {
@@ -631,7 +596,7 @@ func decUTF8Codepoint(data []byte) (rune, int, error) {
 
 func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	if b == nil {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	enc, marshalErr := b.MarshalBinary()
