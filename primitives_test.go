@@ -197,6 +197,18 @@ func Test_decInt(t *testing.T) {
 			expectRead:  5,
 		},
 		{
+			name:        "skip extension bytes - 0",
+			input:       []byte{0x40, 0xff, 0xbf},
+			expectValue: 0,
+			expectRead:  3,
+		},
+		{
+			name:        "skip extension bytes - 8888",
+			input:       []byte{0x42, 0xff, 0xbf, 0x22, 0xb8},
+			expectValue: 8888,
+			expectRead:  5,
+		},
+		{
 			name:        "error too short",
 			input:       []byte{0x03, 0x00, 0x01},
 			expectError: true,
