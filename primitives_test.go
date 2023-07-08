@@ -311,7 +311,7 @@ func Test_decString(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decString(tc.input)
+			actualValue, actualRead, err := decV1String(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
