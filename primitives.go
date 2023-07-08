@@ -303,32 +303,33 @@ func encNil(indirLevels int) []byte {
 	// level of indirection; if so, the bytes that follow after the extension
 	// byte will be a non-nil int that gives the number of indirections.
 
-	infoByte := byte(0)
-	infoByte |= infoBitsNil
+	// encode it with a count header
+	if indirLevels < 0 {
+		indirLevels = 0
+	}
+	hdr := countHeader{
+		NilAt: indirLevels + 1,
 
-	// for compat with older format
-	infoByte |= infoBitsSign
-
-	if indirLevels <= 0 {
-		return []byte{infoByte}
+		// for compat with older format
+		Negative: true,
 	}
 
-	infoByte |= infoBitsIndir
-	enc := []byte{infoByte}
+	enc, err := hdr.MarshalBinary()
+	if err != nil {
+		// should never happen
+		panic(fmt.Sprintf("encoding nil-indicating countHeader failed: %s", err.Error()))
+	}
 
-	enc = append(enc, encInt(tNilLevel(indirLevels))...)
 	return enc
 }
 
-// decNilable decodes a value that could also represent a nil value. If it's not
-// nil, it is decoded by passing it to decFn.
+// decWithHeader decodes a value that has a count header. It could represent a
+// nil value. If it's not nil, it is decoded by passing it to decFn and val is
+// valid.
 //
 // To only interpret the nil and skip interpretation when it's not a nil, set
 // decFn to nil.
-//
-// This function DOES respect the info extension bit, but only when decoding a
-// nil.
-func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
+func decWithHeader[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
 	if len(data) < 1 {
 		return false, tNilLevel(0), val, 0, reziError{
 			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},

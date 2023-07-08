@@ -482,7 +482,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	var nilLevel tNilLevel
 
 	if ti.Indir > 0 {
-		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
+		isNil, nilLevel, _, n, err = decWithHeader[E](nil, data)
 		if err != nil {
 			return decoded, n, reziError{
 				msg:   fmt.Sprintf("check nil value: %s", err.Error()),
@@ -593,7 +593,7 @@ type countHeader struct {
 	// bytes to read for the value being checked (it's nil), a value greater
 	// than 1 additionally means that an integer following the info byte(s) was
 	// decoded/will be encoded to give that number (NilAt - 1).
-	NilAt int
+	NilAt tNilLevel
 
 	// num following bytes that make up an integer, must be representable as a
 	// 4-bit unsigned int (so must be between 0 and 15). will be 0 for nil.
@@ -752,7 +752,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// all extension bytes processed, now decode any indirection level int if
 	// present
 	if infoByte&infoBitsIndir != 0 {
-		extraIndirs, n, err := decInt[tLen](data[decoded.DecodedCount:])
+		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
 			return err
 		}
