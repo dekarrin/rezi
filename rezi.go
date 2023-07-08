@@ -260,8 +260,8 @@
 //
 //	Layout:
 //
-//	[ INFO ] [ INT VALUE ]
-//	 1 byte    0..8 bytes
+//	[ INFO ] [ INT INFO ] [ INT VALUE ]
+//	 1 byte    0..1 byte    0..8 bytes
 //
 // Nil values are encoded similarly to integers, with one major exception: the
 // nil bit in the info byte is set to true. This allows a nil to be stored in
@@ -274,12 +274,11 @@
 //
 // Pointers that are themselves not nil but point to another pointer which is
 // nil are encoded slightly differently. In this case, the info byte will have
-// both the nil bit and the indirection bit set, and its length bits will be
-// non-zero and give the number of bytes which follow that make up an encoded
-// integer. The encoded integer gives the number of indirections that are done
-// before a nil pointer is arrived at. For instance, a ***int that points to a
-// valid **int that itself points to a valid *int which is nil would be encoded
-// as a nil with indirection level of 2.
+// both the nil bit and the indirection bit set, and will then be followed by a
+// normal encoded integer with its own info byte. The encoded integer gives the
+// number of indirections that are done before a nil pointer is arrived at. For
+// instance, a ***int that points to a valid **int that itself points to a valid
+// *int which is nil would be encoded as a nil with indirection level of 2.
 //
 // Encoded nil values are *not* typed; they will be interpreted as the same type
 // as the pointed-to value of the receiver passed to REZI during decoding.
@@ -315,6 +314,7 @@ package rezi
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 )
 
@@ -373,11 +373,11 @@ func Enc(v interface{}) (data []byte, err error) {
 
 	if info.Primitive() {
 		return encCheckedPrim(v, info)
-	} else if info.Main == tNil {
+	} else if info.Main == mtNil {
 		return encNil(0), nil
-	} else if info.Main == tMap {
+	} else if info.Main == mtMap {
 		return encCheckedMap(v, info)
-	} else if info.Main == tSlice {
+	} else if info.Main == mtSlice {
 		return encCheckedSlice(v, info)
 	} else {
 		panic("no possible encoding")
@@ -436,9 +436,9 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 
 	if info.Primitive() {
 		return decCheckedPrim(data, v, info)
-	} else if info.Main == tMap {
+	} else if info.Main == mtMap {
 		return decCheckedMap(data, v, info)
-	} else if info.Main == tSlice {
+	} else if info.Main == mtSlice {
 		return decCheckedSlice(data, v, info)
 	} else {
 		panic("no possible decoding")
@@ -579,4 +579,187 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 
 		return decoded, decConsumed, decErr
 	}
+}
+
+// countHeader represents the info available in the initial "info byte" of an
+// encoded int.
+type countHeader struct {
+	Negative bool
+
+	// NilAt indicates that it is nil at that level of indirection. 1 is nil at
+	// first, 2 is nil at the second (1 level of additional indirection), etc.
+	// 0 is not nil at all. A value greater than 0 means there are no further
+	// bytes to read for the value being checked (it's nil), a value greater
+	// than 1 additionally means that an integer following the info byte(s) was
+	// decoded/will be encoded to give that number (NilAt - 1).
+	NilAt int
+
+	// num following bytes that make up an integer, must be representable as a
+	// 4-bit unsigned int (so must be between 0 and 15). will be 0 for nil.
+	Length int
+
+	// Whether count is explicitly byte count (used to distinguish new-style
+	// string format from old style, which used a count of *runes*). If true,
+	// automatically implies ExtensionLevel >= 1.
+	ByteLength bool
+
+	// Must be representable as a 4-bit unsigned int. If not 0, automatically
+	// implies ExtensionLevel >= 1
+	Version int
+
+	// ExtensionLevel is number of extension bytes that are in the
+	// representation. Caveat - this can be "wrong". When encoding, regardless
+	// of this value as many extension bytes as are needed to encode non-default
+	// values are included; if this number is *higher*, extension bytes up to
+	// the ExtensionLevel (up to the maximum extension bytes possible) are
+	// included.
+	//
+	// during decoding this explicitly notes how many extension bytes were
+	// present even if not needed.
+	//
+	// at this time, 1 is the maximum level supported for encoding. If higher,
+	// encoding will not succeed. It can be higher than 1 after decoding; this
+	// indicates that that many Extension bytes were read (but only the first N
+	// will be interpreted).
+	ExtensionLevel int
+
+	// DecodedCount is the total number of bytes that were consumed during
+	// decode. it is completely ignored during encoding. Includes bytes that
+	// make up integer count of extra indirections of a nil; does NOT include
+	// bytes that make up the "content" of an int that is started by the count
+	// header, as that data is not included in a countHeader and is not parsed.
+	DecodedCount int
+}
+
+// encode the header info as valid bytes.
+func (hdr countHeader) MarshalBinary() ([]byte, error) {
+
+	// infobyte bit layout for ref:
+	// SXNILLLL
+	//
+	// S = Sign
+	// X = eXtesnion
+	// N = Nil
+	// I = has Indirection past 1
+	// L = Length (4-bit unsigned int)
+	//
+	//
+	// extension byte 1 layout for ref:
+	// BXUUVVVV
+	//
+	// B = length is Byte count. not included if not needed.
+	// X = eXtension
+	// U = Unused
+	// V = binary format explicit Version
+
+	if hdr.Length > 15 || hdr.Length < 0 {
+		return nil, reziError{msg: "countHeader.Length cannot fit into nibble", cause: []error{ErrMalformedData}}
+	}
+
+	if hdr.Version > 15 || hdr.Version < 0 {
+		return nil, reziError{msg: "countHeader.Version cannot fit into nibble", cause: []error{ErrMalformedData}}
+	}
+
+	var encoded []byte
+
+	// L bits
+	infoByte := uint8(hdr.Length)
+
+	// S bit
+	if hdr.Negative {
+		infoByte |= infoBitsSign
+	}
+
+	// N bit
+	if hdr.NilAt > 0 {
+		infoByte |= infoBitsNil
+	}
+
+	// I bit
+	if hdr.NilAt > 1 {
+		infoByte |= infoBitsIndir
+	}
+
+	encoded = append(encoded, infoByte)
+
+	// if later things require more info bytes, continue to the next
+	if hdr.ByteLength || hdr.Version > 0 || hdr.ExtensionLevel >= 1 {
+		// do the extension byte
+
+		extByte := uint8(hdr.Version)
+
+		if hdr.ByteLength {
+			extByte |= infoBitsByteCount
+		}
+
+		encoded = append(encoded, extByte)
+	}
+
+	// okay, if nilAt is > 1 then we need to additionally encode an int of that
+	// value
+	if hdr.NilAt > 1 {
+		encoded = append(encoded, encInt(hdr.NilAt-1)...)
+	}
+
+	return encoded, nil
+}
+
+// decode the header info from valid bytes. will consume following int if
+// needed to fill the NilAt value. Will *not* consume regular int value bytes.
+func (hdr *countHeader) UnmarshalBinary(data []byte) error {
+	if len(data) < 1 {
+		return reziError{msg: "no bytes to decode", cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+
+	decoded := countHeader{}
+
+	infoByte := data[0]
+
+	decoded.Length = int(infoByte & infoBitsLen)
+	decoded.Negative = infoByte&infoBitsSign != 0
+	decoded.DecodedCount = 1 // for the initial info byte
+
+	if infoByte&infoBitsNil != 0 {
+		decoded.NilAt++
+		// need to hold off on indir check until after we've processed all bytes
+		// so we will hold on to info byte and check back later
+	}
+
+	// scan all extension bytes
+	extByte := infoByte
+	for extByte&infoBitsExt != 0 {
+		decoded.ExtensionLevel++
+		if len(data) < decoded.ExtensionLevel+1 {
+			return reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		}
+		extByte = data[decoded.ExtensionLevel]
+
+		// we have consumed an additional byte, add it to total decoded
+		decoded.DecodedCount++
+
+		// interpret the extension byte based on which one it is
+		if decoded.ExtensionLevel == 1 {
+			// first extension byte, layout: BXUUVVVV.
+			decoded.Version = int(extByte & infoBitsVersion)
+			decoded.ByteLength = extByte&infoBitsByteCount != 0
+		}
+
+		// future: more extension bytes, if needed. for now, just run through
+		// and process them.
+	}
+
+	// all extension bytes processed, now decode any indirection level int if
+	// present
+	if infoByte&infoBitsIndir != 0 {
+		extraIndirs, n, err := decInt[tLen](data[decoded.DecodedCount:])
+		if err != nil {
+			return err
+		}
+		decoded.DecodedCount += n
+		decoded.NilAt += extraIndirs
+	}
+
+	*hdr = decoded
+
+	return nil
 }

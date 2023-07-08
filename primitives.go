@@ -19,6 +19,11 @@ const (
 	infoBitsNil   = 0b00100000
 	infoBitsIndir = 0b00010000
 	infoBitsLen   = 0b00001111
+
+	// used only in extension byte 1:
+	infoBitsByteCount = 0b10000000
+	infoBitsVersion   = 0b00001111
+	// extension bit not listed because it is the same
 )
 
 type anyUint interface {
@@ -48,11 +53,11 @@ type integral interface {
 // type.
 func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 	switch ti.Main {
-	case tString:
+	case mtString:
 		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
-	case tBool:
+	case mtBool:
 		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
-	case tIntegral:
+	case mtIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
@@ -100,7 +105,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 				})
 			}
 		}
-	case tBinary:
+	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
@@ -118,7 +123,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	// or an implementor of BinaryUnmarshaler.
 
 	switch ti.Main {
-	case tString:
+	case mtString:
 		s, n, err := decWithNilCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
@@ -128,7 +133,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			*tVal = s
 		}
 		return n, nil
-	case tBool:
+	case mtBool:
 		b, n, err := decWithNilCheck(data, v, ti, decBool)
 		if err != nil {
 			return n, err
@@ -138,7 +143,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			*tVal = b
 		}
 		return n, nil
-	case tIntegral:
+	case mtIntegral:
 		var n int
 		var err error
 
@@ -251,7 +256,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 
 		return n, nil
-	case tBinary:
+	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
 		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
