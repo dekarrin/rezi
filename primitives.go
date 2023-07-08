@@ -124,7 +124,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case mtString:
-		s, n, err := decWithNilCheck(data, v, ti, decV1String)
+		s, n, err := decWithNilCheck(data, v, ti, decStringV1)
 		if err != nil {
 			return n, err
 		}
@@ -493,7 +493,7 @@ func encString(s string) []byte {
 	return enc
 }
 
-func decV2String(data []byte) (string, int, error) {
+func decStringV2(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
@@ -536,7 +536,7 @@ func decV2String(data []byte) (string, int, error) {
 	return sb.String(), readBytes, nil
 }
 
-func decV1String(data []byte) (string, int, error) {
+func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
