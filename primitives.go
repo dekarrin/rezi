@@ -493,6 +493,25 @@ func encString(s string) []byte {
 	return enc
 }
 
+// decString decodes a string of any version. Assumes header is not nil.
+func decString(data []byte) (string, int, error) {
+	if len(data) < 1 {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+
+	hdr, _, err := decCountHeader(data)
+	if err != nil {
+		return "", 0, err
+	}
+
+	// compatibility with older format
+	if !hdr.ByteLength {
+		return decStringV1(data)
+	}
+
+	return decStringV2(data)
+}
+
 func decStringV2(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
