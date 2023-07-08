@@ -527,6 +527,49 @@ func encString(s string) []byte {
 	return enc
 }
 
+func decV2String(data []byte) (string, int, error) {
+	if len(data) < 1 {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+	strLength, countLen, err := decInt[int](data)
+	if err != nil {
+		return "", 0, reziError{
+			msg:   fmt.Sprintf("decoding string rune count: %s", err.Error()),
+			cause: []error{err},
+		}
+	}
+	data = data[countLen:]
+
+	if strLength < 0 {
+		return "", 0, reziError{
+			msg:   "string rune count < 0",
+			cause: []error{ErrMalformedData},
+		}
+	}
+
+	if len(data) < strLength {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+	// clamp it
+	data = data[:strLength]
+
+	readBytes := countLen
+
+	var sb strings.Builder
+	for readBytes-countLen < strLength {
+		ch, charBytesRead, err := decUTF8Codepoint(data)
+		if err != nil {
+			return "", 0, err
+		}
+
+		sb.WriteRune(ch)
+		readBytes += charBytesRead
+		data = data[charBytesRead:]
+	}
+
+	return sb.String(), readBytes, nil
+}
+
 func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
@@ -552,21 +595,9 @@ func decString(data []byte) (string, int, error) {
 	var sb strings.Builder
 
 	for i := 0; i < runeCount; i++ {
-		ch, charBytesRead := utf8.DecodeRune(data)
-		if ch == utf8.RuneError {
-			if charBytesRead == 0 {
-				return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
-			} else if charBytesRead == 1 {
-				return "", 0, reziError{
-					msg:   "invalid UTF-8 encoding in string",
-					cause: []error{ErrMalformedData},
-				}
-			} else {
-				return "", 0, reziError{
-					msg:   "invalid unicode replacement character in rune",
-					cause: []error{ErrMalformedData},
-				}
-			}
+		ch, charBytesRead, err := decUTF8Codepoint(data)
+		if err != nil {
+			return "", 0, err
 		}
 
 		sb.WriteRune(ch)
@@ -575,6 +606,26 @@ func decString(data []byte) (string, int, error) {
 	}
 
 	return sb.String(), readBytes, nil
+}
+
+func decUTF8Codepoint(data []byte) (rune, int, error) {
+	ch, charBytesRead := utf8.DecodeRune(data)
+	if ch == utf8.RuneError {
+		if charBytesRead == 0 {
+			return ch, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		} else if charBytesRead == 1 {
+			return ch, 0, reziError{
+				msg:   "invalid UTF-8 encoding in string",
+				cause: []error{ErrMalformedData},
+			}
+		} else {
+			return ch, 0, reziError{
+				msg:   "invalid unicode replacement character in rune",
+				cause: []error{ErrMalformedData},
+			}
+		}
+	}
+	return ch, charBytesRead, nil
 }
 
 func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
