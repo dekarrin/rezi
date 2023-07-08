@@ -261,7 +261,8 @@
 //	Layout:
 //
 //	[ INFO ] [ INT INFO ] [ INT VALUE ]
-//	 1 byte    0..1 byte    0..8 bytes
+//	<-INFO-> <---EXTRA INDIRECTIONS--->
+//	 1 byte          0..9 bytes
 //
 // Nil values are encoded similarly to integers, with one major exception: the
 // nil bit in the info byte is set to true. This allows a nil to be stored in
