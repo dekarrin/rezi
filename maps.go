@@ -128,7 +128,7 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		panic("not a map type")
 	}
 
-	m, n, err := decWithHeaderCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+	m, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},

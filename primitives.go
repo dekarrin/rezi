@@ -124,7 +124,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	switch ti.Main {
 	case mtString:
-		s, n, err := decWithHeaderCheck(data, v, ti, decString)
+		s, n, err := decWithNilCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
 		}
@@ -134,7 +134,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		return n, nil
 	case mtBool:
-		b, n, err := decWithHeaderCheck(data, v, ti, decBool)
+		b, n, err := decWithNilCheck(data, v, ti, decBool)
 		if err != nil {
 			return n, err
 		}
@@ -151,7 +151,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i int64
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int64])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int64])
 				if err != nil {
 					return n, err
 				}
@@ -161,7 +161,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i int32
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int32])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int32])
 				if err != nil {
 					return n, err
 				}
@@ -171,7 +171,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i int16
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int16])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int16])
 				if err != nil {
 					return n, err
 				}
@@ -181,7 +181,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i int8
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int8])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int8])
 				if err != nil {
 					return n, err
 				}
@@ -191,7 +191,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i int
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[int])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[int])
 				if err != nil {
 					return n, err
 				}
@@ -204,7 +204,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			switch ti.Bits {
 			case 64:
 				var i uint64
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint64])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
@@ -214,7 +214,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 32:
 				var i uint32
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint32])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
@@ -224,7 +224,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 16:
 				var i uint16
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint16])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
@@ -234,7 +234,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			case 8:
 				var i uint8
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint8])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
@@ -244,7 +244,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				}
 			default:
 				var i uint
-				i, n, err = decWithHeaderCheck(data, v, ti, decInt[uint])
+				i, n, err = decWithNilCheck(data, v, ti, decInt[uint])
 				if err != nil {
 					return n, err
 				}
@@ -259,7 +259,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithHeaderCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},

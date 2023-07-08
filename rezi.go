@@ -477,7 +477,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
-func decWithHeaderCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
 	var hdr countHeader
 
 	if ti.Indir > 0 {
