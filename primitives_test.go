@@ -326,6 +326,60 @@ func Test_decStringV1(t *testing.T) {
 	}
 }
 
+func Test_decStringV2(t *testing.T) {
+	testCases := []struct {
+		name        string
+		input       []byte
+		expectValue string
+		expectRead  int
+		expectError bool
+	}{
+
+		{
+			name:        "empty",
+			input:       []byte{0x40, 0x80},
+			expectValue: "",
+			expectRead:  2,
+		},
+		{
+			name:        "one byte char followed by ff field",
+			input:       []byte{0x41, 0x80, 0x01, 0x31, 0xff, 0xff},
+			expectValue: "1",
+			expectRead:  4,
+		},
+		{
+			name:        "'Hello, 世界', followed by other bytes",
+			input:       []byte{0x41, 0x80, 0x0d, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c, 0x01, 0x02, 0x03},
+			expectValue: "Hello, 世界",
+			expectRead:  16,
+		},
+		{
+			name:        "'hi, world!'",
+			input:       []byte{0x41, 0x80, 0x0a, 0x68, 0x69, 0x2c, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x21},
+			expectValue: "hi, world!",
+			expectRead:  13,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actualValue, actualRead, err := decStringV2(tc.input)
+			if tc.expectError {
+				if !assert.Error(err) {
+					return
+				}
+			} else if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expectValue, actualValue)
+			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+		})
+	}
+}
+
 func Test_encBinary(t *testing.T) {
 	testCases := []struct {
 		name   string
