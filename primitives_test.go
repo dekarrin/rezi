@@ -272,7 +272,7 @@ func Test_encString(t *testing.T) {
 	}
 }
 
-func Test_decString(t *testing.T) {
+func Test_decStringV1(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
