@@ -2,11 +2,11 @@
 // Encoding (Compressible) Interchange format. It allows types that implement
 // encoding.BinaryUnmarshaler and encoding.BinaryMarshaler to be easily read
 // from and written to byte slices. It has an interface similar to the json
-// package, where one function is used to encode all supported types, and
-// another function receives bytes and a receiver for decoded data and infers
-// how to decode the bytes based on the receiver.
+// package; one function is used to encode all supported types, and another
+// function receives bytes and a receiver for decoded data and infers how to
+// decode the bytes based on the receiver.
 //
-// The [Enc] function is to encode any supported type to REZI bytes:
+// The [Enc] function is used to encode any supported type to REZI bytes:
 //
 //	import "github.com/dekarrin/rezi/v2"
 //
@@ -44,13 +44,13 @@
 //	var n int
 //	var err error
 //
-//	n, err := rezi.Dec(allData, &readNumber)
+//	n, err = rezi.Dec(allData, &readNumber)
 //	if err != nil {
 //		panic(err.Error())
 //	}
 //	allData = allData[n:]
 //
-//	n, err := rezi.Dec(allData, &readName)
+//	n, err = rezi.Dec(allData, &readName)
 //	if err != nil {
 //		panic(err.Error())
 //	}
@@ -58,20 +58,19 @@
 //
 // # Error Checking
 //
-// Errors in REZI have specific types that can be checked in order to determine
-// the cause of an error. These errors conform to the [errors] interface and
+// Errors in REZI have specific types that they can be checked against to
+// determine their cause. These errors conform to the [errors] interface and
 // must be checked by using [errors.Is].
 //
 // As mentioned in that library's documentation, errors should not be checked
-// with simple equality checks. REZI enforces this fully; non-nil errors that
+// with simple equality checks. REZI enforces this fully. Non-nil errors that
 // are checked with `==` will never return true.
-//
-// That is
 //
 //	if err == rezi.Error
 //
-// is not only the non-preferred way of checking an error, but will always
-// return false. Instead, do:
+// The above expression is not simply the non-preferred way of checking an
+// error, but rather is entirely non-functional, as it will always return false.
+// Instead, do:
 //
 //	if errors.Is(err, rezi.Error)
 //
@@ -82,13 +81,13 @@
 // caused due to the supplied bytes being shorter than expected, use
 // errors.Is(err, io.ErrUnexpectedEOF).
 //
-// See the individual functions for a list of error types that non-nil returned
-// errors may be checked against.
+// See the individual functions for a list of error types that returned errors
+// may be checked against.
 //
 // # Supported Data Types
 //
 // REZI supports several built-in basic Go types: int (as well as all of its
-// unsigned and specific-bitsize varieties), string, bool, and any type that
+// unsigned and specific-size varieties), string, bool, and any type that
 // implements encoding.BinaryMarshaler (for encoding) or whose pointer type
 // implements encoding.BinaryUnmarshaler (for decoding).
 //
@@ -98,8 +97,7 @@
 // Slices and maps are supported with some stipulations. Slices must contain
 // only other supported types (or pointers to them). Maps have the same
 // restrictions on their values, but only maps with a key type of string, int
-// (or any of its unsigned and specific-bitsize varieties), or bool are
-// supported.
+// (or any of its unsigned or specific-size varieties), or bool are supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -110,10 +108,10 @@
 // # Binary Data Format
 //
 // REZI uses a binary format for all supported types. Other than bool, which is
-// encoded as simply one of two byte values, an encoded value will start with
-// one or more "info" bytes that gives metadata on the value itself. This is
-// typically the length of the full value, but may include additional
-// information such as whether the encoded value is in fact a nil pointer.
+// encoded as a single byte, an encoded value will start with one or more "info"
+// bytes that contain metadata on the value itself. This is typically the length
+// of the full value but may include additional information such as whether the
+// encoded value is a nil pointer.
 //
 // Note that the info byte does not give information on the type of the encoded
 // value, besides whether it is nil (and still, the type of the nil is not
@@ -131,7 +129,7 @@
 //	MSB  LSB
 //
 // The info byte has information coded into its bits represented as SXNILLLL,
-// where each letter stands for a particular bit, from most signficant to the
+// where each letter from left to right stands for a particular bit from most to
 // least significant.
 //
 // The bit labeled "S" is the sign bit; when high (1), it indicates that the
@@ -142,13 +140,13 @@
 // At this time, only encoded string values use this extension byte.
 //
 // The "N" bit is the explicit nil flag, and when set it indicates that the
-// value is a nil and that there are no following bytes which make up its
-// encoding, with the exception of any indirection amount indicators.
+// value is a nil and that there are no following bytes in the encoded value
+// other than any indirection amount indicators.
 //
 // The "I" bit is the indirection bit, and if set, indicates that the following
 // bytes encode the number of additional indirections of the pointer beyond the
 // initial indirection at which the nil occurs; for instance, a nil *int value
-// is encoded as simply the info byte 0b00100000, but a non nil **int that
+// is encoded as simply the info byte 0b00100000, but a non-nil **int that
 // points at a nil *int would be encoded with one level of additional
 // indirection and the info byte's I bit would be set.
 //
@@ -167,7 +165,7 @@
 //	MSB  LSB
 //
 // The initial INFO byte may be followed by a second byte, the info extension
-// byte (EXT for short). This encodes additional metadata about the the encoded
+// byte (EXT for short). This encodes additional metadata about the encoded
 // value.
 //
 // The "B" bit is the binary count flag. If this is set, it explicitly indicates
@@ -179,7 +177,7 @@
 //
 // The "V" bits make up the version field of the extension byte. This indicates
 // the version of encoding of the particular type that is represented, encoded
-// as a 4-bit unsigned integer. If not present (all 0s, or the EXT byte itself
+// as a 4-bit unsigned integer. If not present (all 0's, or the EXT byte itself
 // is not present), it is assumed to be 1. This version number is purely
 // informative and does not affect decoding in any way.
 //
@@ -277,7 +275,7 @@
 //
 // Map values are encoded as a count of all bytes that make up the entire map,
 // followed by pairs of the encoded keys and associated values for each element
-// of the map. Each pair consistes of the encoded key, followed immediately by
+// of the map. Each pair consists of the encoded key, followed immediately by
 // the encoded value that the key maps to. There is no special delimiter between
 // key-value pairs or between the key and value in a pair; where one ends, the
 // next one begins.
@@ -309,9 +307,9 @@
 // normal encoded integer with its own info byte. The encoded integer gives the
 // number of indirections that are done before a nil pointer is arrived at. For
 // instance, a ***int that points to a valid **int that itself points to a valid
-// *int which is nil would be encoded as a nil with indirection level of 2.
+// *int which is nil would be encoded as a nil with an indirection level of 2.
 //
-// Encoded nil values are *not* typed; they will be interpreted as the same type
+// Encoded nil values are not typed; they will be interpreted as the same type
 // as the pointed-to value of the receiver passed to REZI during decoding.
 //
 //	Pointer Values
@@ -320,10 +318,10 @@
 //
 //	(either encoded value type, or encoded nil)
 //
-// A pointer is not encoded in a special manner. Instead, the value they point
-// to is encoded as though it were not pointer, and when decoding to a pointer,
-// the value is first decoded, then a pointer to the decoded value is used as
-// the value of the pointer.
+// Pointers do not have their own dedicated encoding format. Instead, the value
+// a pointer points to is encoded as though it were not a pointer type, and when
+// decoding to a pointer, the value is first decoded, then a pointer to the
+// decoded value is created and used as the returned value.
 //
 // If a pointer is nil, it is instead encoded as a nil value.
 //
@@ -335,7 +333,7 @@
 // encoded as a nil value; see the section on nil value encodings for a
 // description of how this information is captured.
 //
-// Compatibility:
+// # Backward Compatibility
 //
 // Older versions of the REZI library use a binary data format that differs from
 // the current one. The current version retains compatibility for reading data
@@ -348,15 +346,15 @@
 // count. This older format is only able to encode a single level of
 // indirection, i.e. a nil pointer-to-type, with no additional indirections. Due
 // to this limitation, decoding these values will result in either a nil pointer
-// or all levels indirected up to the non-nil value; it will never be decoded as
-// as, say, a pointer to a pointer which is then nil.
+// or all levels indirected up to the non-nil value; it will never be decoded
+// as, for example, a pointer to a pointer which is then nil.
 //
 // REZI library versions prior to v2.1.0 encode string data length as the number
-// of Unicode codepoints rather than a number of bytes and do so in the info
+// of Unicode codepoints rather than the number of bytes and do so in the info
 // byte with no info extension byte. These strings can be decoded as normal with
 // [Dec], but are not compatible with [Reader] as it relies on byte-based counts
-// in order to function properly and make predictions about how many bytes must
-// be read from the underlying data stream.
+// to function properly and make predictions about how many bytes must be read
+// from the underlying data stream.
 package rezi
 
 import (
