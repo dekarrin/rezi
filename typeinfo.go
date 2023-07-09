@@ -14,14 +14,14 @@ var (
 type mainType int64
 
 const (
-	tUnknown mainType = iota
-	tIntegral
-	tBool
-	tString
-	tBinary
-	tMap
-	tSlice
-	tNil
+	mtUnknown mainType = iota
+	mtIntegral
+	mtBool
+	mtString
+	mtBinary
+	mtMap
+	mtSlice
+	mtNil
 )
 
 // typeInfo holds REZI-specific type info on types that can be encoded and
@@ -36,7 +36,7 @@ type typeInfo struct {
 }
 
 func (ti typeInfo) Primitive() bool {
-	return ti.Main == tIntegral || ti.Main == tBool || ti.Main == tString || ti.Main == tBinary
+	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary
 }
 
 func canEncode(v interface{}) (typeInfo, error) {
@@ -45,7 +45,7 @@ func canEncode(v interface{}) (typeInfo, error) {
 
 func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 	if t == nil {
-		return typeInfo{Main: tNil}, nil
+		return typeInfo{Main: mtNil}, nil
 	}
 
 	origType := t
@@ -68,7 +68,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				// only consider it to be implementing if it is *not* defined
 				// on the value type.
 				if !definedOnValue {
-					return typeInfo{Indir: indirCount, Main: tBinary}, nil
+					return typeInfo{Indir: indirCount, Main: mtBinary}, nil
 				}
 
 				// if it *is* defined on the value type, we are getting implicit
@@ -78,35 +78,35 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			} else {
 				// if it's not a pointer type and it implements, there is no
 				// ambiguity.
-				return typeInfo{Indir: indirCount, Main: tBinary}, nil
+				return typeInfo{Indir: indirCount, Main: mtBinary}, nil
 			}
 		}
 
 		switch t.Kind() {
 		case reflect.String:
-			return typeInfo{Indir: indirCount, Main: tString}, nil
+			return typeInfo{Indir: indirCount, Main: mtString}, nil
 		case reflect.Bool:
-			return typeInfo{Indir: indirCount, Main: tBool}, nil
+			return typeInfo{Indir: indirCount, Main: mtBool}, nil
 		case reflect.Uint8:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: false}, nil
 		case reflect.Uint16:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: false}, nil
 		case reflect.Uint32:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: false}, nil
 		case reflect.Uint64:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: false}, nil
 		case reflect.Uint:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: false}, nil
 		case reflect.Int8:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: true}, nil
 		case reflect.Int16:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: true}, nil
 		case reflect.Int32:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: true}, nil
 		case reflect.Int64:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: true}, nil
 		case reflect.Int:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be encodable.
 			mValType := t.Elem()
@@ -130,14 +130,14 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// maps in general are not supported; the key type MUST be comparable
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
-			if !mKeyInfo.Primitive() || mKeyInfo.Main == tBinary {
+			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
 				return typeInfo{}, reziError{
 					msg:   "map key type must be bool, string, or castable to int",
 					cause: []error{ErrInvalidType},
 				}
 			}
 
-			return typeInfo{Indir: indirCount, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
 		case reflect.Slice:
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
@@ -148,7 +148,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 					cause: []error{ErrInvalidType, err},
 				}
 			}
-			return typeInfo{Indir: indirCount, Main: tSlice, ValType: &slValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &slValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()
@@ -205,34 +205,34 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 		trying = false
 
 		if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
-			return typeInfo{Indir: indirCount, Main: tBinary}, nil
+			return typeInfo{Indir: indirCount, Main: mtBinary}, nil
 		}
 
 		switch t.Kind() {
 		case reflect.String:
-			return typeInfo{Indir: indirCount, Main: tString}, nil
+			return typeInfo{Indir: indirCount, Main: mtString}, nil
 		case reflect.Bool:
-			return typeInfo{Indir: indirCount, Main: tBool}, nil
+			return typeInfo{Indir: indirCount, Main: mtBool}, nil
 		case reflect.Uint8:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: false}, nil
 		case reflect.Uint16:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: false}, nil
 		case reflect.Uint32:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: false}, nil
 		case reflect.Uint64:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: false}, nil
 		case reflect.Uint:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: false}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: false}, nil
 		case reflect.Int8:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 8, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: true}, nil
 		case reflect.Int16:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 16, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: true}, nil
 		case reflect.Int32:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 32, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: true}, nil
 		case reflect.Int64:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 64, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: true}, nil
 		case reflect.Int:
-			return typeInfo{Indir: indirCount, Main: tIntegral, Bits: 0, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be decodable.
 			mValType := t.Elem()
@@ -256,14 +256,14 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// maps in general are not supported; the key type MUST be comparable
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
-			if !mKeyInfo.Primitive() || mKeyInfo.Main == tBinary {
+			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
 				return typeInfo{}, reziError{
 					msg:   "map key type must be bool, string, or castable to int",
 					cause: []error{ErrInvalidType},
 				}
 			}
 
-			return typeInfo{Indir: indirCount, Main: tMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
 		case reflect.Slice:
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
@@ -274,7 +274,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 					cause: []error{ErrInvalidType, err},
 				}
 			}
-			return typeInfo{Indir: indirCount, Main: tSlice, ValType: &slValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &slValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

@@ -22,11 +22,11 @@ func (smk sortableMapKeys) Swap(i, j int) {
 }
 
 func (smk sortableMapKeys) Less(i, j int) bool {
-	if smk.ti.Main == tBool {
+	if smk.ti.Main == mtBool {
 		b1 := smk.keys[i].Bool()
 		b2 := smk.keys[j].Bool()
 		return !b1 && b2
-	} else if smk.ti.Main == tIntegral {
+	} else if smk.ti.Main == mtIntegral {
 		if smk.ti.Signed {
 			i64v1 := smk.keys[i].Int()
 			i64v2 := smk.keys[j].Int()
@@ -58,7 +58,7 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 				return uint(u64v1) < uint(u64v2)
 			}
 		}
-	} else if smk.ti.Main == tString {
+	} else if smk.ti.Main == mtString {
 		s1 := smk.keys[i].String()
 		s2 := smk.keys[j].String()
 		return s1 < s2
@@ -69,7 +69,7 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 
 // encCheckedMap encodes a compatible map as a REZI map.
 func encCheckedMap(v interface{}, ti typeInfo) ([]byte, error) {
-	if ti.Main != tMap {
+	if ti.Main != mtMap {
 		panic("not a map type")
 	}
 
@@ -82,7 +82,7 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	mapKeys := refVal.MapKeys()
@@ -124,7 +124,7 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 // decCheckedMap decodes a REZI map as a compatible map type.
 func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
-	if ti.Main != tMap {
+	if ti.Main != mtMap {
 		panic("not a map type")
 	}
 

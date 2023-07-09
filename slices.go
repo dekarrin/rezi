@@ -10,7 +10,7 @@ import (
 
 // encMap encodes a compatible slice as a REZI map.
 func encCheckedSlice(v interface{}, ti typeInfo) ([]byte, error) {
-	if ti.Main != tSlice {
+	if ti.Main != mtSlice {
 		panic("not a slice type")
 	}
 
@@ -21,7 +21,7 @@ func encSlice(v interface{}) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	enc := make([]byte, 0)
@@ -43,7 +43,7 @@ func encSlice(v interface{}) ([]byte, error) {
 }
 
 func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
-	if ti.Main != tSlice {
+	if ti.Main != mtSlice {
 		panic("not a slice type")
 	}
 

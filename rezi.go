@@ -2,11 +2,11 @@
 // Encoding (Compressible) Interchange format. It allows types that implement
 // encoding.BinaryUnmarshaler and encoding.BinaryMarshaler to be easily read
 // from and written to byte slices. It has an interface similar to the json
-// package, where one function is used to encode all supported types, and
-// another function receives bytes and a receiver for decoded data and infers
-// how to decode the bytes based on the receiver.
+// package; one function is used to encode all supported types, and another
+// function receives bytes and a receiver for decoded data and infers how to
+// decode the bytes based on the receiver.
 //
-// The [Enc] function is to encode any supported type to REZI bytes:
+// The [Enc] function is used to encode any supported type to REZI bytes:
 //
 //	import "github.com/dekarrin/rezi/v2"
 //
@@ -44,13 +44,13 @@
 //	var n int
 //	var err error
 //
-//	n, err := rezi.Dec(allData, &readNumber)
+//	n, err = rezi.Dec(allData, &readNumber)
 //	if err != nil {
 //		panic(err.Error())
 //	}
 //	allData = allData[n:]
 //
-//	n, err := rezi.Dec(allData, &readName)
+//	n, err = rezi.Dec(allData, &readName)
 //	if err != nil {
 //		panic(err.Error())
 //	}
@@ -58,20 +58,19 @@
 //
 // # Error Checking
 //
-// Errors in REZI have specific types that can be checked in order to determine
-// the cause of an error. These errors conform to the [errors] interface and
+// Errors in REZI have specific types that they can be checked against to
+// determine their cause. These errors conform to the [errors] interface and
 // must be checked by using [errors.Is].
 //
 // As mentioned in that library's documentation, errors should not be checked
-// with simple equality checks. REZI enforces this fully; non-nil errors that
+// with simple equality checks. REZI enforces this fully. Non-nil errors that
 // are checked with `==` will never return true.
-//
-// That is
 //
 //	if err == rezi.Error
 //
-// is not only the non-preferred way of checking an error, but will always
-// return false. Instead, do:
+// The above expression is not simply the non-preferred way of checking an
+// error, but rather is entirely non-functional, as it will always return false.
+// Instead, do:
 //
 //	if errors.Is(err, rezi.Error)
 //
@@ -82,13 +81,13 @@
 // caused due to the supplied bytes being shorter than expected, use
 // errors.Is(err, io.ErrUnexpectedEOF).
 //
-// See the individual functions for a list of error types that non-nil returned
-// errors may be checked against.
+// See the individual functions for a list of error types that returned errors
+// may be checked against.
 //
 // # Supported Data Types
 //
 // REZI supports several built-in basic Go types: int (as well as all of its
-// unsigned and specific-bitsize varieties), string, bool, and any type that
+// unsigned and specific-size varieties), string, bool, and any type that
 // implements encoding.BinaryMarshaler (for encoding) or whose pointer type
 // implements encoding.BinaryUnmarshaler (for decoding).
 //
@@ -98,8 +97,7 @@
 // Slices and maps are supported with some stipulations. Slices must contain
 // only other supported types (or pointers to them). Maps have the same
 // restrictions on their values, but only maps with a key type of string, int
-// (or any of its unsigned and specific-bitsize varieties), or bool are
-// supported.
+// (or any of its unsigned or specific-size varieties), or bool are supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -110,10 +108,10 @@
 // # Binary Data Format
 //
 // REZI uses a binary format for all supported types. Other than bool, which is
-// encoded as simply one of two byte values, an encoded value will start with
-// one or more "info" bytes that gives metadata on the value itself. This is
-// typically the length of the full value, but may include additional
-// information such as whether the encoded value is in fact a nil pointer.
+// encoded as a single byte, an encoded value will start with one or more "info"
+// bytes that contain metadata on the value itself. This is typically the length
+// of the full value but may include additional information such as whether the
+// encoded value is a nil pointer.
 //
 // Note that the info byte does not give information on the type of the encoded
 // value, besides whether it is nil (and still, the type of the nil is not
@@ -131,24 +129,24 @@
 //	MSB  LSB
 //
 // The info byte has information coded into its bits represented as SXNILLLL,
-// where each letter stands for a particular bit, from most signficant to the
+// where each letter from left to right stands for a particular bit from most to
 // least significant.
 //
 // The bit labeled "S" is the sign bit; when high (1), it indicates that the
 // following integer value is negative.
 //
 // The "X" bit is the extension flag, and indicates that the next byte is a
-// second info byte with additional information. At this time that bit is
-// unused, but is planned to be used in future releases.
+// second info byte with additional information, called the info extension byte.
+// At this time, only encoded string values use this extension byte.
 //
 // The "N" bit is the explicit nil flag, and when set it indicates that the
-// value is a nil and that there are no following bytes which make up its
-// encoding, with the exception of any indirection amount indicators.
+// value is a nil and that there are no following bytes in the encoded value
+// other than any indirection amount indicators.
 //
 // The "I" bit is the indirection bit, and if set, indicates that the following
 // bytes encode the number of additional indirections of the pointer beyond the
 // initial indirection at which the nil occurs; for instance, a nil *int value
-// is encoded as simply the info byte 0b00100000, but a non nil **int that
+// is encoded as simply the info byte 0b00100000, but a non-nil **int that
 // points at a nil *int would be encoded with one level of additional
 // indirection and the info byte's I bit would be set.
 //
@@ -157,6 +155,33 @@
 // the encoded value. If the I bit is set on the info byte, the L bits give the
 // number of bytes that make up the indirection level rather than the actual
 // value.
+//
+//	The EXT Byte
+//
+//	Layout:
+//
+//	BXUUVVVV
+//	|      |
+//	MSB  LSB
+//
+// The initial INFO byte may be followed by a second byte, the info extension
+// byte (EXT for short). This encodes additional metadata about the encoded
+// value.
+//
+// The "B" bit is the binary count flag. If this is set, it explicitly indicates
+// that the following count is to be interpreted as bytes rather than any
+// alternative. Note that the lack of this flag or the extension byte as a whole
+// does not necessarily indicate that the count is *not* byte-based; an encoded
+// type format that explicitly notes that the count is byte-based without an EXT
+// byte in its layout diagram will be assumed to have a byte-based length.
+//
+// The "V" bits make up the version field of the extension byte. This indicates
+// the version of encoding of the particular type that is represented, encoded
+// as a 4-bit unsigned integer. If not present (all 0's, or the EXT byte itself
+// is not present), it is assumed to be 1. This version number is purely
+// informative and does not affect decoding in any way.
+//
+// The "U" bits are unused at this time and are reserved for future use.
 //
 //	Bool Values
 //
@@ -201,16 +226,19 @@
 //
 //	Layout:
 //
-//	[ INFO ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
-//	<---CODEPOINT COUNT--> <------------CODEPOINTS----------->
-//	      1..9 bytes               COUNT..COUNT*4 bytes
+//	[ INFO ] [ EXT ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
+//	<-----------COUNT------------> <------------CODEPOINTS----------->
+//	         2..10 bytes                       COUNT bytes
 //
-// String values are encoded as a count of codepoints (which is itself encoded
-// as an integer value), followed by the Unicode codepoints that make up the
-// string encoded with UTF-8. Due to the count being of Unicode codepoints
-// rather than bytes, the actual number of bytes in an encoded string will be
-// between the minimum and maximum number of bytes needed to encode a codepoint
-// in UTF-8, multiplied by the number of codepoints.
+// String values are encoded as a count of bytes in the info header section
+// followed by the Unicode codepoints that make up the string encoded using
+// UTF-8.
+//
+// Additionally, a string value's first info byte will have its extension bit
+// set and will indicate explicitly that it uses a byte-based count in the
+// extension byte that follows. This is to distinguish it from the older style
+// string encodings, which encoded data length as the count of codepoints rather
+// than bytes.
 //
 //	encoding.BinaryMarshaler Values
 //
@@ -247,7 +275,7 @@
 //
 // Map values are encoded as a count of all bytes that make up the entire map,
 // followed by pairs of the encoded keys and associated values for each element
-// of the map. Each pair consistes of the encoded key, followed immediately by
+// of the map. Each pair consists of the encoded key, followed immediately by
 // the encoded value that the key maps to. There is no special delimiter between
 // key-value pairs or between the key and value in a pair; where one ends, the
 // next one begins.
@@ -260,8 +288,9 @@
 //
 //	Layout:
 //
-//	[ INFO ] [ INT VALUE ]
-//	 1 byte    0..8 bytes
+//	[ INFO ] [ INT INFO ] [ INT VALUE ]
+//	<-INFO-> <---EXTRA INDIRECTIONS--->
+//	 1 byte          0..9 bytes
 //
 // Nil values are encoded similarly to integers, with one major exception: the
 // nil bit in the info byte is set to true. This allows a nil to be stored in
@@ -274,14 +303,13 @@
 //
 // Pointers that are themselves not nil but point to another pointer which is
 // nil are encoded slightly differently. In this case, the info byte will have
-// both the nil bit and the indirection bit set, and its length bits will be
-// non-zero and give the number of bytes which follow that make up an encoded
-// integer. The encoded integer gives the number of indirections that are done
-// before a nil pointer is arrived at. For instance, a ***int that points to a
-// valid **int that itself points to a valid *int which is nil would be encoded
-// as a nil with indirection level of 2.
+// both the nil bit and the indirection bit set, and will then be followed by a
+// normal encoded integer with its own info byte. The encoded integer gives the
+// number of indirections that are done before a nil pointer is arrived at. For
+// instance, a ***int that points to a valid **int that itself points to a valid
+// *int which is nil would be encoded as a nil with an indirection level of 2.
 //
-// Encoded nil values are *not* typed; they will be interpreted as the same type
+// Encoded nil values are not typed; they will be interpreted as the same type
 // as the pointed-to value of the receiver passed to REZI during decoding.
 //
 //	Pointer Values
@@ -290,10 +318,10 @@
 //
 //	(either encoded value type, or encoded nil)
 //
-// A pointer is not encoded in a special manner. Instead, the value they point
-// to is encoded as though it were not pointer, and when decoding to a pointer,
-// the value is first decoded, then a pointer to the decoded value is used as
-// the value of the pointer.
+// Pointers do not have their own dedicated encoding format. Instead, the value
+// a pointer points to is encoded as though it were not a pointer type, and when
+// decoding to a pointer, the value is first decoded, then a pointer to the
+// decoded value is created and used as the returned value.
 //
 // If a pointer is nil, it is instead encoded as a nil value.
 //
@@ -305,16 +333,33 @@
 // encoded as a nil value; see the section on nil value encodings for a
 // description of how this information is captured.
 //
-// Compatibility:
+// # Backward Compatibility
 //
-// Older versions of the REZI encoding indicated nil by giving -1 as the byte
-// count. This version of REZI will read this as well and can interpret it
-// correctly, however do note that it will only be able to handle a single level
-// of indirection, i.e. a nil pointer-to-type, with no additional indirections.
+// Older versions of the REZI library use a binary data format that differs from
+// the current one. The current version retains compatibility for reading data
+// produced by prior versions of this library, regardless of whether they were
+// major version releases. The binary format outlined above and the changes
+// noted below are all considered a part of "V1" of the binary format itself
+// separate from the version of the Go module.
+//
+// REZI library versions prior to v1.1.0 indicate nil by giving -1 as the byte
+// count. This older format is only able to encode a single level of
+// indirection, i.e. a nil pointer-to-type, with no additional indirections. Due
+// to this limitation, decoding these values will result in either a nil pointer
+// or all levels indirected up to the non-nil value; it will never be decoded
+// as, for example, a pointer to a pointer which is then nil.
+//
+// REZI library versions prior to v2.1.0 encode string data length as the number
+// of Unicode codepoints rather than the number of bytes and do so in the info
+// byte with no info extension byte. These strings can be decoded as normal with
+// [Dec], but are not compatible with [Reader] as it relies on byte-based counts
+// to function properly and make predictions about how many bytes must be read
+// from the underlying data stream.
 package rezi
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 )
 
@@ -373,11 +418,11 @@ func Enc(v interface{}) (data []byte, err error) {
 
 	if info.Primitive() {
 		return encCheckedPrim(v, info)
-	} else if info.Main == tNil {
-		return encNil(0), nil
-	} else if info.Main == tMap {
+	} else if info.Main == mtNil {
+		return encNilHeader(0), nil
+	} else if info.Main == mtMap {
 		return encCheckedMap(v, info)
-	} else if info.Main == tSlice {
+	} else if info.Main == mtSlice {
 		return encCheckedSlice(v, info)
 	} else {
 		panic("no possible encoding")
@@ -436,9 +481,9 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 
 	if info.Primitive() {
 		return decCheckedPrim(data, v, info)
-	} else if info.Main == tMap {
+	} else if info.Main == mtMap {
 		return decCheckedMap(data, v, info)
-	} else if info.Main == tSlice {
+	} else if info.Main == mtSlice {
 		return decCheckedSlice(data, v, info)
 	} else {
 		panic("no possible decoding")
@@ -464,7 +509,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 			encodeTarget = encodeTarget.Elem()
 		}
 		if nilLevel > -1 {
-			return encNil(nilLevel), nil
+			return encNilHeader(nilLevel), nil
 		}
 		return encFn(convFn(encodeTarget))
 	} else {
@@ -477,25 +522,26 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
 func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
-	var isNil bool
-	var nilLevel tNilLevel
+	var hdr countHeader
 
 	if ti.Indir > 0 {
-		isNil, nilLevel, _, n, err = decNilable[E](nil, data)
+		hdr, n, err = decCountHeader(data)
 		if err != nil {
 			return decoded, n, reziError{
-				msg:   fmt.Sprintf("check nil value: %s", err.Error()),
+				msg:   fmt.Sprintf("check count header: %s", err.Error()),
 				cause: []error{err},
 			}
 		}
 	}
 
-	if !isNil {
+	effectiveExtraIndirs := hdr.ExtraNilIndirections()
+
+	if !hdr.IsNil() {
 		decoded, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, err
 		}
-		nilLevel = ti.Indir
+		effectiveExtraIndirs = ti.Indir
 	}
 
 	if ti.Indir > 0 {
@@ -503,7 +549,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		assignTarget := reflect.ValueOf(v)
 		// assignTarget is a **string but we want a *string
 
-		for i := 0; i < ti.Indir && i < nilLevel; i++ {
+		for i := 0; i < ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
 			// *what does it mean*
@@ -514,7 +560,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 			assignTarget = newTarget
 		}
 
-		if !isNil {
+		if !hdr.IsNil() {
 			assignTarget.Elem().Set(reflect.ValueOf(decoded))
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
@@ -579,4 +625,197 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 
 		return decoded, decConsumed, decErr
 	}
+}
+
+// countHeader represents the info available in the initial "info byte" of an
+// encoded int.
+type countHeader struct {
+	Negative bool
+
+	// NilAt indicates that it is nil at that level of indirection. 1 is nil at
+	// first, 2 is nil at the second (1 level of additional indirection), etc.
+	// 0 is not nil at all. A value greater than 0 means there are no further
+	// bytes to read for the value being checked (it's nil), a value greater
+	// than 1 additionally means that an integer following the info byte(s) was
+	// decoded/will be encoded to give that number (NilAt - 1).
+	NilAt tNilLevel
+
+	// num following bytes that make up an integer, must be representable as a
+	// 4-bit unsigned int (so must be between 0 and 15). will be 0 for nil.
+	Length int
+
+	// Whether count is explicitly byte count (used to distinguish new-style
+	// string format from old style, which used a count of *runes*). If true,
+	// automatically implies ExtensionLevel >= 1.
+	ByteLength bool
+
+	// Must be representable as a 4-bit unsigned int. If not 0, automatically
+	// implies ExtensionLevel >= 1
+	Version int
+
+	// ExtensionLevel is number of extension bytes that are in the
+	// representation. Caveat - this can be "wrong". When encoding, regardless
+	// of this value as many extension bytes as are needed to encode non-default
+	// values are included; if this number is *higher*, extension bytes up to
+	// the ExtensionLevel (up to the maximum extension bytes possible) are
+	// included.
+	//
+	// during decoding this explicitly notes how many extension bytes were
+	// present even if not needed.
+	//
+	// at this time, 1 is the maximum level supported for encoding. If higher,
+	// encoding will not succeed. It can be higher than 1 after decoding; this
+	// indicates that that many Extension bytes were read (but only the first N
+	// will be interpreted).
+	ExtensionLevel int
+
+	// DecodedCount is the total number of bytes that were consumed during
+	// decode. it is completely ignored during encoding. Includes bytes that
+	// make up integer count of extra indirections of a nil; does NOT include
+	// bytes that make up the "content" of an int that is started by the count
+	// header, as that data is not included in a countHeader and is not parsed.
+	DecodedCount int
+}
+
+func (hdr countHeader) IsNil() bool {
+	return hdr.NilAt > 0
+}
+
+func (hdr countHeader) ExtraNilIndirections() int {
+	return hdr.NilAt - 1
+}
+
+// encode the header info as valid bytes.
+func (hdr countHeader) MarshalBinary() ([]byte, error) {
+
+	// infobyte bit layout for ref:
+	// SXNILLLL
+	//
+	// S = Sign
+	// X = eXtesnion
+	// N = Nil
+	// I = has Indirection past 1
+	// L = Length (4-bit unsigned int)
+	//
+	//
+	// extension byte 1 layout for ref:
+	// BXUUVVVV
+	//
+	// B = length is Byte count. not included if not needed.
+	// X = eXtension
+	// U = Unused
+	// V = binary format explicit Version
+
+	if hdr.Length > 15 || hdr.Length < 0 {
+		return nil, reziError{msg: "countHeader.Length cannot fit into nibble", cause: []error{ErrMalformedData}}
+	}
+
+	if hdr.Version > 15 || hdr.Version < 0 {
+		return nil, reziError{msg: "countHeader.Version cannot fit into nibble", cause: []error{ErrMalformedData}}
+	}
+
+	var encoded []byte
+
+	// L bits
+	infoByte := uint8(hdr.Length)
+
+	// S bit
+	if hdr.Negative {
+		infoByte |= infoBitsSign
+	}
+
+	// N bit
+	if hdr.NilAt > 0 {
+		infoByte |= infoBitsNil
+	}
+
+	// I bit
+	if hdr.NilAt > 1 {
+		infoByte |= infoBitsIndir
+	}
+
+	encoded = append(encoded, infoByte)
+
+	// if later things require more info bytes, continue to the next
+	if hdr.ByteLength || hdr.Version > 0 || hdr.ExtensionLevel >= 1 {
+		encoded[0] |= infoBitsExt
+
+		// do the extension byte
+
+		extByte := uint8(hdr.Version)
+
+		if hdr.ByteLength {
+			extByte |= infoBitsByteCount
+		}
+
+		encoded = append(encoded, extByte)
+	}
+
+	// okay, if nilAt is > 1 then we need to additionally encode an int of that
+	// value
+	if hdr.NilAt > 1 {
+		encoded = append(encoded, encInt(hdr.NilAt-1)...)
+	}
+
+	return encoded, nil
+}
+
+// decode the header info from valid bytes. will consume following int if
+// needed to fill the NilAt value. Will *not* consume regular int value bytes.
+func (hdr *countHeader) UnmarshalBinary(data []byte) error {
+	if len(data) < 1 {
+		return reziError{msg: "no bytes to decode", cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+
+	decoded := countHeader{}
+
+	infoByte := data[0]
+
+	decoded.Length = int(infoByte & infoBitsLen)
+	decoded.Negative = infoByte&infoBitsSign != 0
+	decoded.DecodedCount = 1 // for the initial info byte
+
+	if infoByte&infoBitsNil != 0 {
+		decoded.NilAt++
+		// need to hold off on indir check until after we've processed all bytes
+		// so we will hold on to info byte and check back later
+	}
+
+	// scan all extension bytes
+	extByte := infoByte
+	for extByte&infoBitsExt != 0 {
+		decoded.ExtensionLevel++
+		if len(data) < decoded.ExtensionLevel+1 {
+			return reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		}
+		extByte = data[decoded.ExtensionLevel]
+
+		// we have consumed an additional byte, add it to total decoded
+		decoded.DecodedCount++
+
+		// interpret the extension byte based on which one it is
+		if decoded.ExtensionLevel == 1 {
+			// first extension byte, layout: BXUUVVVV.
+			decoded.Version = int(extByte & infoBitsVersion)
+			decoded.ByteLength = extByte&infoBitsByteCount != 0
+		}
+
+		// future: more extension bytes, if needed. for now, just run through
+		// and process them.
+	}
+
+	// all extension bytes processed, now decode any indirection level int if
+	// present
+	if infoByte&infoBitsIndir != 0 {
+		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
+		if err != nil {
+			return err
+		}
+		decoded.DecodedCount += n
+		decoded.NilAt += extraIndirs
+	}
+
+	*hdr = decoded
+
+	return nil
 }

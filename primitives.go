@@ -19,6 +19,11 @@ const (
 	infoBitsNil   = 0b00100000
 	infoBitsIndir = 0b00010000
 	infoBitsLen   = 0b00001111
+
+	// used only in extension byte 1:
+	infoBitsByteCount = 0b10000000
+	infoBitsVersion   = 0b00001111
+	// extension bit not listed because it is the same
 )
 
 type anyUint interface {
@@ -48,11 +53,11 @@ type integral interface {
 // type.
 func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 	switch ti.Main {
-	case tString:
+	case mtString:
 		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
-	case tBool:
+	case mtBool:
 		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
-	case tIntegral:
+	case mtIntegral:
 		if ti.Signed {
 			switch ti.Bits {
 			case 8:
@@ -100,7 +105,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 				})
 			}
 		}
-	case tBinary:
+	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
@@ -118,7 +123,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	// or an implementor of BinaryUnmarshaler.
 
 	switch ti.Main {
-	case tString:
+	case mtString:
 		s, n, err := decWithNilCheck(data, v, ti, decString)
 		if err != nil {
 			return n, err
@@ -128,7 +133,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			*tVal = s
 		}
 		return n, nil
-	case tBool:
+	case mtBool:
 		b, n, err := decWithNilCheck(data, v, ti, decBool)
 		if err != nil {
 			return n, err
@@ -138,7 +143,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			*tVal = b
 		}
 		return n, nil
-	case tIntegral:
+	case mtIntegral:
 		var n int
 		var err error
 
@@ -251,7 +256,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 
 		return n, nil
-	case tBinary:
+	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
 		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
@@ -282,7 +287,39 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 }
 
-func encNil(indirLevels int) []byte {
+// Negative, NilAt, and Length from extra are all ignored.
+func encCount(count tLen, extra *countHeader) []byte {
+	intBytes := encInt(count)
+
+	if extra == nil {
+		// normal int enc
+		return intBytes
+	}
+
+	hdr := countHeader{
+		Negative:       false,
+		NilAt:          0,
+		Length:         int(intBytes[0] & infoBitsLen),
+		ExtensionLevel: extra.ExtensionLevel,
+		Version:        extra.Version,
+		ByteLength:     extra.ByteLength,
+	}
+
+	hdrBytes, err := hdr.MarshalBinary()
+	if err != nil {
+		// should never happen
+		panic(err.Error())
+	}
+
+	var enc []byte
+
+	enc = append(enc, hdrBytes...)
+	enc = append(enc, intBytes[1:]...)
+
+	return enc
+}
+
+func encNilHeader(indirLevels int) []byte {
 	// nils are encoded as a special negative that is distinct from others,
 	// should it be checked.
 	//
@@ -298,73 +335,39 @@ func encNil(indirLevels int) []byte {
 	// level of indirection; if so, the bytes that follow after the extension
 	// byte will be a non-nil int that gives the number of indirections.
 
-	infoByte := byte(0)
-	infoByte |= infoBitsNil
+	// encode it with a count header
+	if indirLevels < 0 {
+		indirLevels = 0
+	}
+	hdr := countHeader{
+		NilAt: indirLevels + 1,
 
-	// for compat with older format
-	infoByte |= infoBitsSign
-
-	if indirLevels <= 0 {
-		return []byte{infoByte}
+		// for compat with older format
+		Negative: true,
 	}
 
-	infoByte |= infoBitsIndir
-	enc := []byte{infoByte}
+	enc, err := hdr.MarshalBinary()
+	if err != nil {
+		// should never happen
+		panic(fmt.Sprintf("encoding nil-indicating countHeader failed: %s", err.Error()))
+	}
 
-	enc = append(enc, encInt(tNilLevel(indirLevels))...)
 	return enc
 }
 
-// decNilable decodes a value that could also represent a nil value. If it's not
-// nil, it is decoded by passing it to decFn.
-//
-// To only interpret the nil and skip interpretation when it's not a nil, set
-// decFn to nil.
-//
-// This function DOES respect the info extension bit, but only when decoding a
-// nil.
-func decNilable[E any](decFn decFunc[E], data []byte) (isNil bool, indir tNilLevel, val E, consumed int, err error) {
+// decCountHeader decodes a count header. It could represent a nil value. It
+// will *not* decode the actual count, if in fact the count is present.
+func decCountHeader(data []byte) (countHeader, int, error) {
+	var hdr countHeader
+
 	if len(data) < 1 {
-		return false, tNilLevel(0), val, 0, reziError{
+		return hdr, 0, reziError{
 			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
 		}
 	}
 
-	infoByte := data[0]
-	if infoByte&infoBitsNil != infoBitsNil {
-		// not a nil, regular number, do no more manipulation of data and
-		// interpret as a regular value if ffunc to do so is provided
-
-		if decFn != nil {
-			val, consumed, err = decFn(data)
-		}
-
-		return false, tNilLevel(0), val, consumed, err
-	}
-
-	// it is a nil. do other checks.
-
-	// skip over any extension bytes in the info header
-	for data[0]&infoBitsExt == infoBitsExt {
-		data = data[1:]
-		consumed++
-	}
-
-	// data now starts with the last info byte, skip it.
-	data = data[1:]
-	consumed++
-
-	if infoByte&infoBitsIndir == infoBitsIndir {
-		// the level of indirection is encoded in following bytes
-		var n int
-		indir, n, err = decInt[tNilLevel](data)
-		consumed += n
-		if err != nil {
-			return true, indir, val, consumed, fmt.Errorf("decode ptr indirection level: %w", err)
-		}
-	}
-
-	return true, indir, val, consumed, nil
+	err := hdr.UnmarshalBinary(data)
+	return hdr, hdr.DecodedCount, err
 }
 
 func encBool(b bool) []byte {
@@ -439,6 +442,10 @@ func encInt[E integral](v E) []byte {
 
 // decInt decodes an integer value at the start of the given bytes and
 // returns the value and the number of bytes read.
+//
+// assumes that first byte specifies a non-nil integer whose L field gives
+// number of bytes to decode after all count header bytes and interprets it as
+// such. does not do further checks on count header.
 func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
 		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
@@ -449,14 +456,26 @@ func decInt[E integral](data []byte) (E, int, error) {
 	if byteCount == 0 {
 		return 0, 1, nil
 	}
-	data = data[1:]
 
 	// pull count and sign out of byteCount
 	negative := byteCount&infoBitsSign != 0
 	byteCount &= infoBitsLen
 
-	// do not examine the 2nd, 3rd, and 4th left-most bits; they are reserved
-	// for future use
+	// interpretation of other parts of the count header is handled in different
+	// functions. skip over all extension bytes
+	numHeaderBytes := 0
+	for data[0]&infoBitsExt != 0 {
+		if len(data) < 1 {
+			return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		}
+		data = data[1:]
+		numHeaderBytes++
+	}
+
+	// done reading count header info; move past the last byte of it and
+	// interpret data bytes
+	data = data[1:]
+	numHeaderBytes++
 
 	if len(data) < int(byteCount) {
 		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
@@ -486,27 +505,98 @@ func decInt[E integral](data []byte) (E, int, error) {
 	iVal |= (uint64(intData[6]) << 8)
 	iVal |= (uint64(intData[7]))
 
-	return E(iVal), int(byteCount + 1), nil
+	return E(iVal), int(byteCount) + numHeaderBytes, nil
 }
 
 func encString(s string) []byte {
-	enc := make([]byte, 0)
+	if s == "" {
+		return []byte{0x00}
+	}
 
-	chCount := 0
+	strBytes := make([]byte, 0)
+
 	for _, ch := range s {
 		chBuf := make([]byte, utf8.UTFMax)
 		byteLen := utf8.EncodeRune(chBuf, ch)
-		enc = append(enc, chBuf[:byteLen]...)
-		chCount++
+		strBytes = append(strBytes, chBuf[:byteLen]...)
 	}
 
-	countBytes := encInt(chCount)
-	enc = append(countBytes, enc...)
+	var enc []byte
+
+	enc = append(enc, encCount(len(strBytes), &countHeader{ByteLength: true, Version: 2})...)
+	enc = append(enc, strBytes...)
 
 	return enc
 }
 
+// decString decodes a string of any version. Assumes header is not nil.
 func decString(data []byte) (string, int, error) {
+	if len(data) < 1 {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+
+	// special case; 0x00 is the empty string in all variants
+	if data[0] == 0 {
+		return "", 1, nil
+	}
+
+	hdr, _, err := decCountHeader(data)
+	if err != nil {
+		return "", 0, err
+	}
+
+	// compatibility with older format
+	if !hdr.ByteLength {
+		return decStringV1(data)
+	}
+
+	return decStringV2(data)
+}
+
+func decStringV2(data []byte) (string, int, error) {
+	if len(data) < 1 {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+	strLength, countLen, err := decInt[int](data)
+	if err != nil {
+		return "", 0, reziError{
+			msg:   fmt.Sprintf("decoding string byte count: %s", err.Error()),
+			cause: []error{err},
+		}
+	}
+	data = data[countLen:]
+
+	if strLength < 0 {
+		return "", 0, reziError{
+			msg:   "string byte count < 0",
+			cause: []error{ErrMalformedData},
+		}
+	}
+
+	if len(data) < strLength {
+		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+	}
+	// clamp it
+	data = data[:strLength]
+
+	readBytes := countLen
+
+	var sb strings.Builder
+	for readBytes-countLen < strLength {
+		ch, charBytesRead, err := decUTF8Codepoint(data)
+		if err != nil {
+			return "", 0, err
+		}
+
+		sb.WriteRune(ch)
+		readBytes += charBytesRead
+		data = data[charBytesRead:]
+	}
+
+	return sb.String(), readBytes, nil
+}
+
+func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
 	}
@@ -531,21 +621,9 @@ func decString(data []byte) (string, int, error) {
 	var sb strings.Builder
 
 	for i := 0; i < runeCount; i++ {
-		ch, charBytesRead := utf8.DecodeRune(data)
-		if ch == utf8.RuneError {
-			if charBytesRead == 0 {
-				return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
-			} else if charBytesRead == 1 {
-				return "", 0, reziError{
-					msg:   "invalid UTF-8 encoding in string",
-					cause: []error{ErrMalformedData},
-				}
-			} else {
-				return "", 0, reziError{
-					msg:   "invalid unicode replacement character in rune",
-					cause: []error{ErrMalformedData},
-				}
-			}
+		ch, charBytesRead, err := decUTF8Codepoint(data)
+		if err != nil {
+			return "", 0, err
 		}
 
 		sb.WriteRune(ch)
@@ -556,9 +634,29 @@ func decString(data []byte) (string, int, error) {
 	return sb.String(), readBytes, nil
 }
 
+func decUTF8Codepoint(data []byte) (rune, int, error) {
+	ch, charBytesRead := utf8.DecodeRune(data)
+	if ch == utf8.RuneError {
+		if charBytesRead == 0 {
+			return ch, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		} else if charBytesRead == 1 {
+			return ch, 0, reziError{
+				msg:   "invalid UTF-8 encoding in string",
+				cause: []error{ErrMalformedData},
+			}
+		} else {
+			return ch, 0, reziError{
+				msg:   "invalid unicode replacement character in rune",
+				cause: []error{ErrMalformedData},
+			}
+		}
+	}
+	return ch, charBytesRead, nil
+}
+
 func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 	if b == nil {
-		return encNil(0), nil
+		return encNilHeader(0), nil
 	}
 
 	enc, marshalErr := b.MarshalBinary()
