@@ -138,8 +138,8 @@
 // following integer value is negative.
 //
 // The "X" bit is the extension flag, and indicates that the next byte is a
-// second info byte with additional information. At this time that bit is
-// unused, but is planned to be used in future releases.
+// second info byte with additional information, called the info extension byte.
+// At this time, only encoded string values use this extension byte.
 //
 // The "N" bit is the explicit nil flag, and when set it indicates that the
 // value is a nil and that there are no following bytes which make up its
@@ -157,6 +157,33 @@
 // the encoded value. If the I bit is set on the info byte, the L bits give the
 // number of bytes that make up the indirection level rather than the actual
 // value.
+//
+//	The EXT Byte
+//
+//	Layout:
+//
+//	BXUUVVVV
+//	|      |
+//	MSB  LSB
+//
+// The initial INFO byte may be followed by a second byte, the info extension
+// byte (EXT for short). This encodes additional metadata about the the encoded
+// value.
+//
+// The "B" bit is the binary count flag. If this is set, it explicitly indicates
+// that the following count is to be interpreted as bytes rather than any
+// alternative. Note that the lack of this flag or the extension byte as a whole
+// does not necessarily indicate that the count is *not* byte-based; an encoded
+// type format that explicitly notes that the count is byte-based without an EXT
+// byte in its layout diagram will be assumed to have a byte-based length.
+//
+// The "V" bits make up the version field of the extension byte. This indicates
+// the version of encoding of the particular type that is represented, encoded
+// as a 4-bit unsigned integer. If not present (all 0s, or the EXT byte itself
+// is not present), it is assumed to be 1. This version number is purely
+// informative and does not affect decoding in any way.
+//
+// The "U" bits are unused at this time and are reserved for future use.
 //
 //	Bool Values
 //
@@ -201,16 +228,19 @@
 //
 //	Layout:
 //
-//	[ INFO ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
-//	<---CODEPOINT COUNT--> <------------CODEPOINTS----------->
-//	      1..9 bytes               COUNT..COUNT*4 bytes
+//	[ INFO ] [ EXT ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
+//	<-----------COUNT------------> <------------CODEPOINTS----------->
+//	         2..10 bytes                       COUNT bytes
 //
-// String values are encoded as a count of codepoints (which is itself encoded
-// as an integer value), followed by the Unicode codepoints that make up the
-// string encoded with UTF-8. Due to the count being of Unicode codepoints
-// rather than bytes, the actual number of bytes in an encoded string will be
-// between the minimum and maximum number of bytes needed to encode a codepoint
-// in UTF-8, multiplied by the number of codepoints.
+// String values are encoded as a count of bytes in the info header section
+// followed by the Unicode codepoints that make up the string encoded using
+// UTF-8.
+//
+// Additionally, a string value's first info byte will have its extension bit
+// set and will indicate explicitly that it uses a byte-based count in the
+// extension byte that follows. This is to distinguish it from the older style
+// string encodings, which encoded data length as the count of codepoints rather
+// than bytes.
 //
 //	encoding.BinaryMarshaler Values
 //
@@ -307,10 +337,26 @@
 //
 // Compatibility:
 //
-// Older versions of the REZI encoding indicated nil by giving -1 as the byte
-// count. This version of REZI will read this as well and can interpret it
-// correctly, however do note that it will only be able to handle a single level
-// of indirection, i.e. a nil pointer-to-type, with no additional indirections.
+// Older versions of the REZI library use a binary data format that differs from
+// the current one. The current version retains compatibility for reading data
+// produced by prior versions of this library, regardless of whether they were
+// major version releases. The binary format outlined above and the changes
+// noted below are all considered a part of "V1" of the binary format itself
+// separate from the version of the Go module.
+//
+// REZI library versions prior to v1.1.0 indicate nil by giving -1 as the byte
+// count. This older format is only able to encode a single level of
+// indirection, i.e. a nil pointer-to-type, with no additional indirections. Due
+// to this limitation, decoding these values will result in either a nil pointer
+// or all levels indirected up to the non-nil value; it will never be decoded as
+// as, say, a pointer to a pointer which is then nil.
+//
+// REZI library versions prior to v2.1.0 encode string data length as the number
+// of Unicode codepoints rather than a number of bytes and do so in the info
+// byte with no info extension byte. These strings can be decoded as normal with
+// [Dec], but are not compatible with [Reader] as it relies on byte-based counts
+// in order to function properly and make predictions about how many bytes must
+// be read from the underlying data stream.
 package rezi
 
 import (
