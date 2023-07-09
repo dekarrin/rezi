@@ -509,6 +509,10 @@ func decInt[E integral](data []byte) (E, int, error) {
 }
 
 func encString(s string) []byte {
+	if s == "" {
+		return []byte{0x00}
+	}
+
 	strBytes := make([]byte, 0)
 
 	for _, ch := range s {

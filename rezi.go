@@ -694,6 +694,8 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 
 	// if later things require more info bytes, continue to the next
 	if hdr.ByteLength || hdr.Version > 0 || hdr.ExtensionLevel >= 1 {
+		encoded[0] |= infoBitsExt
+
 		// do the extension byte
 
 		extByte := uint8(hdr.Version)
