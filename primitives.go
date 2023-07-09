@@ -287,6 +287,38 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	}
 }
 
+// Negative, NilAt, and Length from extra are all ignored.
+func encCount(count tLen, extra *countHeader) []byte {
+	intBytes := encInt(count)
+
+	if extra == nil {
+		// normal int enc
+		return intBytes
+	}
+
+	hdr := countHeader{
+		Negative:       false,
+		NilAt:          0,
+		Length:         int(intBytes[0] & infoBitsLen),
+		ExtensionLevel: extra.ExtensionLevel,
+		Version:        extra.Version,
+		ByteLength:     extra.ByteLength,
+	}
+
+	hdrBytes, err := hdr.MarshalBinary()
+	if err != nil {
+		// should never happen
+		panic(err.Error())
+	}
+
+	var enc []byte
+
+	enc = append(enc, hdrBytes...)
+	enc = append(enc, intBytes[1:]...)
+
+	return enc
+}
+
 func encNilHeader(indirLevels int) []byte {
 	// nils are encoded as a special negative that is distinct from others,
 	// should it be checked.
@@ -477,18 +509,18 @@ func decInt[E integral](data []byte) (E, int, error) {
 }
 
 func encString(s string) []byte {
-	enc := make([]byte, 0)
+	strBytes := make([]byte, 0)
 
-	chCount := 0
 	for _, ch := range s {
 		chBuf := make([]byte, utf8.UTFMax)
 		byteLen := utf8.EncodeRune(chBuf, ch)
-		enc = append(enc, chBuf[:byteLen]...)
-		chCount++
+		strBytes = append(strBytes, chBuf[:byteLen]...)
 	}
 
-	countBytes := encInt(chCount)
-	enc = append(countBytes, enc...)
+	var enc []byte
+
+	enc = append(enc, encCount(len(strBytes), &countHeader{ByteLength: true, Version: 2})...)
+	enc = append(enc, strBytes...)
 
 	return enc
 }
