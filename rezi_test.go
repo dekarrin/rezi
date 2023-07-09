@@ -171,6 +171,7 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 			ref(ref(uint(22))),
 			ref(ref(uint(208))),
 		},
+		jobs: nil,
 		friend: &testNontrivial{
 			ptr: nil,
 			goodNums: map[int]bool{
@@ -180,6 +181,7 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 				15:  true,
 			},
 			actions: nil,
+			jobs:    []string{},
 			friend: &testNontrivial{
 				ptr:      ref(413),
 				goodNums: nil,
@@ -189,6 +191,7 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 					ref(ref(uint(8888))),
 					ref(ref(uint(88888888))),
 				},
+				jobs:   []string{"SECURE", "CONTAIN", "PROTECT"},
 				friend: nil,
 			},
 		},
@@ -316,6 +319,7 @@ type testNontrivial struct {
 	friend   *testNontrivial
 	goodNums map[int]bool
 	actions  []**uint
+	jobs     []string
 }
 
 func (tn testNontrivial) MarshalBinary() ([]byte, error) {
@@ -324,6 +328,7 @@ func (tn testNontrivial) MarshalBinary() ([]byte, error) {
 	enc = append(enc, MustEnc(tn.ptr)...)
 	enc = append(enc, MustEnc(tn.goodNums)...)
 	enc = append(enc, MustEnc(tn.actions)...)
+	enc = append(enc, MustEnc(tn.jobs)...)
 	enc = append(enc, MustEnc(tn.friend)...)
 
 	return enc, nil
@@ -350,6 +355,12 @@ func (tn *testNontrivial) UnmarshalBinary(data []byte) error {
 	n, err = Dec(data, &newNontriv.actions)
 	if err != nil {
 		return fmt.Errorf("actions: %w", err)
+	}
+	data = data[n:]
+
+	n, err = Dec(data, &newNontriv.jobs)
+	if err != nil {
+		return fmt.Errorf("jobs: %w", err)
 	}
 	data = data[n:]
 
