@@ -36,10 +36,9 @@ var (
 	ErrMalformedData = errors.New("data cannot be interpretered")
 )
 
-// reziError is the type of error returned by Enc when there is an issue
-// with encoding the provided value, due to the value type being unsupported,
-// the value being an implementor of encoding.BinaryMarshaler and its
-// MarshalBinary function returning an error, or some other reason.
+// reziError is the concrete type of errors returned by all exported functions.
+// It is intended to be used and compared against error types with the errors.Is
+// API.
 type reziError struct {
 	msg   string
 	cause []error

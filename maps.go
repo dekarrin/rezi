@@ -101,11 +101,11 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 		keyData, err := Enc(k.Interface())
 		if err != nil {
-			return nil, errorf("map[%v]: key: %v", k.Interface(), err)
+			return nil, errorf("map key %v: %v", k.Interface(), err)
 		}
 		valData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, errorf("map[%v]: value: %v", k.Interface(), err)
+			return nil, errorf("map value[%v]: %v", k.Interface(), err)
 		}
 
 		enc = append(enc, keyData...)
@@ -174,9 +174,8 @@ func decMap(data []byte, v interface{}) (int, error) {
 			s = ""
 			verbS = "s"
 		}
-		err := errorf("decoded map byte count is %d but only %d byte%s remain%s in data", toConsume, len(data), s, verbS).wrap(
-			io.ErrUnexpectedEOF, ErrMalformedData,
-		)
+		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data"
+		err := errorf(errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return totalConsumed, err
 	}
 
@@ -192,7 +191,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refKey := reflect.New(refMapType.Key())
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return totalConsumed, errorf("decode key: %v", err)
+			return totalConsumed, errorf("map key: %v", err)
 		}
 		totalConsumed += n
 		i += n
@@ -202,7 +201,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, errorf("decode value: %v", err)
+			return totalConsumed, errorf("map value[%v]: %v", refKey.Elem().Interface(), err)
 		}
 		totalConsumed += n
 		i += n
