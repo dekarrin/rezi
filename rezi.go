@@ -775,7 +775,6 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	for extByte&infoBitsExt != 0 {
 		decoded.ExtensionLevel++
 		if len(data) < decoded.ExtensionLevel+1 {
-
 			s := "s"
 			verbS := ""
 			if len(data) == 1 {
