@@ -109,17 +109,21 @@ func (e reziError) Error() string {
 	// lead with offset if provided
 	prefix := ""
 	if offset, ok := e.totalOffset(); ok {
-
+		asHex := fmt.Sprintf("%x", offset)
+		if len(asHex)%2 != 0 {
+			asHex = "0" + asHex
+		}
+		prefix = fmt.Sprintf("byte offset %d (0x%s): ", offset, asHex)
 	}
 
 	if e.msg == "" {
 		if e.cause != nil {
-			return e.cause[0].Error()
+			return prefix + e.cause[0].Error()
 		}
-		return Error.Error()
+		return prefix + Error.Error()
 	}
 
-	return e.msg
+	return prefix + e.msg
 }
 
 // Unwrap returns the causes of Error. The return value will be nil if no causes
