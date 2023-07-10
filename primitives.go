@@ -680,7 +680,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	byteLen, readBytes, err = decInt[tLen](data)
 	if err != nil {
-		return 0, err
+		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
 
 	data = data[readBytes:]
@@ -693,7 +693,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s in data"
-		err := errorf(errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(readBytes, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return readBytes, err
 	}
 	var binData []byte
@@ -704,7 +704,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return readBytes, errorf("%s: %s", ErrUnmarshalBinary, err)
+		return readBytes, errorDecf(readBytes, "%s: %s", ErrUnmarshalBinary, err)
 	}
 
 	return byteLen + readBytes, nil

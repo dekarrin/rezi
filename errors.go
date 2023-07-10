@@ -70,8 +70,8 @@ func errorf(msgFmt string, a ...interface{}) reziError {
 	return e
 }
 
-// decErrorf is same as errorf but requires an offset
-func decErrorf(offset int, msgFmt string, a ...interface{}) reziError {
+// errorDecf is same as errorf but requires an offset
+func errorDecf(offset int, msgFmt string, a ...interface{}) reziError {
 	e := errorf(msgFmt, a...)
 	e.offsetValid = true
 	e.offset = offset
