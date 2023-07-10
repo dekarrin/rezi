@@ -565,6 +565,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 }
 
 func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
+	// TODO: add dec errors
 	return func(data []byte) (interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		receiverType := reflect.TypeOf(wrapped)
