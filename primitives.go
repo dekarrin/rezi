@@ -361,9 +361,7 @@ func decCountHeader(data []byte) (countHeader, int, error) {
 	var hdr countHeader
 
 	if len(data) < 1 {
-		return hdr, 0, reziError{
-			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
-		}
+		return hdr, 0, errorf("%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	err := hdr.UnmarshalBinary(data)
@@ -384,7 +382,7 @@ func encBool(b bool) []byte {
 
 func decBool(data []byte) (bool, int, error) {
 	if len(data) < 1 {
-		return false, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return false, 0, errorf("%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	if data[0] == 0 {

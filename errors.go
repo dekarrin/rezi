@@ -39,9 +39,13 @@ var (
 // reziError is the concrete type of errors returned by all exported functions.
 // It is intended to be used and compared against error types with the errors.Is
 // API.
+//
+// Generally should not be created by hand. create one by calling errorf(), add
+// wrapped errors with reziError.wrap().
 type reziError struct {
-	msg   string
-	cause []error
+	msg          string
+	cause        []error
+	decRelOffset int
 }
 
 // wrap an error, i know nothing about it. i add a msg.
