@@ -101,17 +101,11 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 		keyData, err := Enc(k.Interface())
 		if err != nil {
-			return nil, reziError{
-				msg:   fmt.Sprintf("map[%v]: key: %s", k.Interface(), err.Error()),
-				cause: []error{err},
-			}
+			return nil, errorf("map[%v]: key: %v", k.Interface(), err)
 		}
 		valData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, reziError{
-				msg:   fmt.Sprintf("map[%v]: value: %s", k.Interface(), err.Error()),
-				cause: []error{err},
-			}
+			return nil, errorf("map[%v]: value: %v", k.Interface(), err)
 		}
 
 		enc = append(enc, keyData...)
@@ -149,10 +143,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, reziError{
-			msg:   fmt.Sprintf("decode byte count: %s", err.Error()),
-			cause: []error{err},
-		}
+		return 0, errorf("decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -177,9 +168,16 @@ func decMap(data []byte, v interface{}) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, reziError{
-			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
 		}
+		err := errorf("decoded map byte count is %d but only %d byte%s remain%s in data", toConsume, len(data), s, verbS).wrap(
+			io.ErrUnexpectedEOF, ErrMalformedData,
+		)
+		return totalConsumed, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -194,10 +192,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refKey := reflect.New(refMapType.Key())
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return totalConsumed, reziError{
-				msg:   fmt.Sprintf("decode key: %s", err.Error()),
-				cause: []error{err},
-			}
+			return totalConsumed, errorf("decode key: %v", err)
 		}
 		totalConsumed += n
 		i += n
@@ -207,10 +202,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, reziError{
-				msg:   fmt.Sprintf("decode value: %s", err.Error()),
-				cause: []error{err},
-			}
+			return totalConsumed, errorf("decode value: %v", err)
 		}
 		totalConsumed += n
 		i += n

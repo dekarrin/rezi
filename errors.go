@@ -2,6 +2,8 @@ package rezi
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var (
@@ -41,6 +43,38 @@ var (
 type reziError struct {
 	msg   string
 	cause []error
+}
+
+// wrap an error, i know nothing about it. i add a msg.
+//
+// - errorf(withOffset, msg, ...) <- include %w functionality. simply do replace
+// - reziError.wrap(err...) return reziError, same but with err... appended to causes.
+//
+
+// errorf works like fmt.Errorf, except a %w is not needed to wrap an err; any
+// error type in the a list will be in the wrapped errors, and %s or %v can be
+// used to get their error value.
+func errorf(msgFmt string, a ...interface{}) reziError {
+	if strings.Contains(strings.ReplaceAll(msgFmt, "%%", "--"), "%w") {
+		panic("don't use %w in errorf; use %s/%v and give the error in the args")
+	}
+
+	e := reziError{
+		msg: fmt.Sprintf(msgFmt, a...),
+	}
+
+	for i := range a {
+		if wrappedErr, ok := a[i].(error); ok {
+			e.cause = append(e.cause, wrappedErr)
+		}
+	}
+
+	return e
+}
+
+func (e reziError) wrap(causes ...error) reziError {
+	e.cause = append(e.cause, causes...)
+	return e
 }
 
 // Error returns the message defined for the EncodingError.
