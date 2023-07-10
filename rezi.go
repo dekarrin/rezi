@@ -522,16 +522,17 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	if ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
-			return decoded, n, errorf("check count header: %s", err)
+			return decoded, n, errorDecf(0, "check count header: %s", err)
 		}
 	}
 
+	countHeaderBytes := n
 	effectiveExtraIndirs := hdr.ExtraNilIndirections()
 
 	if !hdr.IsNil() {
 		decoded, n, err = decFn(data)
 		if err != nil {
-			return decoded, n, err
+			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
 		effectiveExtraIndirs = ti.Indir
 	}
@@ -753,7 +754,7 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 // needed to fill the NilAt value. Will *not* consume regular int value bytes.
 func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	if len(data) < 1 {
-		return errorf("no bytes to decode").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return errorDecf(0, "no bytes to decode").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 	}
 
 	decoded := countHeader{}
@@ -782,7 +783,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 				verbS = "s"
 			}
 			const errFmt = "count header length is at least %d but only %d byte%s remain%s in data"
-			err := errorf(errFmt, decoded.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			err := errorDecf(decoded.DecodedCount, errFmt, decoded.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 			return err
 		}
 		extByte = data[decoded.ExtensionLevel]
@@ -806,7 +807,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	if infoByte&infoBitsIndir != 0 {
 		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
-			return err
+			return errorDecf(decoded.DecodedCount, "%s", err)
 		}
 		decoded.DecodedCount += n
 		decoded.NilAt += extraIndirs
