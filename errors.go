@@ -43,16 +43,11 @@ var (
 // Generally should not be created by hand. create one by calling errorf(), add
 // wrapped errors with reziError.wrap().
 type reziError struct {
-	msg          string
-	cause        []error
-	decRelOffset int
+	msg         string
+	cause       []error
+	offsetValid bool
+	offset      int
 }
-
-// wrap an error, i know nothing about it. i add a msg.
-//
-// - errorf(withOffset, msg, ...) <- include %w functionality. simply do replace
-// - reziError.wrap(err...) return reziError, same but with err... appended to causes.
-//
 
 // errorf works like fmt.Errorf, except a %w is not needed to wrap an err; any
 // error type in the a list will be in the wrapped errors, and %s or %v can be
@@ -68,20 +63,55 @@ func errorf(msgFmt string, a ...interface{}) reziError {
 
 	for i := range a {
 		if wrappedErr, ok := a[i].(error); ok {
-			e.cause = append(e.cause, wrappedErr)
+			e = e.wrap(wrappedErr)
 		}
 	}
 
 	return e
 }
 
-func (e reziError) wrap(causes ...error) reziError {
-	e.cause = append(e.cause, causes...)
+// decErrorf is same as errorf but requires an offset and will automatically
+// correct the total offset.
+
+func (e reziError) totalOffset() (offset int, ok bool) {
+	if !e.offsetValid {
+		return 0, false
+	}
+
+	// are we wrapping a rezi error? find one and use it if so
+	for _, wrapped := range e.cause {
+		if reziErr, ok := wrapped.(reziError); ok {
+			if wrappedOff, wrappedOk := reziErr.totalOffset(); wrappedOk {
+				return e.offset + wrappedOff, true
+			}
+		}
+	}
+
+	// if we got here, we aren't wrapping a rezi error that has an offset for us
+	// to add. just return own
+	return e.offset, true
+}
+
+func (e reziError) wrap(wrapped ...error) reziError {
+	e.cause = append(e.cause, wrapped...)
+	for _, w := range wrapped {
+		if reziErr, ok := w.(reziError); ok {
+			if reziErr.offsetValid {
+				e.offsetValid = true
+			}
+		}
+	}
 	return e
 }
 
 // Error returns the message defined for the EncodingError.
 func (e reziError) Error() string {
+	// lead with offset if provided
+	prefix := ""
+	if offset, ok := e.totalOffset(); ok {
+
+	}
+
 	if e.msg == "" {
 		if e.cause != nil {
 			return e.cause[0].Error()
