@@ -358,7 +358,6 @@
 package rezi
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 )
@@ -405,9 +404,7 @@ func MustEnc(v interface{}) []byte {
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = reziError{
-				msg: fmt.Sprintf("%v", r),
-			}
+			err = errorf("%v", r)
 		}
 	}()
 
@@ -468,9 +465,7 @@ func MustDec(data []byte, v interface{}) int {
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = reziError{
-				msg: fmt.Sprintf("%v", r),
-			}
+			err = errorf("%v", r)
 		}
 	}()
 
@@ -527,10 +522,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	if ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
-			return decoded, n, reziError{
-				msg:   fmt.Sprintf("check count header: %s", err.Error()),
-				cause: []error{err},
-			}
+			return decoded, n, errorf("check count header: %s", err)
 		}
 	}
 
@@ -596,10 +588,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, 0, reziError{
-					msg:   "function pointer type receiver is not supported",
-					cause: []error{ErrInvalidType},
-				}
+				return nil, 0, errorf("function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
@@ -707,11 +696,11 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 	// V = binary format explicit Version
 
 	if hdr.Length > 15 || hdr.Length < 0 {
-		return nil, reziError{msg: "countHeader.Length cannot fit into nibble", cause: []error{ErrMalformedData}}
+		return nil, errorf("countHeader.Length cannot fit into nibble").wrap(ErrMalformedData)
 	}
 
 	if hdr.Version > 15 || hdr.Version < 0 {
-		return nil, reziError{msg: "countHeader.Version cannot fit into nibble", cause: []error{ErrMalformedData}}
+		return nil, errorf("countHeader.Version cannot fit into nibble").wrap(ErrMalformedData)
 	}
 
 	var encoded []byte
@@ -764,7 +753,7 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 // needed to fill the NilAt value. Will *not* consume regular int value bytes.
 func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	if len(data) < 1 {
-		return reziError{msg: "no bytes to decode", cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return errorf("no bytes to decode").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 	}
 
 	decoded := countHeader{}
@@ -786,7 +775,16 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	for extByte&infoBitsExt != 0 {
 		decoded.ExtensionLevel++
 		if len(data) < decoded.ExtensionLevel+1 {
-			return reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+
+			s := "s"
+			verbS := ""
+			if len(data) == 1 {
+				s = ""
+				verbS = "s"
+			}
+			const errFmt = "count header length is at least %d but only %d byte%s remain%s in data"
+			err := errorf(errFmt, decoded.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			return err
 		}
 		extByte = data[decoded.ExtensionLevel]
 
