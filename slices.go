@@ -64,7 +64,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorf("decode byte count: %s", err)
+		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -91,7 +91,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded slice byte count is %d but only %d byte%s remain%s in data"
-		err := errorf(errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return totalConsumed, err
 	}
 
@@ -107,7 +107,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, errorf("slice item[%d]: %s", itemIdx, err)
+			return totalConsumed, errorDecf(totalConsumed, "slice item[%d]: %s", itemIdx, err)
 		}
 		totalConsumed += n
 		i += n

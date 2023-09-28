@@ -143,7 +143,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorf("decode byte count: %s", err)
+		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -175,7 +175,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data"
-		err := errorf(errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return totalConsumed, err
 	}
 
@@ -191,7 +191,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refKey := reflect.New(refMapType.Key())
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return totalConsumed, errorf("map key: %v", err)
+			return totalConsumed, errorDecf(totalConsumed, "map key: %v", err)
 		}
 		totalConsumed += n
 		i += n
@@ -201,7 +201,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, errorf("map value[%v]: %v", refKey.Elem().Interface(), err)
+			return totalConsumed, errorDecf(totalConsumed, "map value[%v]: %v", refKey.Elem().Interface(), err)
 		}
 		totalConsumed += n
 		i += n
