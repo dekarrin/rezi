@@ -565,7 +565,6 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 }
 
 func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
-	// TODO: add dec errors
 	return func(data []byte) (interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		receiverType := reflect.TypeOf(wrapped)
@@ -590,7 +589,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, 0, errorf("function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
