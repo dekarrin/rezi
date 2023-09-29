@@ -14,15 +14,20 @@ func Test_reziError_totalOffset_int(t *testing.T) {
 		input             []byte
 		expectTotalOffset int
 	}{
-		/*{
+		{
 			name:              "decode int: empty bytes",
 			input:             []byte{},
 			expectTotalOffset: 0,
-		},*/
+		},
 		{
 			name:              "decode int: count header is extended past slice",
 			input:             []byte{0x40},
-			expectTotalOffset: 1,
+			expectTotalOffset: 0,
+		},
+		{
+			name:              "decode int: length past slice",
+			input:             []byte{0x42, 0x00, 0x00},
+			expectTotalOffset: 2,
 		},
 	}
 
@@ -50,12 +55,10 @@ func Test_reziError_totalOffset_int(t *testing.T) {
 			}
 
 			// assert the offset is the expected
-			if !assert.Equal(tc.expectTotalOffset, actual) {
-				return
-			}
+			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, ensure the offset is in the error output
-			assert.False(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
+			assert.Truef(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }
