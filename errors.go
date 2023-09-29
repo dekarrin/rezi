@@ -49,6 +49,56 @@ type reziError struct {
 	offset      int
 }
 
+// Wrapf takes an offset and applies it to an existing error returned from rezi.
+// It is intended to be used within custom UnmarshalBinary methods to
+// provide the number of bytes into the data that the problem occured for error
+// reporting.
+//
+// The offset is applied to the given error, which must be a rezi error. The
+// first argument to the format string is the error, which will be wrapped by an
+// error that adds the supplied offset. If the error is not an error returned
+// from rezi, this function will panic.
+//
+// Use it like this:
+//
+//	n, err = rezi.Dec(dataBytes[curPos:], &dest)
+//	if err != nil {
+//	  return rezi.Wrapf(curPos, "problem occured: %v", err)
+//	}
+//
+// This is generally only intended to be used with errors returned from
+// decoding, but it can be used to supply an offset for encoding errors as well,
+// should it be desired.
+//
+// Do not use "%w" to wrap the error; it will automatically be wrapped, so use
+// "%v" instead. Using "%w" will make this function panic.
+func Wrapf(offset int, format string, reziErr error, a ...interface{}) error {
+	if strings.Contains(strings.ReplaceAll(format, "%%", "--"), "%w") {
+		panic("don't use %w in Wrap; use %s/%v and give the error in the args")
+	}
+
+	if !errors.Is(reziErr, Error) {
+		panic("supplied error was not returned from a rezi function")
+	}
+
+	rErr := reziErr.(reziError)
+
+	fmtArgs := make([]interface{}, len(a)+1)
+	if len(a) > 0 {
+		copy(fmtArgs[1:], a)
+	}
+	fmtArgs[0] = reziErr
+
+	err := reziError{
+		msg: fmt.Sprintf(format, fmtArgs...),
+	}.wrap(rErr)
+
+	err.offsetValid = true
+	err.offset = offset
+
+	return err
+}
+
 // errorf works like fmt.Errorf, except a %w is not needed to wrap an err; any
 // error type in the a list will be in the wrapped errors, and %s or %v can be
 // used to get their error value.
