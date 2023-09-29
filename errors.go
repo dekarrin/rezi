@@ -47,6 +47,10 @@ type reziError struct {
 	cause       []error
 	offsetValid bool
 	offset      int
+
+	// internal use; set when a reziError is being wrapped and indicates it
+	// should not print its offset
+	hideOffset bool
 }
 
 // Wrapf takes an offset and applies it to an existing error returned from rezi.
@@ -87,7 +91,15 @@ func Wrapf(offset int, format string, reziErr error, a ...interface{}) error {
 	if len(a) > 0 {
 		copy(fmtArgs[1:], a)
 	}
-	fmtArgs[0] = reziErr
+	fmtArgs[0] = rErr
+
+	// disable offset printing on all reziErrors before string formatting them
+	for i := range a {
+		if aReziError, ok := a[i].(reziError); ok {
+			aReziError.hideOffset = true
+			a[i] = aReziError
+		}
+	}
 
 	err := reziError{
 		msg: fmt.Sprintf(format, fmtArgs...),
@@ -105,6 +117,14 @@ func Wrapf(offset int, format string, reziErr error, a ...interface{}) error {
 func errorf(msgFmt string, a ...interface{}) reziError {
 	if strings.Contains(strings.ReplaceAll(msgFmt, "%%", "--"), "%w") {
 		panic("don't use %w in errorf; use %s/%v and give the error in the args")
+	}
+
+	// all reziErrors should now not show the offset, as they are children.
+	for i := range a {
+		if rErr, ok := a[i].(reziError); ok {
+			rErr.hideOffset = true
+			a[i] = rErr
+		}
 	}
 
 	e := reziError{
@@ -163,12 +183,15 @@ func (e reziError) wrap(wrapped ...error) reziError {
 func (e reziError) Error() string {
 	// lead with offset if provided
 	prefix := ""
-	if offset, ok := e.totalOffset(); ok {
-		asHex := fmt.Sprintf("%x", offset)
-		if len(asHex)%2 != 0 {
-			asHex = "0" + asHex
+
+	if !e.hideOffset {
+		if offset, ok := e.totalOffset(); ok {
+			asHex := fmt.Sprintf("%x", offset)
+			if len(asHex)%2 != 0 {
+				asHex = "0" + asHex
+			}
+			prefix = fmt.Sprintf("byte offset %d (0x%s): ", offset, asHex)
 		}
-		prefix = fmt.Sprintf("byte offset %d (0x%s): ", offset, asHex)
 	}
 
 	if e.msg == "" {

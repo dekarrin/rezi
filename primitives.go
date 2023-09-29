@@ -463,15 +463,9 @@ func decInt[E integral](data []byte) (E, int, error) {
 	// functions. skip over all extension bytes
 	numHeaderBytes := 0
 	for data[0]&infoBitsExt != 0 {
-		if len(data) < 1 {
-			s := "s"
-			verbS := ""
-			if len(data) == 1 {
-				s = ""
-				verbS = "s"
-			}
-			const errFmt = "count header length is at least %d but only %d byte%s remain%s in data"
-			err := errorDecf(numHeaderBytes+1, errFmt, numHeaderBytes+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		if len(data[1:]) < 1 {
+			const errFmt = "count header indicates extension byte at offset, but no byte is present"
+			err := errorDecf(numHeaderBytes+1, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 			return 0, 0, err
 		}
 		data = data[1:]
