@@ -517,6 +517,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
 func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+	// TODO: GHI-041: check that errors from here are reported.
 	var hdr countHeader
 
 	if ti.Indir > 0 {
