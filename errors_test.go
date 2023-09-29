@@ -55,7 +55,7 @@ func Test_reziError_totalOffset_int(t *testing.T) {
 			}
 
 			// and finally, ensure the offset is in the error output
-			assert.Falsef(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
+			assert.False(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }
