@@ -291,3 +291,86 @@ func Test_reziError_totalOffset_binary(t *testing.T) {
 		})
 	}
 }
+
+func Test_reziError_totalOffset_slice(t *testing.T) {
+	stringSlice := func(data []byte) error {
+		var sDest []string
+		_, err := Dec(data, &sDest)
+		return err
+	}
+	intSlice := func(data []byte) error {
+		var iDest []int
+		_, err := Dec(data, &iDest)
+		return err
+	}
+
+	testCases := []struct {
+		name              string
+		input             []byte
+		dest              func([]byte) error
+		expectTotalOffset int
+		expectErrText     string
+	}{
+		{
+			name: "decode []int: bad byte count",
+			dest: intSlice,
+			input: []byte{
+				0x01, 0x0d, // len=13
+
+				0x01, 0x01, // 1
+				0x01, 0x03, // 3
+				0x01, 0x04, // 4
+				0x01, 0xc8, // 200
+				0x03, 0x04, 0x4b, 0x41, // 281409
+			},
+			expectTotalOffset: 2,
+			expectErrText:     "decoded slice byte count",
+		},
+		{
+			name: "decode []string: problem with element 3",
+			dest: stringSlice,
+			input: []byte{
+				0x01, 0x11, // len=17
+
+				0x41, 0x80, 0x03, 0x41, 0x42, 0x43, // "ABC"
+				0x41, 0x80, 0x03, 0x41, 0x42, 0x43, // "ABC"
+				0x41, 0x80, 0x02, 0xc3, 0x41, // an invalid sequence followed by "A"
+			},
+			expectTotalOffset: 17,
+			expectErrText:     "item[2]: invalid UTF-8",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			err := tc.dest(tc.input)
+			if !assert.Error(err) {
+				return
+			}
+
+			// convert it to known type reziError
+			rErr, ok := err.(reziError)
+			if !assert.Truef(ok, "Dec returned non-reziErr: %v", err) {
+				return
+			}
+
+			// check if the offset is valid
+			actual, ok := rErr.totalOffset()
+			if !assert.Truef(ok, "Dec returned reziErr with no offset: %v", err) {
+				return
+			}
+
+			// assert the offset is the expected
+			assert.Equal(tc.expectTotalOffset, actual)
+
+			// and finally, check the err output
+			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			lowerMsgAct := strings.ToUpper(rErr.Error())
+			lowerMsgExp := strings.ToUpper(tc.expectErrText)
+			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
+		})
+	}
+}

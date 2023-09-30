@@ -174,7 +174,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 			s = ""
 			verbS = "s"
 		}
-		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data"
+		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data at offset"
 		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return totalConsumed, err
 	}
