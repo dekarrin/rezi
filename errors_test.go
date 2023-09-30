@@ -162,6 +162,24 @@ func Test_reziError_totalOffset_string(t *testing.T) {
 			expectTotalOffset: 2,
 			expectErrText:     "byte count < 0",
 		},
+		{
+			name:              "decode string v2: len < byte len",
+			input:             []byte{0x41, 0x80, 0x02, 0x41},
+			expectTotalOffset: 3,
+			expectErrText:     "only 1 byte remains",
+		},
+		{
+			name:              "decode string v2: invalid character byte seq at start",
+			input:             []byte{0x41, 0x80, 0x01, 0xc3, 0x28},
+			expectTotalOffset: 3,
+			expectErrText:     "invalid UTF-8 encoding",
+		},
+		{
+			name:              "decode string v2: invalid character byte seq at char 2",
+			input:             []byte{0x41, 0x80, 0x02, 0x41, 0xc3, 0x28},
+			expectTotalOffset: 4,
+			expectErrText:     "invalid UTF-8 encoding",
+		},
 	}
 
 	for _, tc := range testCases {
