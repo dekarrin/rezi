@@ -264,6 +264,9 @@ func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler 
 	return marshaledBytesProducer{fn: byteProducer}
 }
 
+// testBinary is a small struct that implements binary.Marshaler and
+// binary.Unmarshaler. It has two fields, that it lays out as such in encoding:
+// "data", a string, followed by "number", an int32.
 type testBinary struct {
 	number int32
 	data   string
@@ -280,15 +283,16 @@ func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	var n int
 	var err error
 
-	n, err = Dec(data, &tbv.data)
+	offset := 0
+	n, err = Dec(data[offset:], &tbv.data)
 	if err != nil {
-		return fmt.Errorf("data: %w", err)
+		return errorDecf(offset, "data: %v", err)
 	}
-	data = data[n:]
+	offset += n
 
-	_, err = Dec(data, &tbv.number)
+	_, err = Dec(data[offset:], &tbv.number)
 	if err != nil {
-		return fmt.Errorf("number: %w", err)
+		return errorDecf(offset, "number: %v", err)
 	}
 
 	return nil

@@ -686,7 +686,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 			s = ""
 			verbS = "s"
 		}
-		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s in data"
+		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(readBytes, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return readBytes, err
 	}
