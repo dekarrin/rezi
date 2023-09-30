@@ -168,7 +168,7 @@
 // byte (EXT for short). This encodes additional metadata about the encoded
 // value.
 //
-// The "B" bit is the binary count flag. If this is set, it explicitly indicates
+// The "B" bit is the byte count flag. If this is set, it explicitly indicates
 // that the following count is to be interpreted as bytes rather than any
 // alternative. Note that the lack of this flag or the extension byte as a whole
 // does not necessarily indicate that the count is *not* byte-based; an encoded

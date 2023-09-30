@@ -582,7 +582,7 @@ func decStringV2(data []byte) (string, int, error) {
 			s = ""
 			verbS = "s"
 		}
-		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s in data"
+		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(countLen, errFmt, strLength, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return "", 0, err
 	}
