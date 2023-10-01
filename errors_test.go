@@ -1,12 +1,96 @@
 package rezi
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_Wrapf(t *testing.T) {
+	type params struct {
+		offset  int
+		format  string
+		err     error
+		fmtArgs []interface{}
+	}
+
+	testCases := []struct {
+		name          string
+		input         params
+		expectErrText string
+		expectPanic   bool
+	}{
+		{
+			name: "add positive offset",
+			input: params{
+				offset: 6,
+				format: "err: %s",
+				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
+			},
+			expectErrText: "(0x08): err: some error",
+		},
+		{
+			name: "add negative offset",
+			input: params{
+				offset: -1,
+				format: "err: %s",
+				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
+			},
+			expectErrText: "(0x01): err: some error",
+		},
+		{
+			name: "add no offset",
+			input: params{
+				offset: 0,
+				format: "err: %s",
+				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
+			},
+			expectErrText: "(0x02): err: some error",
+		},
+		{
+			name: "non-rezi error causes panic",
+			input: params{
+				offset: 0,
+				format: "err: %s",
+				err:    errors.New("some error"),
+			},
+			expectPanic: true,
+		},
+		{
+			name: "%w causes panic",
+			input: params{
+				offset: 0,
+				format: "err: %w",
+				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
+			},
+			expectPanic: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			p := tc.input
+
+			if tc.expectPanic {
+				assert.Panics(func() {
+					Wrapf(p.offset, p.format, p.err, p.fmtArgs...)
+				})
+				return
+			}
+
+			actual := Wrapf(p.offset, p.format, p.err, p.fmtArgs...)
+
+			// and finally, check the err output
+			lowerMsgAct := strings.ToUpper(actual.Error())
+			lowerMsgExp := strings.ToUpper(tc.expectErrText)
+			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, actual.Error())
+		})
+	}
+}
 
 func Test_reziError_totalOffset_int(t *testing.T) {
 	testCases := []struct {
@@ -58,7 +142,8 @@ func Test_reziError_totalOffset_int(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, ensure the offset is in the error output
-			assert.Truef(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
+			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }
@@ -108,7 +193,8 @@ func Test_reziError_totalOffset_bool(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, ensure the offset is in the error output
-			assert.Truef(strings.Contains(rErr.Error(), fmt.Sprintf("%d", tc.expectTotalOffset)), "message does not contain offset: %q", rErr.Error())
+			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }

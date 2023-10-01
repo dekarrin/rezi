@@ -94,10 +94,10 @@ func Wrapf(offset int, format string, reziErr error, a ...interface{}) error {
 	fmtArgs[0] = rErr
 
 	// disable offset printing on all reziErrors before string formatting them
-	for i := range a {
-		if aReziError, ok := a[i].(reziError); ok {
+	for i := range fmtArgs {
+		if aReziError, ok := fmtArgs[i].(reziError); ok {
 			aReziError.hideOffset = true
-			a[i] = aReziError
+			fmtArgs[i] = aReziError
 		}
 	}
 
