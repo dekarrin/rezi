@@ -30,7 +30,7 @@ func Test_Wrapf(t *testing.T) {
 				format: "err: %s",
 				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
 			},
-			expectErrText: "(0x08): err: some error",
+			expectErrText: "0x08: err: some error",
 		},
 		{
 			name: "add negative offset",
@@ -39,7 +39,7 @@ func Test_Wrapf(t *testing.T) {
 				format: "err: %s",
 				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
 			},
-			expectErrText: "(0x01): err: some error",
+			expectErrText: "0x01: err: some error",
 		},
 		{
 			name: "add no offset",
@@ -48,7 +48,7 @@ func Test_Wrapf(t *testing.T) {
 				format: "err: %s",
 				err:    reziError{msg: "some error", offsetValid: true, offset: 2},
 			},
-			expectErrText: "(0x02): err: some error",
+			expectErrText: "0x02: err: some error",
 		},
 		{
 			name: "add offset to non-dec error",
@@ -57,7 +57,7 @@ func Test_Wrapf(t *testing.T) {
 				format: "err: %s",
 				err:    reziError{msg: "some error"},
 			},
-			expectErrText: "(0x06): err: some error",
+			expectErrText: "0x06: err: some error",
 		},
 		{
 			name: "non-rezi error causes panic",
@@ -151,8 +151,11 @@ func Test_reziError_totalOffset_int(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, ensure the offset is in the error output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }
@@ -202,8 +205,11 @@ func Test_reziError_totalOffset_bool(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, ensure the offset is in the error output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 		})
 	}
 }
@@ -304,10 +310,13 @@ func Test_reziError_totalOffset_string(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, check the err output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
 			lowerMsgAct := strings.ToUpper(rErr.Error())
 			lowerMsgExp := strings.ToUpper(tc.expectErrText)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
 		})
 	}
@@ -378,10 +387,13 @@ func Test_reziError_totalOffset_binary(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, check the err output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
 			lowerMsgAct := strings.ToUpper(rErr.Error())
 			lowerMsgExp := strings.ToUpper(tc.expectErrText)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
 		})
 	}
@@ -461,10 +473,13 @@ func Test_reziError_totalOffset_slice(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, check the err output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
 			lowerMsgAct := strings.ToUpper(rErr.Error())
 			lowerMsgExp := strings.ToUpper(tc.expectErrText)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
 		})
 	}
@@ -570,10 +585,13 @@ func Test_reziError_totalOffset_map(t *testing.T) {
 			assert.Equal(tc.expectTotalOffset, actual)
 
 			// and finally, check the err output
-			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
 			lowerMsgAct := strings.ToUpper(rErr.Error())
 			lowerMsgExp := strings.ToUpper(tc.expectErrText)
-			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
 			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
 		})
 	}

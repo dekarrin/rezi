@@ -190,7 +190,7 @@ func (e reziError) Error() string {
 			if len(asHex)%2 != 0 {
 				asHex = "0" + asHex
 			}
-			prefix = fmt.Sprintf("byte offset %d (0x%s): ", offset, asHex)
+			prefix = fmt.Sprintf("at offset 0x%s: ", asHex)
 		}
 	}
 
