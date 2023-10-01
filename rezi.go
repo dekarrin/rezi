@@ -41,20 +41,20 @@
 //	var readNumber int
 //	var readName string
 //
-//	var n int
+//	var n, offset int
 //	var err error
 //
-//	n, err = rezi.Dec(allData, &readNumber)
+//	n, err = rezi.Dec(allData[offset:], &readNumber)
 //	if err != nil {
 //		panic(err.Error())
 //	}
-//	allData = allData[n:]
+//	offset += n
 //
-//	n, err = rezi.Dec(allData, &readName)
+//	n, err = rezi.Dec(allData[offset:], &readName)
 //	if err != nil {
 //		panic(err.Error())
 //	}
-//	allData = allData[n:]
+//	offset += n
 //
 // # Error Checking
 //
@@ -89,7 +89,10 @@
 // REZI supports several built-in basic Go types: int (as well as all of its
 // unsigned and specific-size varieties), string, bool, and any type that
 // implements encoding.BinaryMarshaler (for encoding) or whose pointer type
-// implements encoding.BinaryUnmarshaler (for decoding).
+// implements encoding.BinaryUnmarshaler (for decoding). Implementations of
+// encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error
+// from a REZI function called from within UnmarshalBinary to supply additional
+// offset information, but this is not strictly required.
 //
 // Floating point types and complex types are not supported at this time,
 // although they may be added in a future release.
@@ -168,7 +171,7 @@
 // byte (EXT for short). This encodes additional metadata about the encoded
 // value.
 //
-// The "B" bit is the binary count flag. If this is set, it explicitly indicates
+// The "B" bit is the byte count flag. If this is set, it explicitly indicates
 // that the following count is to be interpreted as bytes rather than any
 // alternative. Note that the lack of this flag or the extension byte as a whole
 // does not necessarily indicate that the count is *not* byte-based; an encoded
@@ -358,7 +361,6 @@
 package rezi
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 )
@@ -405,9 +407,7 @@ func MustEnc(v interface{}) []byte {
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = reziError{
-				msg: fmt.Sprintf("%v", r),
-			}
+			err = errorf("%v", r)
 		}
 	}()
 
@@ -468,9 +468,7 @@ func MustDec(data []byte, v interface{}) int {
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = reziError{
-				msg: fmt.Sprintf("%v", r),
-			}
+			err = errorf("%v", r)
 		}
 	}()
 
@@ -522,24 +520,23 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
 func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+	// TODO: GHI-041: check that errors from here are reported.
 	var hdr countHeader
 
 	if ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
-			return decoded, n, reziError{
-				msg:   fmt.Sprintf("check count header: %s", err.Error()),
-				cause: []error{err},
-			}
+			return decoded, n, errorDecf(0, "check count header: %s", err)
 		}
 	}
 
+	countHeaderBytes := n
 	effectiveExtraIndirs := hdr.ExtraNilIndirections()
 
 	if !hdr.IsNil() {
 		decoded, n, err = decFn(data)
 		if err != nil {
-			return decoded, n, err
+			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
 		effectiveExtraIndirs = ti.Indir
 	}
@@ -596,10 +593,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, 0, reziError{
-					msg:   "function pointer type receiver is not supported",
-					cause: []error{ErrInvalidType},
-				}
+				return nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
@@ -707,11 +701,11 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 	// V = binary format explicit Version
 
 	if hdr.Length > 15 || hdr.Length < 0 {
-		return nil, reziError{msg: "countHeader.Length cannot fit into nibble", cause: []error{ErrMalformedData}}
+		return nil, errorf("countHeader.Length cannot fit into nibble").wrap(ErrMalformedData)
 	}
 
 	if hdr.Version > 15 || hdr.Version < 0 {
-		return nil, reziError{msg: "countHeader.Version cannot fit into nibble", cause: []error{ErrMalformedData}}
+		return nil, errorf("countHeader.Version cannot fit into nibble").wrap(ErrMalformedData)
 	}
 
 	var encoded []byte
@@ -764,7 +758,7 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 // needed to fill the NilAt value. Will *not* consume regular int value bytes.
 func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	if len(data) < 1 {
-		return reziError{msg: "no bytes to decode", cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return errorDecf(0, "no bytes to decode").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 	}
 
 	decoded := countHeader{}
@@ -786,7 +780,15 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	for extByte&infoBitsExt != 0 {
 		decoded.ExtensionLevel++
 		if len(data) < decoded.ExtensionLevel+1 {
-			return reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+			s := "s"
+			verbS := ""
+			if len(data) == 1 {
+				s = ""
+				verbS = "s"
+			}
+			const errFmt = "count header length is at least %d but only %d byte%s remain%s in data"
+			err := errorDecf(decoded.DecodedCount, errFmt, decoded.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			return err
 		}
 		extByte = data[decoded.ExtensionLevel]
 
@@ -809,7 +811,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	if infoByte&infoBitsIndir != 0 {
 		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
-			return err
+			return errorDecf(decoded.DecodedCount, "%s", err)
 		}
 		decoded.DecodedCount += n
 		decoded.NilAt += extraIndirs

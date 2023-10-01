@@ -361,9 +361,7 @@ func decCountHeader(data []byte) (countHeader, int, error) {
 	var hdr countHeader
 
 	if len(data) < 1 {
-		return hdr, 0, reziError{
-			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
-		}
+		return hdr, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	err := hdr.UnmarshalBinary(data)
@@ -384,7 +382,7 @@ func encBool(b bool) []byte {
 
 func decBool(data []byte) (bool, int, error) {
 	if len(data) < 1 {
-		return false, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return false, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	if data[0] == 0 {
@@ -392,7 +390,7 @@ func decBool(data []byte) (bool, int, error) {
 	} else if data[0] == 1 {
 		return true, 1, nil
 	} else {
-		return false, 0, reziError{cause: []error{ErrMalformedData}}
+		return false, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
 	}
 }
 
@@ -448,7 +446,7 @@ func encInt[E integral](v E) []byte {
 // such. does not do further checks on count header.
 func decInt[E integral](data []byte) (E, int, error) {
 	if len(data) < 1 {
-		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return 0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
@@ -465,8 +463,10 @@ func decInt[E integral](data []byte) (E, int, error) {
 	// functions. skip over all extension bytes
 	numHeaderBytes := 0
 	for data[0]&infoBitsExt != 0 {
-		if len(data) < 1 {
-			return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		if len(data[1:]) < 1 {
+			const errFmt = "count header indicates extension byte follows, but at end of data"
+			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			return 0, 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -478,7 +478,15 @@ func decInt[E integral](data []byte) (E, int, error) {
 	numHeaderBytes++
 
 	if len(data) < int(byteCount) {
-		return 0, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded int byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return 0, 0, err
 	}
 
 	intData := data[:byteCount]
@@ -532,7 +540,7 @@ func encString(s string) []byte {
 // decString decodes a string of any version. Assumes header is not nil.
 func decString(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case; 0x00 is the empty string in all variants
@@ -555,26 +563,28 @@ func decString(data []byte) (string, int, error) {
 
 func decStringV2(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 	strLength, countLen, err := decInt[int](data)
 	if err != nil {
-		return "", 0, reziError{
-			msg:   fmt.Sprintf("decoding string byte count: %s", err.Error()),
-			cause: []error{err},
-		}
+		return "", 0, errorDecf(0, "decode string byte count: %s", err)
 	}
 	data = data[countLen:]
 
 	if strLength < 0 {
-		return "", 0, reziError{
-			msg:   "string byte count < 0",
-			cause: []error{ErrMalformedData},
-		}
+		return "", 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
 	}
 
 	if len(data) < strLength {
-		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(countLen, errFmt, strLength, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return "", 0, err
 	}
 	// clamp it
 	data = data[:strLength]
@@ -585,7 +595,7 @@ func decStringV2(data []byte) (string, int, error) {
 	for readBytes-countLen < strLength {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", 0, err
+			return "", 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -598,22 +608,16 @@ func decStringV2(data []byte) (string, int, error) {
 
 func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
-		return "", 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 	runeCount, n, err := decInt[int](data)
 	if err != nil {
-		return "", 0, reziError{
-			msg:   fmt.Sprintf("decoding string rune count: %s", err.Error()),
-			cause: []error{err},
-		}
+		return "", 0, errorDecf(0, "decode string rune count: %s", err)
 	}
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", 0, reziError{
-			msg:   "string rune count < 0",
-			cause: []error{ErrMalformedData},
-		}
+		return "", 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
 	}
 
 	readBytes := n
@@ -623,7 +627,7 @@ func decStringV1(data []byte) (string, int, error) {
 	for i := 0; i < runeCount; i++ {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", 0, err
+			return "", 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -638,17 +642,11 @@ func decUTF8Codepoint(data []byte) (rune, int, error) {
 	ch, charBytesRead := utf8.DecodeRune(data)
 	if ch == utf8.RuneError {
 		if charBytesRead == 0 {
-			return ch, 0, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+			return ch, 0, errorDecf(0, "bytes could not be read as UTF-8 codepoint data").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		} else if charBytesRead == 1 {
-			return ch, 0, reziError{
-				msg:   "invalid UTF-8 encoding in string",
-				cause: []error{ErrMalformedData},
-			}
+			return ch, 0, errorDecf(0, "invalid UTF-8 encoding in string").wrap(ErrMalformedData)
 		} else {
-			return ch, 0, reziError{
-				msg:   "invalid unicode replacement character in rune",
-				cause: []error{ErrMalformedData},
-			}
+			return ch, 0, errorDecf(0, "invalid unicode replacement character in rune").wrap(ErrMalformedData)
 		}
 	}
 	return ch, charBytesRead, nil
@@ -661,10 +659,7 @@ func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 
 	enc, marshalErr := b.MarshalBinary()
 	if marshalErr != nil {
-		return nil, reziError{
-			msg:   fmt.Sprintf("%s: %s", marshalErr.Error(), ErrMarshalBinary.Error()),
-			cause: []error{marshalErr, ErrMarshalBinary},
-		}
+		return nil, errorf("%s: %s", ErrMarshalBinary, marshalErr)
 	}
 
 	enc = append(encInt(len(enc)), enc...)
@@ -679,13 +674,21 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	byteLen, readBytes, err = decInt[tLen](data)
 	if err != nil {
-		return 0, err
+		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
 
 	data = data[readBytes:]
 
 	if len(data) < byteLen {
-		return readBytes, reziError{cause: []error{io.ErrUnexpectedEOF, ErrMalformedData}}
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(readBytes, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return readBytes, err
 	}
 	var binData []byte
 
@@ -695,10 +698,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return readBytes, reziError{
-			msg:   fmt.Sprintf("%s: %s", ErrUnmarshalBinary.Error(), err.Error()),
-			cause: []error{err, ErrUnmarshalBinary},
-		}
+		return readBytes, errorDecf(readBytes, "%s: %s", ErrUnmarshalBinary, err)
 	}
 
 	return byteLen + readBytes, nil

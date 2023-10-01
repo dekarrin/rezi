@@ -1,7 +1,7 @@
 # REZI
 
 ![Tests Status Badge](https://github.com/dekarrin/rezi/actions/workflows/tests.yml/badge.svg?branch=main&event=push)
-[![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi.svg)](https://pkg.go.dev/github.com/dekarrin/rezi)
+[![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi/v2.svg)](https://pkg.go.dev/github.com/dekarrin/rezi/v2)
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode several
@@ -232,23 +232,24 @@ UnmarshalBinary to be defined with a pointer receiver.
 // which it assigns as the value of its receiver.
 func (p *Person) UnmarshalBinary(data []byte) error {
     var n int
+    var offset int
     var err error
 
     var decoded Person
 
     // decode name member
-    n, err = rezi.Dec(data, &decoded.Name)
+    n, err = rezi.Dec(data[offset:], &decoded.Name)
     if err != nil {
         return fmt.Errorf("name: %w", err)
     }
-    data = data[n:]
+    offset += n
 
     // decode number member
-    n, err = rezi.Dec(data, &decoded.Number)
+    n, err = rezi.Dec(data[offset:], &decoded.Number)
     if err != nil {
         return fmt.Errorf("number: %w", err)
     }
-    data = data[n:]
+    offset += n
 
     // everyfin was successfully decoded! assign the result as the value of this
     // Person.
@@ -258,8 +259,28 @@ func (p *Person) UnmarshalBinary(data []byte) error {
 }
 ```
 
-When a type has both of these methods defined, it can be encoded and decoded
-with Enc and Dec just like any other type:
+REZI decoding supports reporting byte offsets where an error occurred in the
+supplied data. In order to support this in user-defined types, Wrapf can be used
+to wrap an error returned from REZI functions and give the offset into the data
+that the REZI function was called on. This offset will be combined with any
+inside the REZI error to give the complete offset:
+
+```golang
+// a typical use of Wrapf within an UnmarshalBinary method:
+
+n, err = rezi.Dec(data[offset:], &decoded.Name)
+if err != nil {
+    // Always make sure to use %s or %v in Wrapf, never %w!
+    return rezi.Wrapf(offset, "name: %s", err)
+}
+offset += n
+
+// Additionally, first arg to the format string must always be the error
+// returned from the REZI function.
+```
+
+When a type has both the `UnmarshalBinary` and `MarshalBinary` methods defined,
+it can be encoded and decoded with Enc and Dec just like any other type:
 
 ```golang
 import (

@@ -3,7 +3,6 @@ package rezi
 // slices.go contains functions for encoding and decoding slices of basic types.
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 )
@@ -30,10 +29,7 @@ func encSlice(v interface{}) ([]byte, error) {
 		v := refVal.Index(i)
 		encData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, reziError{
-				msg:   fmt.Sprintf("slice[%d]: %s", i, err.Error()),
-				cause: []error{err},
-			}
+			return nil, errorf("slice item[%d]: %s", i, err)
 		}
 		enc = append(enc, encData...)
 	}
@@ -68,10 +64,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 
 	toConsume, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, reziError{
-			msg:   fmt.Sprintf("decode byte count: %s", err.Error()),
-			cause: []error{err},
-		}
+		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -91,9 +84,15 @@ func decSlice(data []byte, v interface{}) (int, error) {
 	}
 
 	if len(data) < toConsume {
-		return totalConsumed, reziError{
-			cause: []error{io.ErrUnexpectedEOF, ErrMalformedData},
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
 		}
+		const errFmt = "decoded slice byte count is %d but only %d byte%s remain%s in data at offset"
+		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return totalConsumed, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -102,21 +101,20 @@ func decSlice(data []byte, v interface{}) (int, error) {
 	sl := reflect.MakeSlice(refSliceType, 0, 0)
 
 	var i int
+	var itemIdx int
 	for i < toConsume {
 		refVType := refSliceType.Elem()
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, reziError{
-				msg:   fmt.Sprintf("slice item: %s", err.Error()),
-				cause: []error{err},
-			}
+			return totalConsumed, errorDecf(totalConsumed, "slice item[%d]: %s", itemIdx, err)
 		}
 		totalConsumed += n
 		i += n
 		data = data[n:]
 
 		sl = reflect.Append(sl, refValue.Elem())
+		itemIdx++
 	}
 
 	refSliceVal.Elem().Set(sl)
