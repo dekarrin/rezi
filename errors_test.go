@@ -51,6 +51,15 @@ func Test_Wrapf(t *testing.T) {
 			expectErrText: "(0x02): err: some error",
 		},
 		{
+			name: "add offset to non-dec error",
+			input: params{
+				offset: 6,
+				format: "err: %s",
+				err:    reziError{msg: "some error"},
+			},
+			expectErrText: "(0x06): err: some error",
+		},
+		{
 			name: "non-rezi error causes panic",
 			input: params{
 				offset: 0,
