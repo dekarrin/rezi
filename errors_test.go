@@ -374,3 +374,112 @@ func Test_reziError_totalOffset_slice(t *testing.T) {
 		})
 	}
 }
+
+func Test_reziError_totalOffset_map(t *testing.T) {
+	stringIntMap := func(data []byte) error {
+		var siDest map[string]int
+		_, err := Dec(data, &siDest)
+		return err
+	}
+	intStringMap := func(data []byte) error {
+		var isDest map[int]string
+		_, err := Dec(data, &isDest)
+		return err
+	}
+
+	testCases := []struct {
+		name              string
+		input             []byte
+		dest              func([]byte) error
+		expectTotalOffset int
+		expectErrText     string
+	}{
+		{
+			name: "decode map[int]string: bad byte count",
+			dest: intStringMap,
+			input: []byte{
+				0x01, 0x23, // len=35 (one more than actual)
+
+				0x02, 0x01, 0x9d, // 413:
+				0x41, 0x80, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+				0x02, 0x02, 0x64, // 612:
+				0x41, 0x80, 0x06, 0x4b, 0x41, 0x52, 0x4b, 0x41, 0x54, // "KARKAT"
+
+				0x02, 0xbe, 0x57, // 48727 ("BEST"):
+				0x41, 0x80, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			},
+			expectTotalOffset: 2,
+			expectErrText:     "decoded map byte count",
+		},
+		{
+			name: "decode map[int]string: value issue in 2nd entry",
+			dest: intStringMap,
+			input: []byte{
+				0x01, 0x23, // len=35
+
+				0x02, 0x01, 0x9d, // 413:
+				0x41, 0x80, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+				0x02, 0x02, 0x64, // 612:
+				0x41, 0x80, 0x07, 0x4b, 0x41, 0x52, 0x4b, 0x41, 0x54, 0xc3, // "KARKAT" followed by bad seq
+
+				0x02, 0xbe, 0x57, // 48727 ("BEST"):
+				0x41, 0x80, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			},
+			expectTotalOffset: 24,
+			expectErrText:     "map value[612]: invalid",
+		},
+		{
+			name: "decode map[string]int: key issue in 3rd entry",
+			dest: stringIntMap,
+			input: []byte{
+				0x01, 0x23, // len=35
+
+				0x41, 0x80, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN":
+				0x02, 0x01, 0x9d, // 413
+
+				0x41, 0x80, 0x06, 0x4b, 0x41, 0x52, 0x4b, 0x41, 0x54, // "KARKAT":
+				0x02, 0x02, 0x64, // 612
+
+				0x41, 0x80, 0x07, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0xc3, // "NEPETA" (followed by invalid seq):
+				0x02, 0xbe, 0x57, // 48727 ("BEST")
+			},
+			expectTotalOffset: 33,
+			expectErrText:     "map key: invalid UTF-8 encoding",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			err := tc.dest(tc.input)
+			if !assert.Error(err) {
+				return
+			}
+
+			// convert it to known type reziError
+			rErr, ok := err.(reziError)
+			if !assert.Truef(ok, "Dec returned non-reziErr: %v", err) {
+				return
+			}
+
+			// check if the offset is valid
+			actual, ok := rErr.totalOffset()
+			if !assert.Truef(ok, "Dec returned reziErr with no offset: %v", err) {
+				return
+			}
+
+			// assert the offset is the expected
+			assert.Equal(tc.expectTotalOffset, actual)
+
+			// and finally, check the err output
+			expectOffsetStr := fmt.Sprintf("%d", tc.expectTotalOffset)
+			lowerMsgAct := strings.ToUpper(rErr.Error())
+			lowerMsgExp := strings.ToUpper(tc.expectErrText)
+			assert.Contains(rErr.Error(), expectOffsetStr, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
+		})
+	}
+}
