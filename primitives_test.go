@@ -1576,6 +1576,25 @@ func Test_Dec_Bool(t *testing.T) {
 		})
 	}
 
+	t.Run("nil *bool (no sign bit)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x20}
+			expect         *bool
+			expectConsumed = 1
+		)
+
+		var actual *bool = ref(true)
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("nil *bool", func(t *testing.T) {
 		assert := assert.New(t)
 

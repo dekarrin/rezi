@@ -172,11 +172,13 @@
 // value.
 //
 // The "B" bit is the byte count flag. If this is set, it explicitly indicates
-// that the following count is to be interpreted as bytes rather than any
-// alternative. Note that the lack of this flag or the extension byte as a whole
-// does not necessarily indicate that the count is *not* byte-based; an encoded
-// type format that explicitly notes that the count is byte-based without an EXT
-// byte in its layout diagram will be assumed to have a byte-based length.
+// that a count in bytes is given immediately after all extension bytes in the
+// header have been scanned. This count is given as a regularly-encoded int
+// value, complete with its own header byte sequence. Note that the lack of this
+// flag or the extension byte as a whole does not necessarily indicate that the
+// count is *not* byte-based; an encoded type format that explicitly notes that
+// the count is byte-based without an EXT byte in its layout diagram will be
+// assumed to have a byte-based length.
 //
 // The "V" bits make up the version field of the extension byte. This indicates
 // the version of encoding of the particular type that is represented, encoded
@@ -350,7 +352,10 @@
 // indirection, i.e. a nil pointer-to-type, with no additional indirections. Due
 // to this limitation, decoding these values will result in either a nil pointer
 // or all levels indirected up to the non-nil value; it will never be decoded
-// as, for example, a pointer to a pointer which is then nil.
+// as, for example, a pointer to a pointer which is then nil. When writing a nil
+// value, REZI sets the sign bit and keeps the length bytes clear in the first
+// INFO header byte; this allows versions prior to v1.1.0 to be able to read it,
+// as long as it has only a single level of indirection.
 //
 // REZI library versions prior to v2.1.0 encode string data length as the number
 // of Unicode codepoints rather than the number of bytes and do so in the info
