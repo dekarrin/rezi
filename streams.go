@@ -95,6 +95,76 @@ func (r *Reader) Close() error {
 	return r.srcCloser()
 }
 
+// loadDecodableBytes will, unlike OTHER loadX functions, automatically handle
+// offset setting and converting all errors to their proper dec variants.
+func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
+	var err error
+	var hdrBytes []byte
+
+	// before actually trying that header, let's krill a quick use-case! If the
+	// input is a bool, and nil is not set, then it will be exactly one byte so
+	// load it in.
+	if info.Main == mtBool {
+		var firstByteBuf []byte
+
+		n, err := r.src.Read(firstByteBuf)
+		if n <= 0 {
+			// if error is set
+			if err != nil {
+				if err == io.EOF {
+					// in fact, this is unexpected
+					return nil, errorDecf(0, "%s", io.ErrUnexpectedEOF)
+				}
+				return nil, errorDecf(0, "%s", err)
+			}
+			return nil, errorDecf(0, "%s", io.ErrUnexpectedEOF)
+		}
+		firstByte := firstByteBuf[0]
+		if firstByte&0xf0 == 0 {
+			// no high order bytes, this is ready to be dec'd as is.
+			return firstByteBuf, nil
+		} else {
+			hdrBytes, err = r.loadHeaderBytes(&firstByte)
+			if err != nil {
+				return nil, errorDecf(r.offset, "%s", err)
+			}
+		}
+	} else {
+		// load the entire header in, all other types use an info byte.
+		hdrBytes, err = r.loadHeaderBytes(nil)
+		if err != nil {
+			return nil, errorDecf(r.offset, "%s", err)
+		}
+	}
+
+	// we still have some work to do.
+
+	// we have hdrBytes. know what? just make this easier and decode it
+	// immediately.
+	var hdr countHeader
+	err = hdr.UnmarshalBinary(hdrBytes)
+	if err != nil {
+		return nil, errorDecf(r.offset, "pre-decode header: %s", err)
+	}
+
+	// indir count retrieval is handled by loadHeaderBytes. did we just pull up one? if so, we are done.
+	if hdr.IsNil() {
+		return hdrBytes, nil
+	}
+
+	// okay, if the info header says we need to load an int for a byte count, do
+	// it now
+	// Troll-jegus! Isn't the V1 format awful? ::::(
+	if hdr.ByteLength {
+		// read the int header
+		ihdr, err := r.loadHeaderBytes(nil)
+		if err != nil {
+			return nil, errorDecf(r.offset+len(hdrBytes), "%s", err)
+		}
+
+	}
+}
+
 // TODO: need Dec for reader, and Read, which should read REZI-encoded bytes but
 // in an on-going basis in case more is given. Also, need to create a Writer.
 
@@ -142,21 +212,18 @@ func (r *Reader) Dec(v interface{}) (err error) {
 	//
 	// ALGO:
 	// 1. send any bytes read to buf for later re-read of core DEC routine.
-	// 2. read byte. while ext bit is set on last byte read, read byte. if it specifies
-	// 3. if header bytes are NIL with multiple indirs, read an int header byte. call to get rest of bytes, then pass to Dec.
-	// 4. elif only one byte was read, and the passed in type is bool, we are done. pass off to Dec.
+	//
+
+	// The V2 format is going to be so much 8etter.
+
+	// bytes to be sent to rezi.Dec.
+	var decBuf []byte // TODO: replace this check with function that just returns
+	// for flatter structure.
+	var decReady bool
+
 	// 5. elif header bytes indicate explicit int byte count, read an int. call to get reast of byte, then pass to Dec.
 	// 6. else call to get LLLL bytes, pass all bytes to int dec, this is rest of bytes. call to rest, then pass to Dec.
 	// 7. special case for v0 strings. we literally need to decode right there, it sucks.
-	//
-
-	// bytes to be sent to rezi.Dec.
-	var decBuf []byte
-
-	// before actually trying that header, let's krill a quick use-case! If the
-	// input is a bool, and nil is not set, then it will be exactly one byte so
-	// load it in.
-	//
 
 	// 1. load first byte. are we a bool and is that byte zeroed in the high
 	// nibbles? if so, it is a raw bool and we can pass to decode.
@@ -182,7 +249,9 @@ func (r *Reader) Dec(v interface{}) (err error) {
 //
 // this function will not cause offset to be incremented; caller should do so
 // by []byte amount when it is to be advanced.
-func (r *Reader) loadHeaderBytes() ([]byte, error) {
+//
+// if withFirst is given and non nil, it will be assumed to be the first byte.
+func (r *Reader) loadHeaderBytes(withFirst *byte) ([]byte, error) {
 	// read a byte until we have a complete header.
 	var hdrBytes []byte
 
@@ -191,7 +260,15 @@ func (r *Reader) loadHeaderBytes() ([]byte, error) {
 	// read in initial info byte first
 	extBuf := make([]byte, 1)
 
-	for {
+	var extCheck byte
+	if withFirst != nil {
+		hdrBytes = append(hdrBytes, *withFirst)
+		extCheck = hdrBytes[0]
+	} else {
+		extCheck = infoBitsExt
+	}
+
+	for extCheck&infoBitsExt != 0 {
 		n, err := r.src.Read(extBuf)
 		if n <= 0 {
 			// if error is set
@@ -206,17 +283,14 @@ func (r *Reader) loadHeaderBytes() ([]byte, error) {
 		}
 		totalRead++
 		hdrBytes = append(hdrBytes, extBuf[0])
-		if extBuf[1]&infoBitsExt == 0 {
-			// no more count bytes
-			break
-		}
+		extCheck = extBuf[0]
 	}
 
 	// okay, got our bytes, now check if we have a nil indir level encoding we
 	// need to grab
 	if hdrBytes[0]&infoBitsIndir != 0 {
 		// load info bytes. we should get nothing special here, just a normal int.
-		intHdr, err := r.loadHeaderBytes()
+		intHdr, err := r.loadHeaderBytes(nil)
 		if len(intHdr) > 0 {
 			hdrBytes = append(hdrBytes, intHdr...)
 		}
@@ -264,6 +338,60 @@ func (r *Reader) loadHeaderBytes() ([]byte, error) {
 
 	// explicitly do not load the "byte-based count" bit.
 	return hdrBytes, nil
+}
+
+// loadCountIntBytes loads specifically a header and int that is known to be
+// unsigned and a non-nil value.
+func (r *Reader) loadCountIntBytes() ([]byte, error) {
+	var loaded []byte
+
+	intHdr, err := r.loadHeaderBytes(nil)
+
+	// need count int to work proper
+	if len(intHdr) > 0 {
+		loaded = append(loaded, intHdr...)
+	}
+	if err != nil && err != io.EOF {
+		// genuine error
+		return loaded, err
+	}
+	totalRead += len(intHdr)
+
+	// okay, now peek at the int byte to see if we need to load
+
+	// this had better be a positive int that is not itself nil or indirected.
+	if intHdr[0]&infoBitsSign != 0 {
+		return hdrBytes, errorDecf(totalRead, "indirection count in nil-byte header is negative", ErrMalformedData)
+	}
+	if intHdr[0]&infoBitsNil != 0 {
+		return hdrBytes, errorDecf(totalRead, "indirection count in nil-byte header is itself nil", ErrMalformedData)
+	}
+	if intHdr[0]&infoBitsIndir != 0 {
+		return hdrBytes, errorDecf(totalRead, "indirection count in nil-byte header marks itself as also being an indirected nil", ErrMalformedData)
+	}
+
+	totalRead += len(intHdr)
+	// ext bit doesn't actually matter, grab the LLLL bytes.
+	intByteCount := intHdr[0] & infoBitsLen
+
+	if intByteCount > 0 {
+		// read in rest of the int
+		indirCountBuf := make([]byte, intByteCount)
+		n, err := r.src.Read(indirCountBuf)
+		if n <= 0 {
+			// if error is set
+			if err != nil {
+				if err == io.EOF {
+					// in fact, this is unexpected. there should be at least one.
+					return hdrBytes, io.ErrUnexpectedEOF
+				}
+				return hdrBytes, err
+			}
+			return hdrBytes, io.ErrUnexpectedEOF
+		}
+		hdrBytes = append(hdrBytes, indirCountBuf...)
+		totalRead += len(intHdr)
+	}
 }
 
 // readSrc reads (but does not interpret) the given number of bytes from the
