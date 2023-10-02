@@ -151,13 +151,71 @@ func (r *Reader) Dec(v interface{}) (err error) {
 	//
 
 	// bytes to be sent to rezi.Dec.
-	//var decBuf []byte
-
-	// read a byte until we have a complete reader.
+	var decBuf []byte
 
 	if info.Main == mtBool {
 
 	}
 
 	return nil
+}
+
+func (r *Reader) loadHeader() ([]byte, error) {
+	// read a byte until we have a complete header.
+	var hdrBytes []byte
+
+	// read in initial info byte first
+	extBuf := make([]byte, 1)
+
+	for {
+		n, err := r.src.Read(extBuf)
+		if n <= 0 {
+			// if error is set
+			if err != nil {
+				if err == io.EOF {
+					// in fact, this is unexpected
+					return hdrBytes, io.ErrUnexpectedEOF
+				}
+				return hdrBytes, err
+			}
+			return hdrBytes, io.ErrUnexpectedEOF
+		}
+		hdrBytes = append(hdrBytes, extBuf[0])
+		if extBuf[1]&infoBitsExt == 0 {
+			// no more count bytes
+			break
+		}
+	}
+
+	// okay, got our bytes, now check if we have a nil indir level encoding we
+	// need to grab:
+
+}
+
+// readSrc reads (but does not interpret) the given number of bytes from the
+// underlying data stream. offset is not incremented, callers must do this. the
+// stream is called until that many bytes are present, or an error occurs.
+//
+// returned slice will be <= count in size. if it ever it is < count, it
+// indicates that the underlying stream returned io.EOF.
+//
+// returns io.EOF when at end of stream.
+func (r *Reader) readSrc(count int) ([]byte, error) {
+	if count < 1 {
+		return nil, nil
+	}
+
+	var readBytes []byte
+
+	buf := make([]byte, count)
+	n, err := r.src.Read(buf)
+	if n > 0 {
+		readBytes = buf[:n]
+	}
+
+	if err != nil && err == io.EOF {
+		err = nil
+	}
+
+	return readBytes, err
 }
