@@ -272,7 +272,7 @@ func Test_encString(t *testing.T) {
 	}
 }
 
-func Test_decStringV1(t *testing.T) {
+func Test_decStringV0(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
@@ -311,7 +311,7 @@ func Test_decStringV1(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decStringV1(tc.input)
+			actualValue, actualRead, err := decStringV0(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
@@ -326,7 +326,7 @@ func Test_decStringV1(t *testing.T) {
 	}
 }
 
-func Test_decStringV2(t *testing.T) {
+func Test_decStringV1(t *testing.T) {
 	testCases := []struct {
 		name        string
 		input       []byte
@@ -371,7 +371,7 @@ func Test_decStringV2(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decStringV2(tc.input)
+			actualValue, actualRead, err := decStringV1(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
