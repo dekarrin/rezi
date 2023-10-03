@@ -250,8 +250,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		r.loadV0Strin()
 	}
 
-	// normal circumstances, override due to ByteLength below
-	remByteCount := hdr.Length
+	var remByteCount int
 
 	// okay, if the info header says we need to load an int for a byte count, do
 	// it now
@@ -270,13 +269,38 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		count, n, err := decInt[int](buf)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
-			return decodable, errorDecf(totalRead, "%s", err)
+			return decodable, errorDecf(totalRead, "header byte-count int: %s", err)
 		}
 		if n != len(buf) {
-			return decodable, errorDecf(totalRead, "header byte count int: actual decoded len < read len").wrap(err)
+			return decodable, errorDecf(totalRead, "header byte-count int: actual decoded len < read len").wrap(err)
 		}
 		remByteCount = count
 		totalRead += n
+	} else if info.Main != mtIntegral {
+		// for non-ints, we need to load the rest of the integer ourselves, then
+		// remByteCount is the value of THAT
+		intBytes, err := r.loadBytes(hdr.Length)
+		lastErr = err
+		if len(intBytes) > 0 {
+			decodable = append(decodable, intBytes...)
+		}
+		if err != nil && err != io.EOF {
+			return decodable, errorDecf(totalRead, "%s", err)
+		}
+
+		// okay, we have complete header and int bytes, decode to int type
+		count, n, err := decInt[int](decodable)
+		// do not preserve this error, it will never be io.EOF.
+		if err != nil {
+			return decodable, errorDecf(totalRead, "count header: %s", err)
+		}
+		if n != len(decodable) {
+			return decodable, errorDecf(totalRead, "count header: actual decoded len < read len").wrap(err)
+		}
+		remByteCount = count
+	} else {
+		// if it is an int, rem bytes is hdr.Length
+		remByteCount = hdr.Length
 	}
 
 	// well, at least NOW we know the exact remain bytes to grab, glub!
