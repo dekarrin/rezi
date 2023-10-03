@@ -478,13 +478,13 @@ func (r *Reader) loadCountIntBytes() ([]byte, error) {
 
 	// this had better be a positive int that is not itself nil or indirected.
 	if intHdr[0]&infoBitsSign != 0 {
-		return loaded, errorDecf(totalRead, "count int header indicates negative", ErrMalformedData)
+		return loaded, errorDecf(totalRead, "count int header indicates negative").wrap(ErrMalformedData)
 	}
 	if intHdr[0]&infoBitsNil != 0 {
-		return loaded, errorDecf(totalRead, "count int header is nil", ErrMalformedData)
+		return loaded, errorDecf(totalRead, "count int header is nil").wrap(ErrMalformedData)
 	}
 	if intHdr[0]&infoBitsIndir != 0 {
-		return loaded, errorDecf(totalRead, "count int header marks itself as also being an indirected nil", ErrMalformedData)
+		return loaded, errorDecf(totalRead, "count int header marks itself as also being an indirected nil").wrap(ErrMalformedData)
 	}
 
 	// ext bit doesn't actually matter, grab the LLLL bytes.
@@ -539,32 +539,4 @@ func (r *Reader) loadBytes(count int) ([]byte, error) {
 	}
 
 	return read, err
-}
-
-// readSrc reads (but does not interpret) the given number of bytes from the
-// underlying data stream. offset is not incremented, callers must do this. the
-// stream is called until that many bytes are present, or an error occurs.
-//
-// returned slice will be <= count in size. if it ever it is < count, it
-// indicates that the underlying stream returned io.EOF.
-//
-// returns io.EOF when at end of stream.
-func (r *Reader) readSrc(count int) ([]byte, error) {
-	if count < 1 {
-		return nil, nil
-	}
-
-	var readBytes []byte
-
-	buf := make([]byte, count)
-	n, err := r.src.Read(buf)
-	if n > 0 {
-		readBytes = buf[:n]
-	}
-
-	if err != nil && err == io.EOF {
-		err = nil
-	}
-
-	return readBytes, err
 }
