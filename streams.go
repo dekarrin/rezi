@@ -300,6 +300,9 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 func (r *Reader) loadV0StringBytes(hdr countHeader) ([]byte, error) {
 	// okay, we have a header but we need to load in the actual info int.
 
+	// [ IHDR ] [ IBYTES ] [ CHAR BYTES ]
+	// ^^^^^^^^ - we have THIS part so far
+
 	hdr.Length
 }
 
