@@ -139,31 +139,22 @@ func (r *Reader) Dec(v interface{}) (err error) {
 	//
 	// - it is a slice, no indirection. the amount of data read will be all int bytes
 	//	 NEED TO READ: 1 byte for INFO, any ext, then, LLLL bytes to read int len.
-	//
-	// ALGO:
-	// 1. send any bytes read to buf for later re-read of core DEC routine.
-	//
 
-	// The V2 format is going to be so much 8etter.
-
-	// bytes to be sent to rezi.Dec.
-	var decBuf []byte // TODO: replace this check with function that just returns
-	// for flatter structure.
-	var decReady bool
-
-	// 1. load first byte. are we a bool and is that byte zeroed in the high
-	// nibbles? if so, it is a raw bool and we can pass to decode.
-	// 2. if not, we need to load the rest of the header with that byte starting.
-	//
-	// then, continue algo
-	if info.Main == mtBool {
-		// it count be a ptr, if so it will be a count header. if not, it will
-		// be
+	datumBytes, err := r.loadDecodeableBytes(info)
+	if err != nil && err != io.EOF {
+		return err
 	}
 
-	hdrBytes, err := r.loadHeaderBytes()
+	n, err := Dec(datumBytes, v)
 	if err != nil {
-		return errorDecf(0, "examine bytes for v1 count header: %s", err)
+		err = errorDecf(r.offset, "%s", err)
+		r.offset += len(datumBytes)
+		return err
+	}
+	if n != len(datumBytes) {
+		err = errorDecf(r.offset, "expected decoded data at offset to consume byte len of %d but actual consumed is %d", len(datumBytes), n)
+		r.offset += len(datumBytes)
+		return err
 	}
 
 	return nil
@@ -239,16 +230,21 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		return hdrBytes, nil
 	}
 
-	decodable := make([]byte, len(hdrBytes))
-	copy(decodable, hdrBytes)
-
 	// special case: if it's a non-nil v0 string, we need to immediately decode
-	// it as we go.
+	// it as we go. We can only tell this once we have the header and can
+	// determine that it is not, in fact, a nil.
 	//
 	// This suuuuuuuucks! V2 when?!
 	if info.Main == mtString && !hdr.ByteLength {
-		r.loadV0Strin()
+		loaded, err := r.loadV0StringBytes(hdr, hdrBytes)
+		if err != nil && err != io.EOF {
+			return loaded, errorDecf(0, "load v0 string: %s", err)
+		}
+		return loaded, err
 	}
+
+	decodable := make([]byte, len(hdrBytes))
+	copy(decodable, hdrBytes)
 
 	var remByteCount int
 
@@ -292,12 +288,13 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		count, n, err := decInt[int](decodable)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
-			return decodable, errorDecf(totalRead, "count header: %s", err)
+			return decodable, errorDecf(0, "count header: %s", err)
 		}
 		if n != len(decodable) {
-			return decodable, errorDecf(totalRead, "count header: actual decoded len < read len").wrap(err)
+			return decodable, errorDecf(0, "count header: actual decoded len < read len").wrap(err)
 		}
 		remByteCount = count
+		totalRead += n
 	} else {
 		// if it is an int, rem bytes is hdr.Length
 		remByteCount = hdr.Length
@@ -320,14 +317,82 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 }
 
 // given a countHeader, loadV0StringBytes loads the rest of the bytes that make
-// up a V0 string. it does this by manually attempting to decode.
-func (r *Reader) loadV0StringBytes(hdr countHeader) ([]byte, error) {
+// up a V0 string. it will include hdrBytes in the returned output to make a
+// complete v0 string.
+func (r *Reader) loadV0StringBytes(hdr countHeader, hdrBytes []byte) ([]byte, error) {
 	// okay, we have a header but we need to load in the actual info int.
+	var lastErr error // to propagate io.EOFs.
+	loaded := make([]byte, len(hdrBytes))
+	copy(loaded, hdrBytes)
 
 	// [ IHDR ] [ IBYTES ] [ CHAR BYTES ]
 	// ^^^^^^^^ - we have THIS part so far
 
-	hdr.Length
+	// we need to load the rest of the integer (IBYTES) ourselves to get a char
+	// count
+	intBytes, err := r.loadBytes(hdr.Length)
+	lastErr = err
+	if len(intBytes) > 0 {
+		loaded = append(loaded, intBytes...)
+	}
+	if err != nil && err != io.EOF {
+		return intBytes, err
+	}
+
+	// okay, we have complete header and int bytes, decode to int type
+	runeCount, n, err := decInt[int](loaded)
+	// do not preserve this error, it will never be io.EOF.
+	if err != nil {
+		return loaded, errorDecf(0, "count header: %s", err)
+	}
+	if n != len(loaded) {
+		return loaded, errorDecf(0, "count header: actual decoded len < read len").wrap(err)
+	}
+
+	totalRead := len(loaded)
+
+	// we now have a rune count. begin loading bytes until we have hit it
+	for loadedRunes := 0; loadedRunes < runeCount; loadedRunes++ {
+		// first, load in byte 1. this will tell us if we need more
+		firstByteBuf, err := r.loadBytes(1)
+		lastErr = err
+		if len(firstByteBuf) > 0 {
+			loaded = append(loaded, firstByteBuf...)
+		}
+		if err != nil && err != io.EOF {
+			return loaded, errorDecf(totalRead, "load rune byte 1: %s", err)
+		}
+		totalRead += len(firstByteBuf)
+
+		firstRuneByte := firstByteBuf[0]
+
+		var additionalBytes int
+
+		// check UTF-8 len bits to see if we have more to load
+		if (firstRuneByte&0xc0 != 0) && (firstRuneByte&0x20 == 0) { // matches 0b110xxxxx, two bytes
+			additionalBytes = 1
+		} else if (firstRuneByte&0xe0 != 0) && (firstRuneByte&0x10 == 0) { // matches 0b1110xxxx, three bytes
+			additionalBytes = 2
+		} else if (firstRuneByte&0xf0 != 0) && (firstRuneByte&0x08 == 0) { // matches 0b11110xxx, four bytes
+			additionalBytes = 3
+		}
+
+		if additionalBytes > 0 {
+			nextBytes, err := r.loadBytes(additionalBytes)
+			lastErr = err
+			if len(nextBytes) > 0 {
+				loaded = append(loaded, nextBytes...)
+			}
+			if err != nil && err != io.EOF {
+				return loaded, errorDecf(totalRead, "load next rune byte(s): %s", err)
+			}
+			totalRead++
+		}
+
+		// load of next rune complete
+	}
+
+	return loaded, lastErr
 }
 
 // if EOF encountered at before all bytes are loaded, a reziError that matches
