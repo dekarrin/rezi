@@ -259,12 +259,12 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 
 	var remByteCount int
 
-	// okay, if the info header says we need to load an int for a byte count, do
-	// it now
+	// okay, if the info header says we need to load the rest of an int for a
+	// byte count, do it now
 	// Troll-jegus! Isn't the V1 format awful? ::::(
 	if hdr.ByteLength {
 		// read count int
-		buf, err := r.loadCountIntBytes()
+		buf, err := r.loadCountIntBytes(hdrBytes)
 		lastErr = err
 		if len(buf) > 0 {
 			decodable = append(decodable, buf...)
@@ -282,7 +282,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 			return decodable, errorDecf(totalRead, "header byte-count int: actual decoded len < read len").wrap(err)
 		}
 		remByteCount = count
-		totalRead += n
+		totalRead += (n - len(hdrBytes))
 	} else if info.Main != mtIntegral {
 		// for non-ints, we need to load the rest of the integer ourselves, then
 		// remByteCount is the value of THAT
@@ -449,7 +449,7 @@ func (r *Reader) loadHeaderBytes(withFirst *byte) ([]byte, error) {
 	// need to grab
 	if hdrBytes[0]&infoBitsIndir != 0 {
 		// load info bytes. we should get nothing special here, just a normal int.
-		indirBytes, err := r.loadCountIntBytes()
+		indirBytes, err := r.loadCountIntBytes(nil)
 		lastErr = err
 		if len(indirBytes) > 0 {
 			hdrBytes = append(hdrBytes, indirBytes...)
@@ -464,26 +464,35 @@ func (r *Reader) loadHeaderBytes(withFirst *byte) ([]byte, error) {
 	return hdrBytes, lastErr
 }
 
-// loadCountIntBytes loads specifically a header and int that is known to be
-// unsigned and a non-nil value.
-func (r *Reader) loadCountIntBytes() ([]byte, error) {
+// loadCountIntBytes loads an int that is known to be unsigned and a non-nil
+// value.
+// preloadedHeader can be nil, in which case this function will load a header
+// for it as well.
+func (r *Reader) loadCountIntBytes(preloadedHeader []byte) ([]byte, error) {
 	var loaded []byte
 	var totalRead int
 
 	// for io.EOF preservation
 	var lastErr error
 
-	intHdr, err := r.loadHeaderBytes(nil)
-	lastErr = err
+	var intHdr []byte
+	if preloadedHeader != nil {
+		intHdr = preloadedHeader
+	} else {
+		var err error
+		intHdr, err = r.loadHeaderBytes(nil)
+		lastErr = err
 
-	if len(intHdr) > 0 {
-		totalRead += len(intHdr)
-		loaded = append(loaded, intHdr...)
+		if len(intHdr) > 0 {
+			loaded = append(loaded, intHdr...)
+		}
+		if err != nil && err != io.EOF {
+			// genuine error
+			return loaded, errorDecf(totalRead, "%s", err)
+		}
 	}
-	if err != nil && err != io.EOF {
-		// genuine error
-		return loaded, errorDecf(totalRead, "%s", err)
-	}
+
+	totalRead += len(intHdr)
 
 	// okay, now peek at the int byte to see if we need to load
 

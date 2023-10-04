@@ -173,12 +173,13 @@
 //
 // The "B" bit is the byte count flag. If this is set, it explicitly indicates
 // that a count in bytes is given immediately after all extension bytes in the
-// header have been scanned. This count is given as a regularly-encoded int
-// value, complete with its own header byte sequence. Note that the lack of this
-// flag or the extension byte as a whole does not necessarily indicate that the
-// count is *not* byte-based; an encoded type format that explicitly notes that
-// the count is byte-based without an EXT byte in its layout diagram will be
-// assumed to have a byte-based length.
+// header have been scanned. This count is given as the data bytes of a
+// regularly-encoded int value sans its own header (its header is the one that
+// the EXT byte is a part of). Note that the lack of this flag or the extension
+// byte as a whole does not necessarily indicate that the count is *not*
+// byte-based; an encoded type format that explicitly notes that the count is
+// byte-based without an EXT byte in its layout diagram will be assumed to have
+// a byte-based length.
 //
 // The "V" bits make up the version field of the extension byte. This indicates
 // the version of encoding of the particular type that is represented, encoded
