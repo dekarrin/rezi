@@ -95,6 +95,15 @@ func (r *Reader) Close() error {
 	return r.srcCloser()
 }
 
+// Offset returns the current number of bytes that the Reader has interpreted as
+// REZI encoded bytes from the stream. Note that if compression is enabled, this
+// refers to the number of uncompressed data bytes interpreted, regardless of
+// how many actual bytes are read from the underlying reader provided to r at
+// construction.
+func (r *Reader) Offset() int {
+	return r.offset
+}
+
 // TODO: need Dec for reader, and Read, which should read REZI-encoded bytes but
 // in an on-going basis in case more is given. Also, need to create a Writer.
 
@@ -142,6 +151,7 @@ func (r *Reader) Dec(v interface{}) (err error) {
 
 	datumBytes, err := r.loadDecodeableBytes(info)
 	if err != nil && err != io.EOF {
+		r.offset += len(datumBytes)
 		return err
 	}
 
@@ -156,6 +166,7 @@ func (r *Reader) Dec(v interface{}) (err error) {
 		r.offset += len(datumBytes)
 		return err
 	}
+	r.offset += len(datumBytes)
 
 	return nil
 }
