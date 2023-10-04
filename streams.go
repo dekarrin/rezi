@@ -380,11 +380,11 @@ func (r *Reader) loadV0StringBytes(hdr countHeader, hdrBytes []byte) ([]byte, er
 		var additionalBytes int
 
 		// check UTF-8 len bits to see if we have more to load
-		if (firstRuneByte&0xc0 != 0) && (firstRuneByte&0x20 == 0) { // matches 0b110xxxxx, two bytes
+		if (firstRuneByte&0xc0 == 0xc0) && (firstRuneByte&0x20 == 0) { // matches 0b110xxxxx, two bytes
 			additionalBytes = 1
-		} else if (firstRuneByte&0xe0 != 0) && (firstRuneByte&0x10 == 0) { // matches 0b1110xxxx, three bytes
+		} else if (firstRuneByte&0xe0 == 0xe0) && (firstRuneByte&0x10 == 0) { // matches 0b1110xxxx, three bytes
 			additionalBytes = 2
-		} else if (firstRuneByte&0xf0 != 0) && (firstRuneByte&0x08 == 0) { // matches 0b11110xxx, four bytes
+		} else if (firstRuneByte&0xf0 == 0xf0) && (firstRuneByte&0x08 == 0) { // matches 0b11110xxx, four bytes
 			additionalBytes = 3
 		}
 

@@ -247,7 +247,7 @@ func Test_Reader_Dec_stringV0(t *testing.T) {
 			name:      "string with no multibyte chars",
 			input:     []byte{0x01, 0x01, 0x31},
 			expect:    "1",
-			expectOff: 4,
+			expectOff: 3,
 		},
 		{
 			name:      "string with multibyte chars",
@@ -265,7 +265,7 @@ func Test_Reader_Dec_stringV0(t *testing.T) {
 			name:      "string with no multibyte chars - multiple values",
 			input:     []byte{0x01, 0x01, 0x31, 0x01, 0x01, 0x31},
 			expect:    "1",
-			expectOff: 4,
+			expectOff: 3,
 		},
 		{
 			name:      "string with multibyte chars - multiple values",
