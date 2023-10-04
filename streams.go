@@ -266,8 +266,8 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		// read count int
 		buf, err := r.loadCountIntBytes(hdrBytes)
 		lastErr = err
-		if len(buf) > 0 {
-			decodable = append(decodable, buf...)
+		if len(buf) > len(hdrBytes) {
+			decodable = append(decodable, buf[len(hdrBytes):]...)
 		}
 		if err != nil && err != io.EOF {
 			return decodable, errorDecf(totalRead, "%s", err)
@@ -478,6 +478,7 @@ func (r *Reader) loadCountIntBytes(preloadedHeader []byte) ([]byte, error) {
 	var intHdr []byte
 	if preloadedHeader != nil {
 		intHdr = preloadedHeader
+		loaded = append(loaded, preloadedHeader...)
 	} else {
 		var err error
 		intHdr, err = r.loadHeaderBytes(nil)
