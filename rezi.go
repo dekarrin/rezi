@@ -348,14 +348,15 @@
 // separate from the version of the Go module.
 //
 // REZI library versions prior to v1.1.0 indicate nil by giving -1 as the byte
-// count. This older format is only able to encode a single level of
-// indirection, i.e. a nil pointer-to-type, with no additional indirections. Due
-// to this limitation, decoding these values will result in either a nil pointer
-// or all levels indirected up to the non-nil value; it will never be decoded
-// as, for example, a pointer to a pointer which is then nil. When writing a nil
-// value, REZI sets the sign bit and keeps the length bytes clear in the first
-// INFO header byte; this allows versions prior to v1.1.0 to be able to read it,
-// as long as it has only a single level of indirection.
+// count, and could only encode a nil value for slices and maps. This older
+// format is only able to encode a single level of indirection, i.e. a nil
+// pointer-to-type, with no additional indirections. Due to this limitation,
+// decoding these values will result in either a nil pointer or all levels
+// indirected up to the non-nil value; it will never be decoded as, for example,
+// a pointer to a pointer which is then nil. When writing a nil value, REZI sets
+// the sign bit and keeps the length bytes clear in the first INFO header byte;
+// this allows versions prior to v1.1.0 to be able to read it, as long as it has
+// only a single level of indirection.
 //
 // REZI library versions prior to v2.1.0 encode string data length as the number
 // of Unicode codepoints rather than the number of bytes and do so in the info

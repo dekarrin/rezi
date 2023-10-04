@@ -307,9 +307,90 @@ func Test_Reader_Dec_stringV0(t *testing.T) {
 		})
 	}
 
+	// cannot encode a v0 string that is nil so we also cannot decode one
+}
+
+func Test_Reader_Dec_stringV1(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    string
+		expectErr bool
+		expectOff int
+	}{
+		{
+			name:      "empty",
+			input:     []byte{0x00},
+			expect:    "",
+			expectOff: 1,
+		},
+		{
+			name:      "string with no multibyte chars",
+			input:     []byte{0x40, 0x80, 0x01, 0x01, 0x31},
+			expect:    "1",
+			expectOff: 5,
+		},
+		{
+			name:      "string with multibyte chars",
+			input:     []byte{0x40, 0x80, 0x01, 0x0d, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c},
+			expect:    "Hello, 世界",
+			expectOff: 17,
+		},
+		{
+			name:      "empty - multiple values",
+			input:     []byte{0x00, 0x00},
+			expect:    "",
+			expectOff: 1,
+		},
+		{
+			name:      "string with no multibyte chars - multiple values",
+			input:     []byte{0x40, 0x80, 0x01, 0x01, 0x31, 0x40, 0x80, 0x01, 0x01, 0x31},
+			expect:    "1",
+			expectOff: 5,
+		},
+		{
+			name:      "string with multibyte chars - multiple values",
+			input:     []byte{0x40, 0x80, 0x01, 0x0d, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c, 0x40, 0x80, 0x01, 0x0d, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0xe4, 0xb8, 0x96, 0xe7, 0x95, 0x8c},
+			expect:    "Hello, 世界",
+			expectOff: 17,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest string
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
 	t.Run("nil value - single indir", func(t *testing.T) {
 		assert := assert.New(t)
-		input := []byte{0x80}
+		input := []byte{0x20}
 		expect := nilRef[string]()
 		expectOff := 1
 
@@ -328,5 +409,25 @@ func Test_Reader_Dec_stringV0(t *testing.T) {
 		assert.Equal(expectOff, r.offset, "offset mismatch")
 	})
 
-	// nil with multiple indirs not possible with V0
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		expectPtr := nilRef[string]()
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest **string
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
 }
