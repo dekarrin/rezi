@@ -7,6 +7,124 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_Reader_Dec_sequential(t *testing.T) {
+	assert := assert.New(t)
+	var input []byte
+
+	input = append(input, 0x02, 0x01, 0x9d) // 413
+	var dest1Int int
+	expect1Int := 413
+
+	input = append(input, 0x01) // true
+	var dest2Bool bool
+	expect2Bool := true
+
+	input = append(input, 0xa0) // nil
+	var dest3Slice1 []int
+	var expect3Slice1 []int
+
+	input = append(input, // slice: {"VRISKA", "NEPETA", "TEREZI"}
+		0x01, 0x1b, // len = 27
+		0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+		0x41, 0x82, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49, // "TEREZI"
+	)
+	var dest4Slice2 []string
+	expect4Slice2 := []string{"VRISKA", "NEPETA", "TEREZI"}
+
+	input = append(input, 0x41, 0x80, 0x01, 0x31) // "1"
+	var dest5String string
+	expect5String := "1"
+
+	input = append(input, 0x02, 0x02, 0x64) // 612
+	var dest6IntPtr *int
+	expect6IntPtr := ref(612)
+
+	input = append(input, // map: {413: "JOHN", 612: "VRISKA"}
+		0x01, 0x16, // len=22
+
+		0x02, 0x01, 0x9d, // 413:
+		0x41, 0x82, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+		0x02, 0x02, 0x64, // 612:
+		0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+	)
+	var dest7Map map[int]string
+	expect7Map := map[int]string{413: "JOHN", 612: "VRISKA"}
+
+	input = append(input, 0xa0) // nil
+	var dest8BoolPtr *bool
+	expect8BoolPtr := nilRef[bool]()
+
+	input = append(input, // testBinary{data: "ABC", number: 8}
+		/* byte count = 8  */ 0x01, 0x08,
+		/*  data  (string) */ 0x41, 0x80, 0x03, 0x41, 0x42, 0x43, // "ABC"
+		/* number (int32)  */ 0x01, 0x08, // 8
+	)
+	var dest9Bin testBinary
+	expect9Bin := testBinary{number: 8, data: "ABC"}
+
+	r, err := NewReader(bytes.NewReader(input), nil)
+	if !assert.NoError(err, "creating Reader returned error") {
+		return
+	}
+
+	err = r.Dec(&dest1Int)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect1Int, dest1Int, "dest1Int mismatch")
+
+	err = r.Dec(&dest2Bool)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect2Bool, dest2Bool, "dest2Bool mismatch")
+
+	err = r.Dec(&dest3Slice1)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect3Slice1, dest3Slice1, "dest3Slice1 mismatch")
+
+	err = r.Dec(&dest4Slice2)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect4Slice2, dest4Slice2, "dest4Slice2 mismatch")
+
+	err = r.Dec(&dest5String)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect5String, dest5String, "dest5String mismatch")
+
+	err = r.Dec(&dest6IntPtr)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect6IntPtr, dest6IntPtr, "dest6IntPtr mismatch")
+
+	err = r.Dec(&dest7Map)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect7Map, dest7Map, "dest7Map mismatch")
+
+	err = r.Dec(&dest8BoolPtr)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect8BoolPtr, dest8BoolPtr, "dest8BoolPtr mismatch")
+
+	err = r.Dec(&dest9Bin)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect9Bin, dest9Bin, "dest9Bin mismatch")
+
+}
+
 func Test_Reader_Dec_int(t *testing.T) {
 	testCases := []struct {
 		name      string
@@ -685,6 +803,142 @@ func Test_Reader_Dec_slice(t *testing.T) {
 		}
 
 		var dest *[]string
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
+
+func Test_Reader_Dec_map(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    map[int]string
+		expectErr bool
+		expectOff int
+	}{
+		{
+			name: "nil",
+			input: []byte{
+				0xa0, // nil=true
+			},
+			expect:    nil,
+			expectOff: 1,
+		},
+		{
+			name: "empty",
+			input: []byte{
+				0x00, // len=0
+			},
+			expect:    map[int]string{},
+			expectOff: 1,
+		},
+		{
+			name: "2 values",
+			input: []byte{
+				0x01, 0x16, // len=22
+
+				0x02, 0x01, 0x9d, // 413:
+				0x41, 0x82, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+				0x02, 0x02, 0x64, // 612:
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+			},
+			expect:    map[int]string{413: "JOHN", 612: "VRISKA"},
+			expectOff: 24,
+		},
+		{
+			name: "nil x2",
+			input: []byte{
+				0xa0, // nil=true
+				0xa0, // nil=true
+			},
+			expect:    nil,
+			expectOff: 1,
+		},
+		{
+			name: "empty x2",
+			input: []byte{
+				0x00, // len=0
+				0x00, // len=0
+			},
+			expect:    map[int]string{},
+			expectOff: 1,
+		},
+		{
+			name: "2 values x2",
+			input: []byte{
+				0x01, 0x16, // len=22
+
+				0x02, 0x01, 0x9d, // 413:
+				0x41, 0x82, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+				0x02, 0x02, 0x64, // 612:
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+
+				0x01, 0x16, // len=22
+
+				0x02, 0x01, 0x9d, // 413:
+				0x41, 0x82, 0x04, 0x4a, 0x4f, 0x48, 0x4e, // "JOHN"
+
+				0x02, 0x02, 0x64, // 612:
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+			},
+			expect:    map[int]string{413: "JOHN", 612: "VRISKA"},
+			expectOff: 24,
+		},
+
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest map[int]string
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		var expectPtr map[int]string
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *map[int]string
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return
