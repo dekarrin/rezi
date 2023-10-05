@@ -565,3 +565,132 @@ func Test_Reader_Dec_binary(t *testing.T) {
 		assert.Equal(expectOff, r.offset, "offset mismatch")
 	})
 }
+
+func Test_Reader_Dec_slice(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    []string
+		expectErr bool
+		expectOff int
+	}{
+		{
+			name: "nil",
+			input: []byte{
+				0xa0, // nil=true
+			},
+			expect:    nil,
+			expectOff: 1,
+		},
+		{
+			name: "empty",
+			input: []byte{
+				0x00, // len=0
+			},
+			expect:    []string{},
+			expectOff: 1,
+		},
+		{
+			name: "3 value",
+			input: []byte{
+				0x01, 0x1b, // len=27
+
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49, // "TEREZI"
+			},
+			expect:    []string{"VRISKA", "NEPETA", "TEREZI"},
+			expectOff: 29,
+		},
+		{
+			name: "nil x2",
+			input: []byte{
+				0xa0, // nil=true
+				0xa0, // nil=true
+			},
+			expect:    nil,
+			expectOff: 1,
+		},
+		{
+			name: "empty x2",
+			input: []byte{
+				0x00, // len=0
+				0x00, // len=0
+			},
+			expect:    []string{},
+			expectOff: 1,
+		},
+		{
+			name: "3 value x2",
+			input: []byte{
+				0x01, 0x1b, // len=27
+
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49, // "TEREZI"
+
+				0x01, 0x1b, // len=27
+
+				0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, // "VRISKA"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49, // "TEREZI"
+			},
+			expect:    []string{"VRISKA", "NEPETA", "TEREZI"},
+			expectOff: 29,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest []string
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		var expectPtr []string
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *[]string
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
