@@ -533,28 +533,7 @@ func Test_Reader_Dec_binary(t *testing.T) {
 			return
 		}
 
-		var dest *string
-		err = r.Dec(&dest)
-		if !assert.NoError(err) {
-			return
-		}
-
-		assert.Equal(expect, dest, "dest not expected value")
-		assert.Equal(expectOff, r.offset, "offset mismatch")
-	})
-
-	t.Run("nil value - v0 nil", func(t *testing.T) {
-		assert := assert.New(t)
-		input := []byte{0x80}
-		expect := nilRef[testBinary]()
-		expectOff := 1
-
-		r, err := NewReader(bytes.NewReader(input), nil)
-		if !assert.NoError(err, "creating Reader returned error") {
-			return
-		}
-
-		var dest *string
+		var dest *testBinary
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return
@@ -567,7 +546,7 @@ func Test_Reader_Dec_binary(t *testing.T) {
 	t.Run("nil value - multi indir", func(t *testing.T) {
 		assert := assert.New(t)
 		input := []byte{0x30, 0x01, 0x01}
-		expectPtr := nilRef[string]()
+		expectPtr := nilRef[testBinary]()
 		expect := &expectPtr
 		expectOff := 3
 
@@ -576,7 +555,7 @@ func Test_Reader_Dec_binary(t *testing.T) {
 			return
 		}
 
-		var dest **string
+		var dest **testBinary
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return
