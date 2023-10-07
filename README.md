@@ -182,6 +182,9 @@ Output from Writer can be read in earlier versions of REZI as well with
 non-Reader calls, as long as a nil or a Version 1 format is used at startup,
 without compression enabled.
 
+Readers are able to read data written by any prior version of REZI with a nil or
+Version 1 format passed in.
+
 ### Supported Types
 
 At this time REZI supports the built-in types `bool`, `int`, `uint`, `int8`,
