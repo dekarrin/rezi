@@ -179,8 +179,12 @@ fmt.Println(isGood) // true
 ```
 
 Output from Writer can be read in earlier versions of REZI as well with
-non-Reader calls, as long as a nil or a Version 1 format is used at startup,
-without compression enabled.
+non-Reader calls, as long as a nil or a Version 1 Format is used at startup,
+without compression enabled. This does not extend to data types that didn't
+exist in that version, however.
+
+Readers created with a nil or Version 1 Format with compression disabled are
+able to read data written by any prior version of REZI.
 
 ### Supported Types
 
