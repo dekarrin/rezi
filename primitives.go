@@ -555,13 +555,13 @@ func decString(data []byte) (string, int, error) {
 
 	// compatibility with older format
 	if !hdr.ByteLength {
-		return decStringV1(data)
+		return decStringV0(data)
 	}
 
-	return decStringV2(data)
+	return decStringV1(data)
 }
 
-func decStringV2(data []byte) (string, int, error) {
+func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -606,7 +606,7 @@ func decStringV2(data []byte) (string, int, error) {
 	return sb.String(), readBytes, nil
 }
 
-func decStringV1(data []byte) (string, int, error) {
+func decStringV0(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
