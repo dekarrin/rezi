@@ -134,6 +134,54 @@ fmt.Println(decodedName) // "Terezi"
 fmt.Println(decodedNumber) // 612
 ```
 
+#### Readers And Writers
+
+You can also use REZI by creating a Reader or Writer and calling their Dec or
+Enc methods respectively. This lets you read and write values directly to and
+from streams of bytes.
+
+```golang
+
+// on the write side, get an io.Writer someWriter you want to write REZI-encoded
+// data to, and write out with Enc.
+
+w, err := rezi.NewWriter(someWriter, nil)
+if err != nil {
+    panic(err)
+}
+
+w.Enc(413)
+w.Enc("NEPETA")
+w.Enc(true)
+
+// don't forget to call Flush or Close when done!
+w.Flush()
+
+// on the read side, get an io.Reader someReader you want to read REZI-encoded
+// data from, and read it with Dec.
+
+r, err := rezi.NewReader(someReader, nil)
+if err != nil {
+    panic(err)
+}
+
+var number int
+var name string
+var isGood bool
+
+r.Dec(&number)
+r.Dec(&name)
+r.Dec(&isGood)
+
+fmt.Println(number) // 413
+fmt.Println(name)   // "NEPETA"
+fmt.Println(isGood) // true
+```
+
+Output from Writer can be read in earlier versions of REZI as well with
+non-Reader calls, as long as a nil or a Version 1 format is used at startup,
+without compression enabled.
+
 ### Supported Types
 
 At this time REZI supports the built-in types `bool`, `int`, `uint`, `int8`,
@@ -311,5 +359,34 @@ fmt.Println(decoded.Number) // 612
 
 ### Compression
 
-REZI does not currently support compression itself but its results can be
-compressed. Automatic compression will come in a future release.
+REZI supports compression via the use of Reader and Writer. When one is created,
+instead of giving a nil value for the Format it accepts, pass in a Format with
+Compression set to true.
+
+```golang
+
+w, err := rezi.NewWriter(someWriter, &rezi.Format{Compression: true})
+if err != nil {
+    panic(err)
+}
+
+w.Enc(413)
+
+// don't forget to call Flush or Close when done
+w.Flush()
+
+// on the read side, get an io.Reader someReader you want to read REZI-encoded
+// data from, and pass it to NewReader along with a Format that enables
+// Compression.
+
+r, err := rezi.NewReader(someReader, &rezi.Format{Compression: true})
+if err != nil {
+    panic(err)
+}
+
+var number int
+
+r.Dec(&number)
+
+fmt.Println(number) // 413
+```
