@@ -3,6 +3,7 @@ package rezi
 import (
 	"bufio"
 	"compress/zlib"
+	"errors"
 	"io"
 )
 
@@ -36,6 +37,11 @@ type Reader struct {
 
 	// offset of decoded bytes into the stream we are. used for error reporting.
 	offset int
+
+	// readBuf keeps a buffer of read bytes obtained during a call to Read()
+	// for 'normal io.Reader' use of Reader. It holds any loaded decoded bytes
+	// that were not used to fill the slice passed in by the caller of Read.
+	readBuf []byte
 }
 
 // Format returns the Format that r interprets data as.
@@ -102,6 +108,95 @@ func (r *Reader) Close() error {
 // construction.
 func (r *Reader) Offset() int {
 	return r.offset
+}
+
+// Read reads up to len(p) bytes from one or more REZI-encoded byte slices
+// present in sequence in the data stream and places them into p. Returns the
+// number of valid bytes read into p.
+//
+// Read requires the underlying data stream at the current position to consist
+// only of one or more REZI-encoded byte slices. Attempting to read more bytes
+// than the current byte slice has will cause more slices to be read from the
+// underlying reader until either p can be filled or the end of the stream is
+// reached. If the last slice read in this fashion is not completely used by p,
+// i.e. if p does not have enough room to hold the complete slice, then the
+// remaining bytes decoded are buffered, and the next call to Read will begin
+// filling its p with those bytes before reading another slice from the
+// underlying reader.
+//
+// Note that the number of bytes read into p (returned as n) is almost certainly
+// less than the total number of bytes read from the underlying data stream; to
+// capture this, call Offset before and after calling Read and check the
+// difference between them.
+//
+// Returns io.EOF only in non-error circumstances. It is possible for n > 0 when
+// err is non-nil and even when err is not io.EOF. All errors besides io.EOF
+// will be wrapped in a special error type from the rezi package; use errors.Is
+// to compare the returned error.
+//
+// If len(p) is greater than the total number of bytes available, but every byte
+// that *is* available is organized as valid REZI-encoded byte slices, err will
+// be io.EOF and n will be the number of bytes that could be read.
+func (r *Reader) Read(p []byte) (n int, err error) {
+	// if p is empty, great, we are done
+	if len(p) < 1 {
+		return 0, nil
+	}
+
+	var cur int
+
+	// before anyfin else, do we have bytes left over from the last call to
+	// Read? use those first, glub!
+	if len(r.readBuf) > 0 {
+		needed := len(p) - cur
+		if needed < len(r.readBuf) {
+			copy(p[cur:], r.readBuf[:needed])
+			cur += needed
+
+			// reset cache for next call
+			r.readBuf = r.readBuf[needed:]
+		} else {
+			copy(p[cur:], r.readBuf)
+			cur += len(r.readBuf)
+
+			// invalidate cache, we just used it up
+			r.readBuf = nil
+		}
+	}
+
+	for cur < len(p) {
+		var loadedBytes []byte
+
+		// need to capture this to check if any bytes actually read
+		oldOffset := r.offset
+		err := r.Dec(&loadedBytes)
+		if err != nil {
+			// okay, if we got UnexpectedEOF due to no bytes at all being
+			// present, that is okay, actually. we just hit the end of the
+			// stream.
+			if errors.Is(err, io.ErrUnexpectedEOF) && r.offset == oldOffset {
+				return cur, io.EOF
+			}
+
+			return cur, err
+		}
+
+		// how many of the loaded bytes do we need?
+		needed := len(p) - cur
+
+		if needed < len(loadedBytes) {
+			copy(p[cur:], loadedBytes[:needed])
+			cur += needed
+
+			// cache the rest for next call to Read:
+			r.readBuf = loadedBytes[needed:]
+		} else {
+			copy(p[cur:], loadedBytes)
+			cur += len(loadedBytes)
+		}
+	}
+
+	return cur, nil
 }
 
 // TODO: need Dec for reader, and Read, which should read REZI-encoded bytes but
