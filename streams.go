@@ -18,10 +18,172 @@ type Format struct {
 	//
 	// As a special case, a Version value of 0 is interpreted as data format V1;
 	// all other values are interpreted as that exact data format version.
+	//
+	// A Version value of -1 is interpreted as auto-detected data format. This
+	// can only be used to detect formats in data written in formats after V1.
 	Version int
 
 	// Compression is whether compression is enabled.
 	Compression bool
+
+	// CompressionLevel is the level of compression to use for writing, as
+	// specified by constants from the zlib package. If not given,
+	// zlib.DefaultCompression is used.
+	//
+	// This property is used only by NewWriter and is ignored by NewReader.
+	CompressionLevel int
+}
+
+// TODO: Format as an interface, only?
+// But why, we have valid values. It's a config obj, just make all members exported.
+
+// Writer is an io.WriteCloser that writes REZI data streams. A Writer may be
+// opened in compression mode or normal mode; bytes written in compression can
+// only be read by a [Reader] in compression mode.
+//
+// The zero-value is a Writer ready to write REZI data streams in the default
+// V1 data format.
+type Writer struct {
+	f          Format
+	dst        io.Writer
+	dstCloser  func() error // does any closing of dst, if needed
+	dstFlusher func() error // does any flushing of dst, if possible
+}
+
+// NewWriter creates a new Writer ready to write data to w. If Compression is
+// enabled in the supplied Format, it will write compressed REZI-encoded data to
+// w.
+//
+// If f is nil or points to the zero-value of Format, the default format of V1
+// with compression disabled is selected, compatible for writing data that can
+// be read by routines which do not specify a Format (including those in older
+// releases of REZI). This function will make a copy of the Format pointed to;
+// changes to it from outside this function will not be reflected in the
+// returned Writer.
+//
+// This function returns a non-nil error only in cases where compression is
+// selected via the format and an error occurs when opening a zlib writer on w.
+//
+// It is the caller's responsibility to call Close on the returned Writer when
+// done. Writes may be bufferred and not flushed until Close.
+func NewWriter(w io.Writer, f *Format) (*Writer, error) {
+	// prep format, check args
+	if f == nil {
+		f = &Format{}
+	}
+	usedFormat := *f
+	if usedFormat.Version == 0 {
+		usedFormat.Version = 1
+	}
+
+	if w == nil {
+		panic("NewWriter called on nil io.Writer")
+	}
+
+	streamWriter := &Writer{f: usedFormat}
+
+	if f.Compression {
+		// if it is compressed, open a zlib writer on the stream.
+		compLev := f.CompressionLevel
+		if compLev == 0 {
+			compLev = zlib.DefaultCompression
+		}
+
+		zWriter, err := zlib.NewWriterLevel(w, compLev)
+		if err != nil {
+			return nil, err
+		}
+
+		// no buffered writing here, *zlib.Writer does that itself
+		streamWriter.dst = zWriter
+		streamWriter.dstCloser = zWriter.Close
+		streamWriter.dstFlusher = zWriter.Flush
+	} else {
+		streamWriter.dst = w
+		streamWriter.dstCloser = func() error { return nil }
+		streamWriter.dstFlusher = func() error { return nil }
+	}
+
+	return streamWriter, nil
+}
+
+// Format returns the Format that w encodes data as.
+func (w *Writer) Format() Format {
+	return w.f
+}
+
+// Close flushes any pending bytes to the underlying stream and frees any
+// resources created from opening the Writer.
+func (w *Writer) Close() error {
+	var err error
+
+	flErr := w.Flush()
+	if flErr != nil {
+		err = errorf("flush data: %s", flErr)
+	}
+
+	closeErr := w.dstCloser()
+	if closeErr != nil {
+		if err != nil {
+			err = errorf("%s;\nclose underlying stream: %s", err, closeErr)
+		} else {
+			err = errorf("close underlying stream: %s", closeErr)
+		}
+	}
+
+	return err
+}
+
+// Flush writes any pending data to the underlying data stream.
+func (w *Writer) Flush() error {
+	return w.dstFlusher()
+}
+
+// Write writes the given bytes as a single slice of REZI-encoded bytes to the
+// underlying data stream. Any number of bytes written in this function across
+// multiple calls to Write can be read by Reader.Read in any aribitrary order;
+// this makes it so that the length does not need to be known ahead of time on
+// either side, at the cost of data space.
+//
+// If the Writer was opened with compression enabled, the written bytes are not
+// necessarily flushed until the Writer is closed or explicitly flushed.
+//
+// Written byte slices use an explicit header; this will result in corrupted
+// data if n is ever < len(p). At this time, n is not a reliable indicator of
+// the number of bytes from p that were written when err != nil, but rather the
+// total number written to the stream. When err == nil, n will be equal to
+// len(p).
+func (w *Writer) Write(p []byte) (n int, err error) {
+	// we can't just call w.Enc because we need to know if n
+	toWrite, err := Enc(p)
+	if err != nil {
+		return 0, err
+	}
+
+	n, err = w.dst.Write(toWrite)
+	if err != nil {
+		return n, err
+	}
+
+	return len(p), nil
+}
+
+// Enc writes REZI-encoded bytes to w. The encoded bytes are not necessarily
+// flushed until the Writer is closed or explicitly flushed.
+//
+// Parameter v must be a type supported by REZI.
+func (w *Writer) Enc(v interface{}) error {
+	data, err := Enc(v)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.dst.Write(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Reader is an io.ReadCloser that reads from REZI data streams. A Reader may be
@@ -44,11 +206,6 @@ type Reader struct {
 	readBuf []byte
 }
 
-// Format returns the Format that r interprets data as.
-func (r *Reader) Format() Format {
-	return r.f
-}
-
 // NewReader creates a new Reader ready to read data from r. If Compression is
 // enabled in the supplied Format, it will interpret compressed data returned
 // from r.
@@ -61,6 +218,9 @@ func (r *Reader) Format() Format {
 //
 // This function returns a non-nil error only in cases where compression is
 // selected via the format and an error occurs when opening a zlib reader on r.
+//
+// It is the caller's responsibility to call Close on the returned reader when
+// done.
 func NewReader(r io.Reader, f *Format) (*Reader, error) {
 	// prep format, check args
 	if f == nil {
@@ -75,9 +235,7 @@ func NewReader(r io.Reader, f *Format) (*Reader, error) {
 		panic("NewReader called on nil io.Reader")
 	}
 
-	streamReader := &Reader{
-		f: usedFormat,
-	}
+	streamReader := &Reader{f: usedFormat}
 
 	if f.Compression {
 		// if it is compressed, open a zlib reader on the stream.
@@ -96,9 +254,9 @@ func NewReader(r io.Reader, f *Format) (*Reader, error) {
 	return streamReader, nil
 }
 
-// Close frees any resources needed from opening the Reader.
-func (r *Reader) Close() error {
-	return r.srcCloser()
+// Format returns the Format that r interprets data as.
+func (r *Reader) Format() Format {
+	return r.f
 }
 
 // Offset returns the current number of bytes that the Reader has interpreted as
@@ -108,6 +266,11 @@ func (r *Reader) Close() error {
 // construction.
 func (r *Reader) Offset() int {
 	return r.offset
+}
+
+// Close frees any resources needed from opening the Reader.
+func (r *Reader) Close() error {
+	return r.srcCloser()
 }
 
 // Read reads up to len(p) bytes from one or more REZI-encoded byte slices
@@ -199,9 +362,6 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 	return cur, nil
 }
 
-// TODO: need Dec for reader, and Read, which should read REZI-encoded bytes but
-// in an on-going basis in case more is given. Also, need to create a Writer.
-
 // Dec decodes REZI-encoded bytes in r at the current position into the supplied
 // value v, then advances the data stream past those bytes.
 //
@@ -219,30 +379,6 @@ func (r *Reader) Dec(v interface{}) (err error) {
 	if err != nil {
 		return err
 	}
-
-	// data len possibilities:
-	// - it is an encoded nil. the amount of data read will be 1+ext bytes+len of
-	// next int (only if indir bit set)
-	//   NEED TO READ: 1 byte for detect of INFO props, any more ext bytes to get their count, then reg INT INFO after that+ext bytes.
-	//
-	// - it is a bool, no indirection. the amount of data read will be 1 byte.
-	//   NEED TO READ: 1 byte for detection of INFO props + any more ext bytes needed.
-	//
-	// - it is an int, no indirection. the amount of data read will be given in LLLL nibble of INFO.
-	//   NEED TO READ: 1 byte for detection of INFO props&len + any more ext bytes needed.
-	//
-	// - it is a string, no indirection. the amount of data read will be all int bytes OR that many utf-8 chars.
-	//   NEED TO READ: 1 byte for detect of INFO props, any ext bytes, then, if extended mode, 0-9 bytes to read int w byte len.
-	//		if not extended mode: 1 byte for detect of INFO props, any ext bytes, then, all bytes until UTF-8 chars read.
-	//
-	// - it is a binary, no indirection. the amount of data read will be all int bytes
-	//	 NEED TO READ: 1 byte for INFO, any ext, then, LLLL bytes to read int len.
-	//
-	// - it is a map, no indirection. the amount of data read will be all int bytes
-	//	 NEED TO READ: 1 byte for INFO, any ext, then, LLLL bytes to read int len.
-	//
-	// - it is a slice, no indirection. the amount of data read will be all int bytes
-	//	 NEED TO READ: 1 byte for INFO, any ext, then, LLLL bytes to read int len.
 
 	datumBytes, err := r.loadDecodeableBytes(info)
 	if err != nil && err != io.EOF {

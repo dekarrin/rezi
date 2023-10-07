@@ -2,11 +2,152 @@ package rezi
 
 import (
 	"bytes"
+	"compress/zlib"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func Test_WriteRead_Cycle_Compressed(t *testing.T) {
+	assert := assert.New(t)
+
+	startValue := []byte{
+		0x01, 0x02, 0xff, 0xff, 0x2f, 0xf1, 0x57, 0x1c, 0x0f, 0xf5,
+	}
+
+	// write data to bytes across multiple calls to Write:
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, &Format{Version: 1, Compression: true, CompressionLevel: zlib.BestCompression})
+	if !assert.NoError(err, "error creating writer") {
+		return
+	}
+	_, err = w.Write(startValue[:2])
+	if !assert.NoError(err, "error writing value") {
+		return
+	}
+	_, err = w.Write(startValue[2:])
+	if !assert.NoError(err, "error writing value") {
+		return
+	}
+	w.Flush()
+
+	// read data from bytes across a single call to Read:
+	rBuf := bytes.NewReader(buf.Bytes())
+	r, err := NewReader(rBuf, &Format{Version: 1, Compression: true})
+	if !assert.NoError(err, "error creating reader") {
+		return
+	}
+	actual := make([]byte, len(startValue))
+	_, err = r.Read(actual)
+	if !assert.NoError(err, "error reading value") {
+		return
+	}
+
+	assert.Equal(startValue, actual)
+}
+
+func Test_WriteRead_Cycle(t *testing.T) {
+	assert := assert.New(t)
+
+	startValue := []byte{
+		0x01, 0x02, 0xff, 0xff, 0x2f, 0xf1, 0x57, 0x1c, 0x0f, 0xf5,
+	}
+
+	// write data to bytes across multiple calls to Write:
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if !assert.NoError(err, "error creating writer") {
+		return
+	}
+	_, err = w.Write(startValue[:2])
+	if !assert.NoError(err, "error writing value") {
+		return
+	}
+	_, err = w.Write(startValue[2:])
+	if !assert.NoError(err, "error writing value") {
+		return
+	}
+	w.Flush()
+
+	// read data from bytes across a single call to Read:
+	rBuf := bytes.NewReader(buf.Bytes())
+	r, err := NewReader(rBuf, nil)
+	if !assert.NoError(err, "error creating reader") {
+		return
+	}
+	actual := make([]byte, len(startValue))
+	_, err = r.Read(actual)
+	if !assert.NoError(err, "error reading value") {
+		return
+	}
+
+	assert.Equal(startValue, actual)
+}
+
+func Test_EncDec_Cycle_Compressed(t *testing.T) {
+	assert := assert.New(t)
+
+	startValue := testBinary{data: "NEPETA", number: 413}
+
+	// write data to bytes:
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, &Format{Version: 1, Compression: true})
+	if !assert.NoError(err, "error creating writer") {
+		return
+	}
+	err = w.Enc(startValue)
+	if !assert.NoError(err, "error writing value") {
+		return
+	}
+	w.Flush()
+
+	// read data from bytes:
+	rBuf := bytes.NewReader(buf.Bytes())
+	r, err := NewReader(rBuf, &Format{Version: 1, Compression: true})
+	if !assert.NoError(err, "error creating reader") {
+		return
+	}
+	var actual testBinary
+	err = r.Dec(&actual)
+	if !assert.NoError(err, "error reading value") {
+		return
+	}
+
+	assert.Equal(startValue, actual)
+}
+
+func Test_Writer_Enc(t *testing.T) {
+	assert := assert.New(t)
+
+	var expect []byte
+
+	buf := &bytes.Buffer{}
+	w, err := NewWriter(buf, nil)
+	if !assert.NoError(err, "error creating writer") {
+		return
+	}
+
+	strData := "NEPETA"
+	intData := 413
+	expect = []byte{
+		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+		0x02, 0x01, 0x9d,
+	}
+
+	err = w.Enc(strData)
+	if !assert.NoError(err, "error writing first time") {
+		return
+	}
+	err = w.Enc(intData)
+	if !assert.NoError(err, "error writing second time") {
+		return
+	}
+	w.Flush()
+
+	actual := buf.Bytes()
+	assert.Equal(expect, actual)
+}
 
 func Test_Reader_Read_oneCall(t *testing.T) {
 	testCases := []struct {
