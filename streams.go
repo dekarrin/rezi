@@ -34,9 +34,6 @@ type Format struct {
 	CompressionLevel int
 }
 
-// TODO: Format as an interface, only?
-// But why, we have valid values. It's a config obj, just make all members exported.
-
 // Writer is an io.WriteCloser that writes REZI data streams. A Writer may be
 // opened in compression mode or normal mode; bytes written in compression can
 // only be read by a [Reader] in compression mode.

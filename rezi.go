@@ -56,6 +56,30 @@
 //	}
 //	offset += n
 //
+// # Compression
+//
+// Compression can be enabled by passing a [Format] struct with Compression
+// options set to any method which accepts a Format. At this time, this is
+// possible only with Readers and Writers.
+//
+// The zlib library is used for compression, with a compression ratio that may
+// be specified at write time.
+//
+// # Readers and Writers
+//
+// For reading and writing from data streams, [Reader] and [Writer] are
+// provided. They each have their own Dec and Enc methods and do not require
+// that manual tracking be provided for proper offset error-reporting.
+//
+// Additionally, the Reader and Writer both support being used for writing
+// arbitrary streams of bytes encoded as REZI byte slices. Using the typical
+// Write method on Writer will result in writing them as a single REZI-encoded
+// slice of bytes. Those bytes can later be read from via calls to Reader.Read,
+// which will automatically read across multiple encoded slices if needed. This
+// allows both sides to operate without needing to the "full" length of their
+// data ahead of time, although it should be noted that this is not a
+// particularly efficient use of REZI encoding.
+//
 // # Error Checking
 //
 // Errors in REZI have specific types that they can be checked against to
@@ -527,7 +551,6 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
 func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
-	// TODO: GHI-041: check that errors from here are reported.
 	var hdr countHeader
 
 	if ti.Indir > 0 {
