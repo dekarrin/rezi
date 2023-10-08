@@ -8,6 +8,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -26,6 +27,13 @@ const (
 	// extension bit not listed because it is the same
 )
 
+// some constants for IEEE-754 float representation
+const (
+	ieee754NegativeBits = 0x8000000000000000
+	ieee754ExponentBits = 0x7ff0000000000000
+	ieee754MantissaBits = 0x000fffffffffffff
+)
+
 type anyUint interface {
 	uint | uint8 | uint16 | uint32 | uint64
 }
@@ -38,6 +46,12 @@ type anyInt interface {
 // allows int, uint, and all of their specifically-sized varieties.
 type integral interface {
 	anyInt | anyUint
+}
+
+// anyFloat is a union interface that combines float-types. It allows float32
+// and float64.
+type anyFloat interface {
+	float32 | float64
 }
 
 // encCheckedPrim encodes the primitve REZI value as rezi-format bytes. The type
@@ -392,6 +406,42 @@ func decBool(data []byte) (bool, int, error) {
 	} else {
 		return false, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
 	}
+}
+
+func encFloat[E anyFloat](v E) []byte {
+	// first off, if it is 0, than we can return special 0-value
+	if v == 0.0 {
+		return []byte{0x00}
+	}
+
+	i := math.Float64bits(float64(v))
+
+	// get its parts
+	signPart := i & ieee754NegativeBits
+	expoPart := i & ieee754ExponentBits
+	mantPart := i & ieee754MantissaBits
+
+	// sign is encoded into the count.
+	//
+	// expo is 11-bits, in storage we will take the top 3-bits will be a 16-bit normal int. (ugh).
+	//
+	// mant is special. if mostly 0's are at
+	// mant is 52-bits, in storage it will be a 52-bit normal int (RLY?!)
+
+	// TODO: byte count in upper LLLL bits. (CHECK: will it fit?)
+	// TODO: add EXT2 byte - EXEEMMMM
+	// X - extension bit
+	// E, and EE - append together to get EEE which is top 3-bits from exponent
+	// MMMM - top 4-bits of mantissa.
+	//
+	// store the afore-mentioned items in EXT2 byte
+	// then
+	//
+	// take bottom 8 bits of EXPO, store as regular int (1 or 2 bytes, exactly)
+	// take bottom 48 bits of MANT, store as regular int (1-7 bytes, exactly)
+	// max byte len = 3 (minimum header) + 1-2 (EXPO) + 1-7 (MANT) = 5-12 bytes.
+	// This is in fact 11 bytes after header, which is easily fittable in
+	// lower-order LLLL bits of first count.
 }
 
 func encInt[E integral](v E) []byte {
