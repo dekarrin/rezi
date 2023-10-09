@@ -259,7 +259,7 @@
 //	Layout:
 //
 //	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
-//	 1 byte   1 byte       1 byte       1..6 bytes
+//	 1 byte          1 byte            1 byte      1..6 bytes
 //
 // A float value is encoded by taking the components of its representation in
 // IEEE-754 double-precision and encoding them across 1 to 9 bytes, using
