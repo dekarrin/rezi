@@ -428,20 +428,18 @@ func encFloat[E anyFloat](v E) []byte {
 	// mant is special. if mostly 0's are at
 	// mant is 52-bits, in storage it will be a 52-bit normal int (RLY?!)
 
-	// TODO: byte count in upper LLLL bits. (CHECK: will it fit?)
-	// TODO: add EXT2 byte - EXEEMMMM
-	// X - extension bit
-	// E, and EE - append together to get EEE which is top 3-bits from exponent
-	// MMMM - top 4-bits of mantissa.
+	// "HIGHS" byte for float - UEEEMMMM
 	//
-	// store the afore-mentioned items in EXT2 byte
+	// U - unused
+	// EEE - top 3 bits from exponent
+	// MMMM - top 4 bits of mantissa.
 	// then
 	//
-	// take bottom 8 bits of EXPO, store as regular int (1 or 2 bytes, exactly)
-	// take bottom 48 bits of MANT, store as regular int (1-7 bytes, exactly)
-	// max byte len = 3 (minimum header) + 1-2 (EXPO) + 1-7 (MANT) = 5-12 bytes.
-	// This is in fact 11 bytes after header, which is easily fittable in
-	// lower-order LLLL bits of first count.
+	// take bottom 8 bits of EXPO, store as 8-bit int val (1 byte, exactly)
+	// take bottom 48 bits of MANT, store as int (1-6 bytes, exactly, inferred by LLLL field)
+	// max byte len = 1 (minimum header) + 1 (HIGHS) + 1 (EXPO) + 1-6 (MANT) = 4-9 bytes.
+	// This is in fact 8 bytes max after header, which is easily fittable in
+	// LLLL field.
 }
 
 func encInt[E integral](v E) []byte {
