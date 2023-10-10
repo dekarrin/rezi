@@ -267,11 +267,20 @@ func Test_encFloat(t *testing.T) {
 			expect: []byte{0x82, 0x3f, 0xf0},
 		},
 		{
-			name:   "256.01220703125",
+			name:   "pad from right",
 			input:  256.01220703125,
 			expect: []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
 		},
-		// need: normal pad style
+		{
+			name:   "pad from left",
+			input:  1.00000000000159161572810262442,
+			expect: []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00},
+		},
+		{
+			name:   "no padding possible",
+			input:  2.02499999999999991118215802999,
+			expect: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
+		},
 	}
 
 	for _, tc := range testCases {
