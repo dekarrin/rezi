@@ -411,7 +411,11 @@ func decBool(data []byte) (bool, int, error) {
 func encFloat[E anyFloat](v E) []byte {
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
-		return []byte{0x00}
+		if math.Signbit(float64(v)) {
+			return []byte{0x00}
+		} else {
+			return []byte{0x80}
+		}
 	}
 
 	i := math.Float64bits(float64(v))
@@ -423,23 +427,187 @@ func encFloat[E anyFloat](v E) []byte {
 
 	// sign is encoded into the count.
 	//
-	// expo is 11-bits, in storage we will take the top 3-bits will be a 16-bit normal int. (ugh).
 	//
-	// mant is special. if mostly 0's are at
-	// mant is 52-bits, in storage it will be a 52-bit normal int (RLY?!)
+	//	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
+	//  SXNILLLL     CEEEEEEE            EEEEMMMM  MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
 
-	// "HIGHS" byte for float - UEEEMMMM
-	//
-	// U - unused
-	// EEE - top 3 bits from exponent
-	// MMMM - top 4 bits of mantissa.
-	// then
-	//
-	// take bottom 8 bits of EXPO, store as 8-bit int val (1 byte, exactly)
-	// take bottom 48 bits of MANT, store as int (1-6 bytes, exactly, inferred by LLLL field)
-	// max byte len = 1 (minimum header) + 1 (HIGHS) + 1 (EXPO) + 1-6 (MANT) = 4-9 bytes.
-	// This is in fact 8 bytes max after header, which is easily fittable in
-	// LLLL field.
+	// first, split the exponent part into 7-bits and 4-bits
+	expoHigh7 := byte((expoPart >> 56) & 0x7f)
+	expoLow4 := byte((expoPart >> 52) & 0x0f)
+
+	// next, split out the mantissa into 4-bits and 48 bits.
+	mantHigh4 := byte((mantPart >> 48) & 0x0f)
+	mantLow48b1 := byte((mantPart >> 40) & 0xff)
+	mantLow48b2 := byte((mantPart >> 32) & 0xff)
+	mantLow48b3 := byte((mantPart >> 24) & 0xff)
+	mantLow48b4 := byte((mantPart >> 16) & 0xff)
+	mantLow48b5 := byte((mantPart >> 8) & 0xff)
+	mantLow48b6 := byte(mantPart & 0xff)
+
+	// great, we now have all of our parts.
+
+	// analyze the mantissa
+	mantLow48 := []byte{mantLow48b1, mantLow48b2, mantLow48b3, mantLow48b4, mantLow48b5, mantLow48b6}
+	var hitMSBAfter int
+	for i := range mantLow48 {
+		if mantLow48[i] != 0x00 {
+			break
+		} else {
+			hitMSBAfter++
+		}
+	}
+	var hitLSBAfter int
+	for i := range mantLow48 {
+		if mantLow48[len(mantLow48)-(i+1)] != 0x00 {
+			break
+		} else {
+			hitLSBAfter++
+		}
+	}
+	var useLSBCompaction bool
+	useLSBCompaction = hitLSBAfter > hitMSBAfter
+
+	// okay, now ready to start building encoded bytes
+
+	// build COMP-EXPONENT-HIGHS byte CEEEEEEE
+	var compactionStyle byte = 0x00
+	if useLSBCompaction {
+		compactionStyle = 0x80
+	}
+
+	var compExpoHighs byte = compactionStyle | expoHigh7
+
+	// build MIXED byte EEEEMMMM
+	var mixed byte = (expoLow4 << 4) | mantHigh4
+
+	// put it all into enc and then add the mantissa bytes as they are ready
+	enc := []byte{compExpoHighs, mixed}
+
+	var hitSigByte bool
+	for i := range mantLow48 {
+		mantPart := mantLow48[i]
+		if useLSBCompaction {
+			mantPart = mantLow48[len(mantLow48)-(i+1)]
+		}
+
+		if hitSigByte {
+			enc = append(enc, mantPart)
+		} else if mantPart != 0x00 {
+			hitSigByte = true
+			enc = append(enc, mantPart)
+		}
+	}
+
+	byteCount := uint8(len(enc))
+
+	// byteCount will never be more than 8 so we can encode sign info in most
+	// significant bit
+	if signPart&ieee754NegativeBits == ieee754NegativeBits {
+		byteCount |= infoBitsSign
+	}
+
+	enc = append([]byte{byteCount}, enc...)
+
+	return enc
+}
+
+func decFloat[E anyFloat](data []byte) (E, int, error) {
+	if len(data) < 1 {
+		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+	}
+
+	byteCount := data[0]
+
+	if byteCount == 0 {
+		var val float64
+		if byteCount&infoBitsSign == infoBitsSign {
+			val *= -1.0
+		}
+		return E(val), 1, nil
+	}
+
+	// pull count and sign out of byteCount
+	negative := byteCount&infoBitsSign != 0
+	byteCount &= infoBitsLen
+
+	// interpretation of other parts of the count header is handled in different
+	// functions. skip over all extension bytes
+	numHeaderBytes := 0
+	for data[0]&infoBitsExt != 0 {
+		if len(data[1:]) < 1 {
+			const errFmt = "count header indicates extension byte follows, but at end of data"
+			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			return 0.0, 0, err
+		}
+		data = data[1:]
+		numHeaderBytes++
+	}
+
+	// done reading count header info; move past the last byte of it and
+	// interpret data bytes
+	data = data[1:]
+	numHeaderBytes++
+
+	if int(byteCount) < 2 {
+		// the absolute minimum is 2
+		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
+		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
+		return 0.0, 0, err
+	}
+
+	if len(data) < int(byteCount) {
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return 0.0, 0, err
+	}
+
+	floatData := data[:byteCount]
+	compExpoHighs := floatData[0]
+	mixed := floatData[1]
+	mantissaLows := floatData[2:]
+
+	useLSBCompaction := compExpoHighs&0x80 == 0x80
+
+	// put compacted other bytes back in
+	for len(mantissaLows) < 6 {
+		if useLSBCompaction {
+			mantissaLows = append(mantissaLows, 0x00)
+		} else {
+			mantissaLows = append([]byte{0x00}, mantissaLows...)
+		}
+	}
+
+	// now reconstruct original byte layout of the float
+	var signBit byte
+	if negative {
+		signBit = 0x80
+	}
+
+	compExpoHighs &= 0x7f
+	compExpoHighs |= signBit
+
+	// place complete result into a uint64 so we can send it to bit-based
+	// interpretation and to avoid logical shift semantics
+
+	var iVal uint64
+	iVal |= (uint64(compExpoHighs) << 56)
+	iVal |= (uint64(mixed) << 48)
+	iVal |= (uint64(mantissaLows[0]) << 40)
+	iVal |= (uint64(mantissaLows[1]) << 32)
+	iVal |= (uint64(mantissaLows[2]) << 24)
+	iVal |= (uint64(mantissaLows[3]) << 16)
+	iVal |= (uint64(mantissaLows[5]) << 8)
+	iVal |= (uint64(mantissaLows[6]))
+
+	fVal := math.Float64frombits(iVal)
+
+	return E(fVal), int(byteCount) + numHeaderBytes, nil
 }
 
 func encInt[E integral](v E) []byte {

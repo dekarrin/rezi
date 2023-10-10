@@ -298,6 +298,10 @@
 // mantissa; the high 4 bits will always be present in the MIXED byte regardless
 // of their value.
 //
+// The value 0.0 (positive zero) is a special-case that is encoded as a single
+// 0x00 byte. The value -0.0 (negative zero) is also a special case, encoded as
+// a single 0x80 byte.
+//
 //	String Values
 //
 //	Layout:
