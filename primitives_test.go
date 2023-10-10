@@ -258,9 +258,20 @@ func Test_encFloat(t *testing.T) {
 		{
 			name:   "1",
 			input:  1.0,
-			expect: []byte{0x02, 0xbf, 0xf0}, // note: we are not getting the LSB tag on this and we should; we are eliminating from the right
-			// double check docs on that i may have confused things
+			expect: []byte{0x02, 0x3f, 0xf0},
+			// no LSB tag bc nothing to compact
 		},
+		{
+			name:   "-1",
+			input:  -1.0,
+			expect: []byte{0x82, 0x3f, 0xf0},
+		},
+		{
+			name:   "256.01220703125",
+			input:  256.01220703125,
+			expect: []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
+		},
+		// need: normal pad style
 	}
 
 	for _, tc := range testCases {

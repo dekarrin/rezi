@@ -480,9 +480,7 @@ func encFloat[E anyFloat](v E) []byte {
 	// build MIXED byte EEEEMMMM
 	var mixed byte = (expoLow4 << 4) | mantHigh4
 
-	// put it all into enc and then add the mantissa bytes as they are ready
-	enc := []byte{compExpoHighs, mixed}
-
+	var encMantLows []byte
 	var hitSigByte bool
 	for i := range mantLow48 {
 		mantPart := mantLow48[i]
@@ -491,12 +489,24 @@ func encFloat[E anyFloat](v E) []byte {
 		}
 
 		if hitSigByte {
-			enc = append(enc, mantPart)
+			if useLSBCompaction {
+				encMantLows = append([]byte{mantPart}, encMantLows...)
+			} else {
+				encMantLows = append(encMantLows, mantPart)
+			}
 		} else if mantPart != 0x00 {
 			hitSigByte = true
-			enc = append(enc, mantPart)
+			if useLSBCompaction {
+				encMantLows = append([]byte{mantPart}, encMantLows...)
+			} else {
+				encMantLows = append(encMantLows, mantPart)
+			}
 		}
 	}
+
+	// put it all into enc
+	enc := []byte{compExpoHighs, mixed}
+	enc = append(enc, encMantLows...)
 
 	byteCount := uint8(len(enc))
 
