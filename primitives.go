@@ -412,9 +412,9 @@ func encFloat[E anyFloat](v E) []byte {
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
 		if math.Signbit(float64(v)) {
-			return []byte{0x00}
-		} else {
 			return []byte{0x80}
+		} else {
+			return []byte{0x00}
 		}
 	}
 

@@ -233,6 +233,47 @@ func Test_decInt(t *testing.T) {
 	}
 }
 
+func Test_encFloat(t *testing.T) {
+	// operation on an existing float64 var of 0 mult by -1.0 is only way we
+	// could find to reliably get a signed negative zero! glub
+
+	var negZero = float64(0.0)
+	negZero *= -1.0
+
+	testCases := []struct {
+		name   string
+		input  float64
+		expect []byte
+	}{
+		{
+			name:   "zero",
+			input:  0.0,
+			expect: []byte{0x00},
+		},
+		{
+			name:   "signed negative zero",
+			input:  negZero,
+			expect: []byte{0x80},
+		},
+		{
+			name:   "1",
+			input:  1.0,
+			expect: []byte{0x02, 0xbf, 0xf0}, // note: we are not getting the LSB tag on this and we should; we are eliminating from the right
+			// double check docs on that i may have confused things
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual := encFloat(tc.input)
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+}
+
 func Test_encString(t *testing.T) {
 	testCases := []struct {
 		name   string
