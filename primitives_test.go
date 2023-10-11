@@ -2031,144 +2031,165 @@ func Test_Dec_Float(t *testing.T) {
 		assert.True(math.IsNaN(f), "other NaN input did not decode to an NaN")
 	})
 
-	/*
-		t.Run("*float32 (nil)", func(t *testing.T) {
-			assert := assert.New(t)
+	t.Run("nil *float32", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var (
-				input  *float32
-				expect = []byte{0xa0}
-			)
+		var (
+			input          = []byte{0xa0}
+			expect         *float32
+			expectConsumed = 1
+		)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var actual *float32 = ref(float32(12.0))
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-			assert.Equal(expect, actual)
-		})
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-		t.Run("*float32", func(t *testing.T) {
-			assert := assert.New(t)
+	t.Run("*float32", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var (
-				inputVal = float32(8.0)
-				input    = &inputVal
-				expect   = []byte{0x02, 0x40, 0x20}
-			)
+		var (
+			input          = []byte{0x02, 0x40, 0x20}
+			expectVal      = float32(8.0)
+			expect         = &expectVal
+			expectConsumed = 3
+		)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var actual *float32
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-			assert.Equal(expect, actual)
-		})
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-		t.Run("**float32", func(t *testing.T) {
-			assert := assert.New(t)
+	t.Run("**float32", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var (
-				inputVal = float32(8)
-				inputPtr = &inputVal
-				input    = &inputPtr
-				expect   = []byte{0x02, 0x40, 0x20}
-			)
+		var (
+			input          = []byte{0x02, 0x40, 0x20}
+			expectVal      = float32(8.0)
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 3
+		)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var actual **float32
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-			assert.Equal(expect, actual)
-		})
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-		t.Run("**float32, but nil float32 part", func(t *testing.T) {
-			assert := assert.New(t)
+	t.Run("**float32, but nil float32 part", func(t *testing.T) {
+		assert := assert.New(t)
 
-			var (
-				ptr    *float32
-				input  = &ptr
-				expect = []byte{0xb0, 0x01, 0x01}
-			)
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var actual **float32
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-			assert.Equal(expect, actual)
-		})
+		assert.Equal(expectConsumed, consumed)
 
-		t.Run("*float64 (nil)", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
 
-			var (
-				input  *float64
-				expect = []byte{0xa0}
-			)
+	t.Run("nil *float64", func(t *testing.T) {
+		assert := assert.New(t)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var (
+			input          = []byte{0xa0}
+			expect         *float64
+			expectConsumed = 1
+		)
 
-			assert.Equal(expect, actual)
-		})
+		var actual *float64 = ref(float64(12.0))
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("*float64", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				inputVal = float64(8.0)
-				input    = &inputVal
-				expect   = []byte{0x02, 0x40, 0x20}
-			)
+	t.Run("*float64", func(t *testing.T) {
+		assert := assert.New(t)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var (
+			input          = []byte{0x02, 0x40, 0x20}
+			expectVal      = float64(8.0)
+			expect         = &expectVal
+			expectConsumed = 3
+		)
 
-			assert.Equal(expect, actual)
-		})
+		var actual *float64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**float64", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				inputVal = float64(8)
-				inputPtr = &inputVal
-				input    = &inputPtr
-				expect   = []byte{0x02, 0x40, 0x20}
-			)
+	t.Run("**float64", func(t *testing.T) {
+		assert := assert.New(t)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var (
+			input          = []byte{0x02, 0x40, 0x20}
+			expectVal      = float64(8.0)
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 3
+		)
 
-			assert.Equal(expect, actual)
-		})
+		var actual **float64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-		t.Run("**float64, but nil float64 part", func(t *testing.T) {
-			assert := assert.New(t)
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 
-			var (
-				ptr    *float64
-				input  = &ptr
-				expect = []byte{0xb0, 0x01, 0x01}
-			)
+	t.Run("**float64, but nil float64 part", func(t *testing.T) {
+		assert := assert.New(t)
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
 
-			assert.Equal(expect, actual)
-		})
-	*/
+		var actual **float64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
 }
 
 func Test_Dec_Bool(t *testing.T) {
