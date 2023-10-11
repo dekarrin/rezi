@@ -21,6 +21,7 @@ const (
 	mtMap
 	mtSlice
 	mtNil
+	mtFloat
 )
 
 // typeInfo holds REZI-specific type info on types that can be encoded and
@@ -35,7 +36,7 @@ type typeInfo struct {
 }
 
 func (ti typeInfo) Primitive() bool {
-	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary
+	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat
 }
 
 func canEncode(v interface{}) (typeInfo, error) {
@@ -106,6 +107,10 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: true}, nil
 		case reflect.Int:
 			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: true}, nil
+		case reflect.Float32:
+			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 32, Signed: true}, nil
+		case reflect.Float64:
+			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 64, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be encodable.
 			mValType := t.Elem()
@@ -124,7 +129,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
-				return typeInfo{}, errorf("map key type must be bool, string, or castable to int").wrap(ErrInvalidType)
+				return typeInfo{}, errorf("map key type must be bool, string, float, or castable to int").wrap(ErrInvalidType)
 			}
 
 			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
@@ -211,6 +216,10 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: true}, nil
 		case reflect.Int:
 			return typeInfo{Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: true}, nil
+		case reflect.Float32:
+			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 32, Signed: true}, nil
+		case reflect.Float64:
+			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 64, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be decodable.
 			mValType := t.Elem()
@@ -229,7 +238,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
-				return typeInfo{}, errorf("map key type must be bool, string, or castable to int").wrap(ErrInvalidType)
+				return typeInfo{}, errorf("map key type must be bool, string, float, or castable to int").wrap(ErrInvalidType)
 			}
 
 			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil

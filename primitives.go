@@ -119,6 +119,19 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 				})
 			}
 		}
+	case mtFloat:
+		switch ti.Bits {
+		case 32:
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
+				return float32(r.Float())
+			})
+		default:
+			fallthrough
+		case 64:
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), func(r reflect.Value) float64 {
+				return r.Float()
+			})
+		}
 	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
@@ -266,6 +279,36 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					tVal := v.(*uint)
 					*tVal = i
 				}
+			}
+		}
+
+		return n, nil
+	case mtFloat:
+		var n int
+		var err error
+
+		switch ti.Bits {
+		case 32:
+			var f float32
+			f, n, err = decWithNilCheck(data, v, ti, decFloat[float32])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*float32)
+				*tVal = f
+			}
+		default:
+			fallthrough
+		case 64:
+			var f float64
+			f, n, err = decWithNilCheck(data, v, ti, decFloat[float64])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*float64)
+				*tVal = f
 			}
 		}
 
