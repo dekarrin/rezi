@@ -1015,6 +1015,178 @@ func Test_Enc_Int(t *testing.T) {
 
 }
 
+func Test_Enc_Float(t *testing.T) {
+	var negZero64 = float64(0.0)
+	negZero64 *= -1.0
+	var negZero32 = float32(0.0)
+	negZero32 *= -1.0
+
+	testCases := []struct {
+		name   string
+		input  interface{}
+		expect []byte
+	}{
+		{name: "float64 0.0", input: float64(0.0), expect: []byte{0x00}},
+		{name: "float64 -0.0", input: negZero64, expect: []byte{0x80}},
+		{name: "float64 large pos mag", input: float64(2.02499999999999991118215802999), expect: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}},
+		{name: "float64 large neg mag", input: float64(-2.02499999999999991118215802999), expect: []byte{0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}},
+		{name: "float64 1.0", input: float64(1.0), expect: []byte{0x02, 0x3f, 0xf0}},
+		{name: "float64 256ish", input: float64(256.01220703125), expect: []byte{0x04, 0xc0, 0x70, 0x00, 0x32}},
+		{name: "float64 -1", input: float64(-1.0), expect: []byte{0x82, 0x3f, 0xf0}},
+		{name: "float64 -413.0", input: float64(-413.0), expect: []byte{0x82, 0xc0, 0x79, 0xd0}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+
+	t.Run("*int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *int
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 8
+			input    = &inputVal
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 8
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**int, but nil int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*uint (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *uint
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = uint(8)
+			input    = &inputVal
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = uint(8)
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x01, 0x08}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint, but nil uint part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *uint
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+}
+
 func Test_Enc_Bool(t *testing.T) {
 	testCases := []struct {
 		name   string
