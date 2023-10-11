@@ -1895,6 +1895,221 @@ func Test_Dec_Int(t *testing.T) {
 	})
 }
 
+func Test_Dec_Float(t *testing.T) {
+	var negZero64 = float64(0.0)
+	negZero64 *= -1.0
+	var negZero32 = float32(0.0)
+	negZero32 *= -1.0
+
+	type result struct {
+		val      interface{}
+		consumed int
+		err      bool
+	}
+
+	testCases := []struct {
+		name   string
+		input  []byte
+		expect result
+	}{
+		{name: "float64 0.0", input: []byte{0x00}, expect: result{val: float64(0.0), consumed: 1}},
+		{name: "float64 -0.0", input: []byte{0x80}, expect: result{val: negZero64}},
+		{name: "float64 wide pos", input: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}, expect: result{val: float64(2.02499999999999991118215802999), consumed: 9}},
+		{name: "float64 wide neg", input: []byte{0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}, expect: result{val: float64(-2.02499999999999991118215802999), consumed: 9}},
+		{name: "float64 1.0", input: []byte{0x02, 0x3f, 0xf0}, expect: result{val: float64(1.0), consumed: 3}},
+		{name: "float64 256ish", input: []byte{0x04, 0xc0, 0x70, 0x00, 0x32}, expect: result{val: float64(256.01220703125), consumed: 5}},
+		{name: "float64 -1.0", input: []byte{0x82, 0x3f, 0xf0}, expect: result{val: float64(-1.0), consumed: 3}},
+		{name: "float64 -413.0", input: []byte{0x83, 0xc0, 0x79, 0xd0}, expect: result{val: float64(-413.0), consumed: 4}},
+		{name: "float64 +inf", input: []byte{0x02, 0x7f, 0xf0}, expect: result{val: float64(math.Inf(0)), consumed: 3}},
+		{name: "float64 -inf", input: []byte{0x82, 0x7f, 0xf0}, expect: result{val: float64(math.Inf(-1)), consumed: 3}},
+
+		{name: "float32 0.0", input: []byte{0x00}, expect: result{val: float32(0.0), consumed: 1}},
+		{name: "float32 -0.0", input: []byte{0x80}, expect: result{val: negZero32, consumed: 1}},
+		{name: "float32 wide pos", input: []byte{0x05, 0xc0, 0x20, 0xc3, 0xae, 0x60}, expect: result{val: float32(8.38218975067138671875), consumed: 6}},
+		{name: "float32 wide neg", input: []byte{0x85, 0xc0, 0x20, 0xc3, 0xae, 0x60}, expect: result{val: float32(-8.38218975067138671875), consumed: 6}},
+		{name: "float32 1.0", input: []byte{0x02, 0x3f, 0xf0}, expect: result{val: float32(1.0), consumed: 3}},
+		{name: "float32 256ish", input: []byte{0x04, 0xc0, 0x70, 0x00, 0x32}, expect: result{val: float32(256.01220703125), consumed: 5}},
+		{name: "float32 -1.0", input: []byte{0x82, 0x3f, 0xf0}, expect: result{val: float32(-1.0), consumed: 3}},
+		{name: "float32 -413.0", input: []byte{0x83, 0xc0, 0x79, 0xd0}, expect: result{val: float32(-413.0), consumed: 4}},
+		{name: "float32 +inf", input: []byte{0x02, 0x7f, 0xf0}, expect: result{val: float32(math.Inf(0)), consumed: 3}},
+		{name: "float32 -inf", input: []byte{0x82, 0x7f, 0xf0}, expect: result{val: float32(math.Inf(-1)), consumed: 3}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			var actual result
+			var err error
+
+			// we are about to have type examination on our actual pointer
+			// be run, so we'd betta pass it the correct kind of ptr
+			switch tc.expect.val.(type) {
+			case float32:
+				var v float32
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case float64:
+				var v int64
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			default:
+				panic("bad test case")
+			}
+
+			if tc.expect.err {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+
+	// need multiple checks for NaN in particular - neg, qNaN, sNaN, whatever NaN.
+
+	/*
+		t.Run("*float32 (nil)", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				input  *float32
+				expect = []byte{0xa0}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("*float32", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				inputVal = float32(8.0)
+				input    = &inputVal
+				expect   = []byte{0x02, 0x40, 0x20}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("**float32", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				inputVal = float32(8)
+				inputPtr = &inputVal
+				input    = &inputPtr
+				expect   = []byte{0x02, 0x40, 0x20}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("**float32, but nil float32 part", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				ptr    *float32
+				input  = &ptr
+				expect = []byte{0xb0, 0x01, 0x01}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("*float64 (nil)", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				input  *float64
+				expect = []byte{0xa0}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("*float64", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				inputVal = float64(8.0)
+				input    = &inputVal
+				expect   = []byte{0x02, 0x40, 0x20}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("**float64", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				inputVal = float64(8)
+				inputPtr = &inputVal
+				input    = &inputPtr
+				expect   = []byte{0x02, 0x40, 0x20}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+
+		t.Run("**float64, but nil float64 part", func(t *testing.T) {
+			assert := assert.New(t)
+
+			var (
+				ptr    *float64
+				input  = &ptr
+				expect = []byte{0xb0, 0x01, 0x01}
+			)
+
+			actual, err := Enc(input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(expect, actual)
+		})
+	*/
+
+}
+
 func Test_Dec_Bool(t *testing.T) {
 	type result struct {
 		val      bool
