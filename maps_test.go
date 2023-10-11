@@ -27,6 +27,33 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	// TODO: also need a float64 as value in map
+	t.Run("map[float64]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = map[float64]int{0.25: 1, 8.5: 8}
+			expect = []byte{
+				0x01, 0x0a, // len=10
+
+				0x02, 0x3f, 0xd0, // 0.25
+				0x01, 0x01, // 1
+
+				0x02, 0x40, 0x21, // 8.5
+				0x01, 0x08, // 8
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("map[string]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)

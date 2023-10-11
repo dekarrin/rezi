@@ -2,6 +2,7 @@ package rezi
 
 import (
 	"encoding"
+	"fmt"
 	"reflect"
 )
 
@@ -23,6 +24,31 @@ const (
 	mtNil
 	mtFloat
 )
+
+func (mt mainType) String() string {
+	switch mt {
+	case mtUnknown:
+		return "mtUnknown"
+	case mtIntegral:
+		return "mtIntegral"
+	case mtBool:
+		return "mtBool"
+	case mtString:
+		return "mtString"
+	case mtBinary:
+		return "mtBinary"
+	case mtMap:
+		return "mtMap"
+	case mtSlice:
+		return "mtSlice"
+	case mtNil:
+		return "mtNil"
+	case mtFloat:
+		return "mtFloat"
+	default:
+		return fmt.Sprintf("mainType(%d)", mt)
+	}
+}
 
 // typeInfo holds REZI-specific type info on types that can be encoded and
 // decoded.
