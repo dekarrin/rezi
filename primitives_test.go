@@ -1062,147 +1062,141 @@ func Test_Enc_Float(t *testing.T) {
 		})
 	}
 
-	/*
-		// NaNs are special bc they only need an all-1's exp and non-zero mantissa; sign may or may not be set and is not important.
-		// decodes will need to check several varieties.
+	t.Run("*float32 (nil)", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("*int (nil)", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			input  *float32
+			expect = []byte{0xa0}
+		)
 
-			var (
-				input  *int
-				expect = []byte{0xa0}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("*float32", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("*int", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			inputVal = float32(8.0)
+			input    = &inputVal
+			expect   = []byte{0x02, 0x40, 0x20}
+		)
 
-			var (
-				inputVal = 8
-				input    = &inputVal
-				expect   = []byte{0x01, 0x08}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("**float32", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("**int", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			inputVal = float32(8)
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x02, 0x40, 0x20}
+		)
 
-			var (
-				inputVal = 8
-				inputPtr = &inputVal
-				input    = &inputPtr
-				expect   = []byte{0x01, 0x08}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("**float32, but nil float32 part", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("**int, but nil int part", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			ptr    *float32
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
 
-			var (
-				ptr    *int
-				input  = &ptr
-				expect = []byte{0xb0, 0x01, 0x01}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("*float64 (nil)", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("*uint (nil)", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			input  *float64
+			expect = []byte{0xa0}
+		)
 
-			var (
-				input  *uint
-				expect = []byte{0xa0}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("*float64", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("*uint", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			inputVal = float64(8.0)
+			input    = &inputVal
+			expect   = []byte{0x02, 0x40, 0x20}
+		)
 
-			var (
-				inputVal = uint(8)
-				input    = &inputVal
-				expect   = []byte{0x01, 0x08}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("**float64", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("**uint", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			inputVal = float64(8)
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x02, 0x40, 0x20}
+		)
 
-			var (
-				inputVal = uint(8)
-				inputPtr = &inputVal
-				input    = &inputPtr
-				expect   = []byte{0x01, 0x08}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
+		assert.Equal(expect, actual)
+	})
 
-			assert.Equal(expect, actual)
-		})
+	t.Run("**float64, but nil float64 part", func(t *testing.T) {
+		assert := assert.New(t)
 
-		t.Run("**uint, but nil uint part", func(t *testing.T) {
-			assert := assert.New(t)
+		var (
+			ptr    *float64
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
 
-			var (
-				ptr    *uint
-				input  = &ptr
-				expect = []byte{0xb0, 0x01, 0x01}
-			)
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
 
-			actual, err := Enc(input)
-			if !assert.NoError(err) {
-				return
-			}
-
-			assert.Equal(expect, actual)
-		})
-
-	*/
+		assert.Equal(expect, actual)
+	})
 
 }
 
