@@ -3,6 +3,7 @@ package rezi
 import (
 	"encoding"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -228,6 +229,126 @@ func Test_decInt(t *testing.T) {
 			}
 
 			assert.Equal(tc.expectValue, actualValue)
+			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+		})
+	}
+}
+
+func Test_decFloat(t *testing.T) {
+	// operation on an existing float64 var of 0 mult by -1.0 is only way we
+	// could find to reliably get a signed negative zero! glub
+
+	var negZero = float64(0.0)
+	negZero *= -1.0
+
+	testCases := []struct {
+		name       string
+		input      []byte
+		expect     float64
+		expectRead int
+		expectErr  bool
+	}{
+		{
+			name:       "zero - exact value",
+			input:      []byte{0x00},
+			expect:     0.0,
+			expectRead: 1,
+		},
+		{
+			name:       "signed negative zero - exact value",
+			input:      []byte{0x80},
+			expect:     negZero,
+			expectRead: 1,
+		},
+		{
+			name:       "1 - exact value",
+			input:      []byte{0x02, 0x3f, 0xf0},
+			expect:     1.0,
+			expectRead: 3,
+		},
+		{
+			name:       "-1 - exact value",
+			input:      []byte{0x82, 0x3f, 0xf0},
+			expect:     -1.0,
+			expectRead: 3,
+		},
+		{
+			name:       "pad from right - exact value",
+			input:      []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
+			expect:     256.01220703125,
+			expectRead: 5,
+		},
+		{
+			name:       "pad from right - sequence",
+			input:      []byte{0x04, 0xc0, 0x70, 0x00, 0x32, 0x04, 0xc0, 0x70, 0x00, 0x32},
+			expect:     256.01220703125,
+			expectRead: 5,
+		},
+		{
+			name:       "pad from left - exact value",
+			input:      []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00},
+			expect:     1.00000000000159161572810262442,
+			expectRead: 5,
+		},
+		{
+			name:       "pad from left - sequence",
+			input:      []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00, 0x04, 0x3f, 0xf0, 0x1c, 0x00},
+			expect:     1.00000000000159161572810262442,
+			expectRead: 5,
+		},
+		{
+			name:       "no padding possible - exact value",
+			input:      []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
+			expect:     2.02499999999999991118215802999,
+			expectRead: 9,
+		},
+		{
+			name:       "no padding possible - sequence",
+			input:      []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
+			expect:     2.02499999999999991118215802999,
+			expectRead: 9,
+		},
+		{
+			name:       "skip extension bytes - 0",
+			input:      []byte{0x40, 0xff, 0xbf},
+			expect:     0.0,
+			expectRead: 3,
+		},
+		{
+			name:       "skip extension bytes - negative 0",
+			input:      []byte{0xc0, 0xff, 0xbf},
+			expect:     negZero,
+			expectRead: 3,
+		},
+		{
+			name:       "skip extension bytes - 875.0",
+			input:      []byte{0x43, 0xff, 0xbf, 0xc0, 0x8b, 0x58},
+			expect:     875.0,
+			expectRead: 6,
+		},
+		{
+			name:      "error too short",
+			input:     []byte{0x03, 0x00, 0x01},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			expectBits := math.Float64bits(tc.expect)
+
+			actual, actualRead, err := decFloat[float64](tc.input)
+			if tc.expectErr {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+			actualBits := math.Float64bits(actual)
+
+			assert.Equal(tc.expect, actual, "float values differ")
+			assert.Equal(expectBits, actualBits, "bit values differ")
 			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
 		})
 	}

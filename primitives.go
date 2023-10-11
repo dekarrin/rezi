@@ -464,8 +464,7 @@ func encFloat[E anyFloat](v E) []byte {
 			hitLSBAfter++
 		}
 	}
-	var useLSBCompaction bool
-	useLSBCompaction = hitLSBAfter > hitMSBAfter
+	useLSBCompaction := hitLSBAfter > hitMSBAfter
 
 	// okay, now ready to start building encoded bytes
 
@@ -528,11 +527,12 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 
 	byteCount := data[0]
 
+	// special case single-byte 0's check
 	if byteCount == 0 {
+		return E(0.0), 1, nil
+	} else if byteCount == 0x80 {
 		var val float64
-		if byteCount&infoBitsSign == infoBitsSign {
-			val *= -1.0
-		}
+		val *= -1.0
 		return E(val), 1, nil
 	}
 
@@ -547,7 +547,7 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return 0.0, 0, err
+			return E(0.0), 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -558,11 +558,20 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 	data = data[1:]
 	numHeaderBytes++
 
+	// it could still have been a zero or neg zero. check now
+	if int(byteCount) == 0 {
+		var val float64
+		if negative {
+			val *= -1.0
+		}
+		return E(val), numHeaderBytes, nil
+	}
+
 	if int(byteCount) < 2 {
-		// the absolute minimum is 2
+		// the absolute minimum is 2 if not 0
 		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
 		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
-		return 0.0, 0, err
+		return E(0.0), 0, err
 	}
 
 	if len(data) < int(byteCount) {
@@ -574,7 +583,7 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 		}
 		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return 0.0, 0, err
+		return E(0.0), 0, err
 	}
 
 	floatData := data[:byteCount]
@@ -612,8 +621,8 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 	iVal |= (uint64(mantissaLows[1]) << 32)
 	iVal |= (uint64(mantissaLows[2]) << 24)
 	iVal |= (uint64(mantissaLows[3]) << 16)
-	iVal |= (uint64(mantissaLows[5]) << 8)
-	iVal |= (uint64(mantissaLows[6]))
+	iVal |= (uint64(mantissaLows[4]) << 8)
+	iVal |= (uint64(mantissaLows[5]))
 
 	fVal := math.Float64frombits(iVal)
 
