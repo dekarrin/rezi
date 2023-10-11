@@ -1913,7 +1913,7 @@ func Test_Dec_Float(t *testing.T) {
 		expect result
 	}{
 		{name: "float64 0.0", input: []byte{0x00}, expect: result{val: float64(0.0), consumed: 1}},
-		{name: "float64 -0.0", input: []byte{0x80}, expect: result{val: negZero64}},
+		{name: "float64 -0.0", input: []byte{0x80}, expect: result{val: negZero64, consumed: 1}},
 		{name: "float64 wide pos", input: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}, expect: result{val: float64(2.02499999999999991118215802999), consumed: 9}},
 		{name: "float64 wide neg", input: []byte{0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33}, expect: result{val: float64(-2.02499999999999991118215802999), consumed: 9}},
 		{name: "float64 1.0", input: []byte{0x02, 0x3f, 0xf0}, expect: result{val: float64(1.0), consumed: 3}},
@@ -1950,7 +1950,7 @@ func Test_Dec_Float(t *testing.T) {
 				actual.consumed, err = Dec(tc.input, &v)
 				actual.val = v
 			case float64:
-				var v int64
+				var v float64
 				actual.consumed, err = Dec(tc.input, &v)
 				actual.val = v
 			default:
@@ -1969,6 +1969,67 @@ func Test_Dec_Float(t *testing.T) {
 	}
 
 	// need multiple checks for NaN in particular - neg, qNaN, sNaN, whatever NaN.
+	t.Run("NaN", func(t *testing.T) {
+		assert := assert.New(t)
+
+		// NaN is all 1 exponent field and a non-zero mantissa. Try it.
+
+		// 0 11111111111 0000000000000000000000000000000000000000000000000001
+		// "sNaN"
+		input_sNaN := []byte{
+			0x03,
+			0x7f, 0xf0, // exponent and COMP
+			0x01, // compacted 1
+		}
+
+		// 0 11111111111 1000000000000000000000000000000000000000000000000001
+		// "qNaN"
+		input_qNaN := []byte{
+			0x08,
+			0x7f, 0xf8, // exponent and COMP
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+		}
+
+		// 1 11111111111 1000000000000000000000000000000000000000000000000001
+		// signed shouldn't matter
+		input_signedNaN := []byte{
+			0x88,
+			0x7f, 0xf8, // exponent and COMP
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+		}
+
+		// 0 11111111111 1111000011110000000000000000000000000000000000000000
+		// even an "irregular" NaN should be decoded as NaN
+		input_otherNaN := []byte{
+			0x03,
+			0xff, 0xff, // exponent and COMP
+			0x0f,
+		}
+
+		var n int
+		var err error
+		var f float64
+
+		n, err = Dec(input_sNaN, &f)
+		assert.NoError(err, "error decoding sNaN")
+		assert.Equal(len(input_sNaN), n, "sNaN did not decode expected len")
+		assert.True(math.IsNaN(f), "sNaN input did not decode to an NaN")
+
+		n, err = Dec(input_qNaN, &f)
+		assert.NoError(err, "error decoding qNaN")
+		assert.Equal(len(input_qNaN), n, "qNaN did not decode expected len")
+		assert.True(math.IsNaN(f), "qNaN input did not decode to an NaN")
+
+		n, err = Dec(input_signedNaN, &f)
+		assert.NoError(err, "error decoding signed NaN")
+		assert.Equal(len(input_signedNaN), n, "signed NaN did not decode expected len")
+		assert.True(math.IsNaN(f), "signed NaN input did not decode to an NaN")
+
+		n, err = Dec(input_otherNaN, &f)
+		assert.NoError(err, "error decoding other NaN")
+		assert.Equal(len(input_otherNaN), n, "other NaN did not decode expected len")
+		assert.True(math.IsNaN(f), "other NaN input did not decode to an NaN")
+	})
 
 	/*
 		t.Run("*float32 (nil)", func(t *testing.T) {
