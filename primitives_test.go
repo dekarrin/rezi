@@ -234,6 +234,67 @@ func Test_decInt(t *testing.T) {
 	}
 }
 
+func Test_encFloat(t *testing.T) {
+	// operation on an existing float64 var of 0 mult by -1.0 is only way we
+	// could find to reliably get a signed negative zero! glub
+
+	var negZero = float64(0.0)
+	negZero *= -1.0
+
+	testCases := []struct {
+		name   string
+		input  float64
+		expect []byte
+	}{
+		{
+			name:   "zero",
+			input:  0.0,
+			expect: []byte{0x00},
+		},
+		{
+			name:   "signed negative zero",
+			input:  negZero,
+			expect: []byte{0x80},
+		},
+		{
+			name:   "1",
+			input:  1.0,
+			expect: []byte{0x02, 0x3f, 0xf0},
+			// no LSB tag bc nothing to compact
+		},
+		{
+			name:   "-1",
+			input:  -1.0,
+			expect: []byte{0x82, 0x3f, 0xf0},
+		},
+		{
+			name:   "pad from right",
+			input:  256.01220703125,
+			expect: []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
+		},
+		{
+			name:   "pad from left",
+			input:  1.00000000000159161572810262442,
+			expect: []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00},
+		},
+		{
+			name:   "no padding possible",
+			input:  2.02499999999999991118215802999,
+			expect: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual := encFloat(tc.input)
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+}
+
 func Test_decFloat(t *testing.T) {
 	// operation on an existing float64 var of 0 mult by -1.0 is only way we
 	// could find to reliably get a signed negative zero! glub
@@ -350,67 +411,6 @@ func Test_decFloat(t *testing.T) {
 			assert.Equal(tc.expect, actual, "float values differ")
 			assert.Equal(expectBits, actualBits, "bit values differ")
 			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
-		})
-	}
-}
-
-func Test_encFloat(t *testing.T) {
-	// operation on an existing float64 var of 0 mult by -1.0 is only way we
-	// could find to reliably get a signed negative zero! glub
-
-	var negZero = float64(0.0)
-	negZero *= -1.0
-
-	testCases := []struct {
-		name   string
-		input  float64
-		expect []byte
-	}{
-		{
-			name:   "zero",
-			input:  0.0,
-			expect: []byte{0x00},
-		},
-		{
-			name:   "signed negative zero",
-			input:  negZero,
-			expect: []byte{0x80},
-		},
-		{
-			name:   "1",
-			input:  1.0,
-			expect: []byte{0x02, 0x3f, 0xf0},
-			// no LSB tag bc nothing to compact
-		},
-		{
-			name:   "-1",
-			input:  -1.0,
-			expect: []byte{0x82, 0x3f, 0xf0},
-		},
-		{
-			name:   "pad from right",
-			input:  256.01220703125,
-			expect: []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
-		},
-		{
-			name:   "pad from left",
-			input:  1.00000000000159161572810262442,
-			expect: []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00},
-		},
-		{
-			name:   "no padding possible",
-			input:  2.02499999999999991118215802999,
-			expect: []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert := assert.New(t)
-
-			actual := encFloat(tc.input)
-
-			assert.Equal(tc.expect, actual)
 		})
 	}
 }
