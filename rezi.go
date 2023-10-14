@@ -264,7 +264,7 @@
 //	Layout:
 //
 //	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
-//	 1 byte          1 byte            1 byte      1..6 bytes
+//	 1 byte          1 byte            1 byte      0..6 bytes
 //
 // A float value is encoded by taking the components of its representation in
 // IEEE-754 double-precision and encoding them across 1 to 9 bytes, using
@@ -297,7 +297,8 @@
 // of those 48 bits, whatever would make it more compact. The "C" bit being set
 // in the COMP-EXPONENT-HIGHS byte indicates that they are removed from the
 // right, otherwise they are removed from the left as in compaction of integer
-// values.
+// values. If all 48 low-order bits of the Mantissa are 0x00, they will all be
+// compacted and the entire float will take up only the initial three bytes.
 //
 // Note that the above compaction applies only to the 48 low-order bits of the
 // mantissa; the high 4 bits will always be present in the MIXED byte regardless
@@ -306,6 +307,18 @@
 // The value 0.0 (positive zero) is a special-case that is encoded as a single
 // 0x00 byte. The value -0.0 (negative zero) is also a special case, encoded as
 // a single 0x80 byte.
+//
+//	Complex Values
+//
+//	Layout:
+//	[ INFO ] [ EXT ] [ INT VALUE ] [ INFO ] [ FLOAT VALUE ] [ INFO ] [ FLOAT VALUE ]
+//	<-----------COUNT------------> <------REAL PART-------> <----IMAGINARY PART---->
+//	         2..10 bytes                  3..9 bytes               3..9 bytes
+//
+// Complex values are encoded as a count of bytes in the header bytes given as
+// an explicit byte count followed by that many bytes containing first the real
+// component and then the imaginary component in sequence, encoded as float
+// values.
 //
 //	String Values
 //
