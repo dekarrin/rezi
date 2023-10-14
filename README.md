@@ -189,16 +189,16 @@ able to read data written by any prior version of REZI.
 ### Supported Types
 
 At this time REZI supports the built-in types `bool`, `int`, `uint`, `int8`,
-`int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, and `string`.
-Additionally, any type that implements `encoding.BinaryMarshaler` can be
-encoded, and any type that implements `encoding.BinaryUnmarshaler` with a
-pointer receiver can be decoded. `float32`, `float64`, `complex64`, and
-`complex128` are not supported.
+`int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, `float64`,
+`float32`, and `string`. Additionally, any type that implements
+`encoding.BinaryMarshaler` can be encoded, and any type that implements
+`encoding.BinaryUnmarshaler` with a pointer receiver can be decoded.
+`complex64`, and `complex128` are not supported at this time.
 
 REZI supports slice types and map types whose values are of any supported type
 (including those whose values are themselves slice or map values). Maps must
-additionally have keys of type `string`, `bool`, or one of the integer types
-listed above.
+additionally have keys of type `string`, `bool`, one of the integer types
+listed above, or one of the float types listed above.
 
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.

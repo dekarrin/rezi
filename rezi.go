@@ -56,6 +56,10 @@
 //	}
 //	offset += n
 //
+// Alternatively, instead of calling Dec and Enc directly on a pre-loaded slice
+// of data bytes, the [Reader] and [Writer] types can be used to operate on a
+// stream of data. See the section below for more information.
+//
 // # Compression
 //
 // Compression can be enabled by passing a [Format] struct with Compression
@@ -111,20 +115,21 @@
 // # Supported Data Types
 //
 // REZI supports several built-in basic Go types: int (as well as all of its
-// unsigned and specific-size varieties), string, bool, and any type that
-// implements encoding.BinaryMarshaler (for encoding) or whose pointer type
-// implements encoding.BinaryUnmarshaler (for decoding). Implementations of
-// encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error
-// from a REZI function called from within UnmarshalBinary to supply additional
-// offset information, but this is not strictly required.
+// unsigned and specific-size varieties), float32, float64, string, bool, and
+// any type that implements encoding.BinaryMarshaler (for encoding) or whose
+// pointer type implements encoding.BinaryUnmarshaler (for decoding).
+// Implementations of encoding.BinaryUnmarshaler should use [Wrapf] when
+// encountering an error from a REZI function called from within UnmarshalBinary
+// to supply additional offset information, but this is not strictly required.
 //
-// Floating point types and complex types are not supported at this time,
-// although they may be added in a future release.
+// Complex types are not supported at this time, although they will be added in
+// a future release.
 //
 // Slices and maps are supported with some stipulations. Slices must contain
 // only other supported types (or pointers to them). Maps have the same
 // restrictions on their values, but only maps with a key type of string, int
-// (or any of its unsigned or specific-size varieties), or bool are supported.
+// (or any of its unsigned or specific-size varieties), float32, float64, or
+// bool are supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
