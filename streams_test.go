@@ -129,9 +129,11 @@ func Test_Writer_Enc(t *testing.T) {
 	}
 
 	strData := "NEPETA"
+	floatData := 256.01220703125
 	intData := 413
 	expect = []byte{
 		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+		0x04, 0xc0, 0x70, 0x00, 0x32,
 		0x02, 0x01, 0x9d,
 	}
 
@@ -139,8 +141,12 @@ func Test_Writer_Enc(t *testing.T) {
 	if !assert.NoError(err, "error writing first time") {
 		return
 	}
-	err = w.Enc(intData)
+	err = w.Enc(floatData)
 	if !assert.NoError(err, "error writing second time") {
+		return
+	}
+	err = w.Enc(intData)
+	if !assert.NoError(err, "error writing third time") {
 		return
 	}
 	w.Flush()
@@ -479,13 +485,17 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	var dest8BoolPtr *bool
 	expect8BoolPtr := nilRef[bool]()
 
+	input = append(input, 0x04, 0xc0, 0x70, 0x00, 0x32) // 256.01220703125
+	var dest9Float float64
+	expect9Float := 256.01220703125
+
 	input = append(input, // testBinary{data: "ABC", number: 8}
 		/* byte count = 8  */ 0x01, 0x08,
 		/*  data  (string) */ 0x41, 0x80, 0x03, 0x41, 0x42, 0x43, // "ABC"
 		/* number (int32)  */ 0x01, 0x08, // 8
 	)
-	var dest9Bin testBinary
-	expect9Bin := testBinary{number: 8, data: "ABC"}
+	var dest10Bin testBinary
+	expect10Bin := testBinary{number: 8, data: "ABC"}
 
 	r, err := NewReader(bytes.NewReader(input), nil)
 	if !assert.NoError(err, "creating Reader returned error") {
@@ -540,11 +550,17 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	}
 	assert.Equal(expect8BoolPtr, dest8BoolPtr, "dest8BoolPtr mismatch")
 
-	err = r.Dec(&dest9Bin)
+	err = r.Dec(&dest9Float)
 	if !assert.NoError(err) {
 		return
 	}
-	assert.Equal(expect9Bin, dest9Bin, "dest9Bin mismatch")
+	assert.Equal(expect9Float, dest9Float, "dest9Float mismatch")
+
+	err = r.Dec(&dest10Bin)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect10Bin, dest10Bin, "dest10Bin mismatch")
 
 }
 
@@ -650,6 +666,130 @@ func Test_Reader_Dec_int(t *testing.T) {
 		}
 
 		var dest **int
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
+
+func Test_Reader_Dec_float(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    float64
+		expectOff int
+		expectErr bool
+	}{
+		{
+			name:      "normal value - no compaction",
+			input:     []byte{0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33},
+			expect:    2.02499999999999991118215802999,
+			expectOff: 9,
+		},
+		{
+			name:      "normal value - LSB compaction",
+			input:     []byte{0x04, 0xc0, 0x70, 0x00, 0x32},
+			expect:    256.01220703125,
+			expectOff: 5,
+		},
+		{
+			name:      "normal value - MSB compaction",
+			input:     []byte{0x04, 0x3f, 0xf0, 0x1c, 0x00},
+			expect:    1.00000000000159161572810262442,
+			expectOff: 5,
+		},
+		{
+			// due to header sniffing for V1, this will fail if second byte has 0x80 bit set
+			name:      "skip extension bytes",
+			input:     []byte{0xc2, 0x7f, 0xbf, 0x3f, 0xf0},
+			expect:    -1.0,
+			expectOff: 5,
+		},
+		{
+			name:      "normal value - multi value",
+			input:     []byte{0x82, 0x3f, 0xf0, 0x82, 0x3f, 0xf0},
+			expect:    -1.0,
+			expectOff: 3,
+		},
+		{
+			// due to header sniffing for V1, this will fail if second byte has 0x80 bit set
+			name:      "skip extension bytes - multi value",
+			input:     []byte{0xc2, 0x7f, 0xbf, 0x3f, 0xf0, 0xc2, 0x7f, 0xbf, 0x3f, 0xf0},
+			expect:    -1.0,
+			expectOff: 5,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest float64
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - single indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x20}
+		expect := nilRef[float64]()
+		expectOff := 1
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *float64
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		expectPtr := nilRef[float64]()
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest **float64
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return

@@ -56,6 +56,10 @@
 //	}
 //	offset += n
 //
+// Alternatively, instead of calling Dec and Enc directly on a pre-loaded slice
+// of data bytes, the [Reader] and [Writer] types can be used to operate on a
+// stream of data. See the section below for more information.
+//
 // # Compression
 //
 // Compression can be enabled by passing a [Format] struct with Compression
@@ -111,20 +115,21 @@
 // # Supported Data Types
 //
 // REZI supports several built-in basic Go types: int (as well as all of its
-// unsigned and specific-size varieties), string, bool, and any type that
-// implements encoding.BinaryMarshaler (for encoding) or whose pointer type
-// implements encoding.BinaryUnmarshaler (for decoding). Implementations of
-// encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error
-// from a REZI function called from within UnmarshalBinary to supply additional
-// offset information, but this is not strictly required.
+// unsigned and specific-size varieties), float32, float64, string, bool, and
+// any type that implements encoding.BinaryMarshaler (for encoding) or whose
+// pointer type implements encoding.BinaryUnmarshaler (for decoding).
+// Implementations of encoding.BinaryUnmarshaler should use [Wrapf] when
+// encountering an error from a REZI function called from within UnmarshalBinary
+// to supply additional offset information, but this is not strictly required.
 //
-// Floating point types and complex types are not supported at this time,
-// although they may be added in a future release.
+// Complex types are not supported at this time, although they will be added in
+// a future release.
 //
 // Slices and maps are supported with some stipulations. Slices must contain
 // only other supported types (or pointers to them). Maps have the same
 // restrictions on their values, but only maps with a key type of string, int
-// (or any of its unsigned or specific-size varieties), or bool are supported.
+// (or any of its unsigned or specific-size varieties), float32, float64, or
+// bool are supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -243,14 +248,64 @@
 // negative integers). These bytes are then used as the INT VALUE.
 //
 // As a result of the above encoding, certain integer values can be encoded with
-// no bytes in INT VALUE at all; the 64-bit representation for 0 all 0x00's, and
-// therefore has no significant bytes. Likewise, the 64-bit representation for
-// -1 using two's complement representation is all 0xff's.
+// no bytes in INT VALUE at all; the 64-bit representation for 0 is all 0x00's,
+// and therefore has no significant bytes. Likewise, the 64-bit representation
+// for -1 using two's complement representation is all 0xff's. Both of these are
+// encoded by an INFO byte that gives a length of zero; distinguishing between
+// the two is done via the sign bit in the INFO byte.
 //
 // All Go integer types are encoded in the same way. This includes int, int8,
 // int16, int32, int64, uint, uint8, uint16, uint32, and uint64. The specific
 // interpretation into a value is handled at decoding time by infering the type
 // from the pointer passed to Enc.
+//
+//	Float Values
+//
+//	Layout:
+//
+//	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
+//	 1 byte          1 byte            1 byte      1..6 bytes
+//
+// A float value is encoded by taking the components of its representation in
+// IEEE-754 double-precision and encoding them across 1 to 9 bytes, using
+// compaction where possible. These components are a 1-bit sign, an 11-bit
+// exponent, and a 52-bit fraction (also known as the mantissa).
+//
+// Float values begin with an INFO byte. Assuming it does not denote a nil
+// value, the 4 L bits of the info byte give the number of bytes following all
+// header bytes that are used to encode the value, and the S bit represents
+// whether the value is negative, thus encoding the 1-bit sign.
+//
+// The INFO byte is followed by the COMP-EXPONENT-HIGHS byte. This contains two
+// fields, organized in the byte bits as CEEEEEEE. The first field is a 1-bit
+// flag, denoted by "C", that indicates whether compaction of the mantissa is
+// performed from the right or the left side. If set, it is from the right; if
+// not set, it is from the left. The remaining bits in the byte, denoted by "E",
+// are the 7 high-order bits of the exponent component of the represented value.
+//
+// The next byte is a MIXED byte containing two fields, organized in the byte
+// bits as EEEEMMMM. The first field, denoted by "E", contains the 4 lower-order
+// bits of the exponent. The second field, denoted by "MMMM", contains the 4
+// high-order bits of the mantissa.
+//
+// After the MIXED byte, the remaining 48 low-order bits of the mantissa are
+// encoded with compaction similar to that performed on integer values, but with
+// some modifications. First, only 0x00 bytes are removed from the
+// representation to compact them; 0xff bytes are never removed, as the mantissa
+// is itself is never represented as a two's complement negative value. Second,
+// consecutive 0x00 bytes may be removed from either the left or the right side
+// of those 48 bits, whatever would make it more compact. The "C" bit being set
+// in the COMP-EXPONENT-HIGHS byte indicates that they are removed from the
+// right, otherwise they are removed from the left as in compaction of integer
+// values.
+//
+// Note that the above compaction applies only to the 48 low-order bits of the
+// mantissa; the high 4 bits will always be present in the MIXED byte regardless
+// of their value.
+//
+// The value 0.0 (positive zero) is a special-case that is encoded as a single
+// 0x00 byte. The value -0.0 (negative zero) is also a special case, encoded as
+// a single 0x80 byte.
 //
 //	String Values
 //

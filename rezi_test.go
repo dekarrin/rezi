@@ -3,7 +3,6 @@ package rezi
 import (
 	"encoding"
 	"errors"
-	"fmt"
 	"io"
 	"testing"
 
@@ -171,6 +170,7 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 			ref(ref(uint(22))),
 			ref(ref(uint(208))),
 		},
+		frac: 0.8,
 		jobs: nil,
 		friend: &testNontrivial{
 			ptr: nil,
@@ -324,6 +324,7 @@ type testNontrivial struct {
 	goodNums map[int]bool
 	actions  []**uint
 	jobs     []string
+	frac     float64
 }
 
 func (tn testNontrivial) MarshalBinary() ([]byte, error) {
@@ -333,6 +334,7 @@ func (tn testNontrivial) MarshalBinary() ([]byte, error) {
 	enc = append(enc, MustEnc(tn.goodNums)...)
 	enc = append(enc, MustEnc(tn.actions)...)
 	enc = append(enc, MustEnc(tn.jobs)...)
+	enc = append(enc, MustEnc(tn.frac)...)
 	enc = append(enc, MustEnc(tn.friend)...)
 
 	return enc, nil
@@ -341,36 +343,43 @@ func (tn testNontrivial) MarshalBinary() ([]byte, error) {
 func (tn *testNontrivial) UnmarshalBinary(data []byte) error {
 	var err error
 	var n int
+	var offset int
 
 	newNontriv := testNontrivial{}
 
-	n, err = Dec(data, &newNontriv.ptr)
+	n, err = Dec(data[offset:], &newNontriv.ptr)
 	if err != nil {
-		return fmt.Errorf("ptr: %w", err)
+		return Wrapf(offset, "ptr: %s", err)
 	}
-	data = data[n:]
+	offset += n
 
-	n, err = Dec(data, &newNontriv.goodNums)
+	n, err = Dec(data[offset:], &newNontriv.goodNums)
 	if err != nil {
-		return fmt.Errorf("goodNums: %w", err)
+		return Wrapf(offset, "goodNums: %s", err)
 	}
-	data = data[n:]
+	offset += n
 
-	n, err = Dec(data, &newNontriv.actions)
+	n, err = Dec(data[offset:], &newNontriv.actions)
 	if err != nil {
-		return fmt.Errorf("actions: %w", err)
+		return Wrapf(offset, "actions: %s", err)
 	}
-	data = data[n:]
+	offset += n
 
-	n, err = Dec(data, &newNontriv.jobs)
+	n, err = Dec(data[offset:], &newNontriv.jobs)
 	if err != nil {
-		return fmt.Errorf("jobs: %w", err)
+		return Wrapf(offset, "jobs: %s", err)
 	}
-	data = data[n:]
+	offset += n
 
-	_, err = Dec(data, &newNontriv.friend)
+	n, err = Dec(data[offset:], &newNontriv.frac)
 	if err != nil {
-		return fmt.Errorf("friend: %w", err)
+		return Wrapf(offset, "frac: %s", err)
+	}
+	offset += n
+
+	_, err = Dec(data[offset:], &newNontriv.friend)
+	if err != nil {
+		return Wrapf(offset, "friend: %s", err)
 	}
 
 	*tn = newNontriv

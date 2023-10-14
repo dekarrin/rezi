@@ -8,6 +8,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"strings"
 	"unicode/utf8"
@@ -26,6 +27,13 @@ const (
 	// extension bit not listed because it is the same
 )
 
+// some constants for IEEE-754 float representation
+const (
+	ieee754NegativeBits = 0x8000000000000000
+	ieee754ExponentBits = 0x7ff0000000000000
+	ieee754MantissaBits = 0x000fffffffffffff
+)
+
 type anyUint interface {
 	uint | uint8 | uint16 | uint32 | uint64
 }
@@ -38,6 +46,12 @@ type anyInt interface {
 // allows int, uint, and all of their specifically-sized varieties.
 type integral interface {
 	anyInt | anyUint
+}
+
+// anyFloat is a union interface that combines float-types. It allows float32
+// and float64.
+type anyFloat interface {
+	float32 | float64
 }
 
 // encCheckedPrim encodes the primitve REZI value as rezi-format bytes. The type
@@ -104,6 +118,19 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 					return uint(r.Uint())
 				})
 			}
+		}
+	case mtFloat:
+		switch ti.Bits {
+		case 32:
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
+				return float32(r.Float())
+			})
+		default:
+			fallthrough
+		case 64:
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), func(r reflect.Value) float64 {
+				return r.Float()
+			})
 		}
 	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
@@ -256,6 +283,36 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 
 		return n, nil
+	case mtFloat:
+		var n int
+		var err error
+
+		switch ti.Bits {
+		case 32:
+			var f float32
+			f, n, err = decWithNilCheck(data, v, ti, decFloat[float32])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*float32)
+				*tVal = f
+			}
+		default:
+			fallthrough
+		case 64:
+			var f float64
+			f, n, err = decWithNilCheck(data, v, ti, decFloat[float64])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*float64)
+				*tVal = f
+			}
+		}
+
+		return n, nil
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
@@ -394,6 +451,239 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
+func encFloat[E anyFloat](v E) []byte {
+	// first off, if it is 0, than we can return special 0-value
+	if v == 0.0 {
+		if math.Signbit(float64(v)) {
+			return []byte{0x80}
+		} else {
+			return []byte{0x00}
+		}
+	}
+
+	i := math.Float64bits(float64(v))
+
+	// get its parts
+	signPart := i & ieee754NegativeBits
+	expoPart := i & ieee754ExponentBits
+	mantPart := i & ieee754MantissaBits
+
+	// sign is encoded into the count.
+	//
+	//
+	//	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
+	//  SXNILLLL     CEEEEEEE            EEEEMMMM  MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
+
+	// first, split the exponent part into 7-bits and 4-bits
+	expoHigh7 := byte((expoPart >> 56) & 0x7f)
+	expoLow4 := byte((expoPart >> 52) & 0x0f)
+
+	// next, split out the mantissa into 4-bits and 48 bits.
+	mantHigh4 := byte((mantPart >> 48) & 0x0f)
+	mantLow48b1 := byte((mantPart >> 40) & 0xff)
+	mantLow48b2 := byte((mantPart >> 32) & 0xff)
+	mantLow48b3 := byte((mantPart >> 24) & 0xff)
+	mantLow48b4 := byte((mantPart >> 16) & 0xff)
+	mantLow48b5 := byte((mantPart >> 8) & 0xff)
+	mantLow48b6 := byte(mantPart & 0xff)
+
+	// great, we now have all of our parts.
+
+	// analyze the mantissa
+	mantLow48 := []byte{mantLow48b1, mantLow48b2, mantLow48b3, mantLow48b4, mantLow48b5, mantLow48b6}
+	var hitMSBAfter int
+	for i := range mantLow48 {
+		if mantLow48[i] != 0x00 {
+			break
+		} else {
+			hitMSBAfter++
+		}
+	}
+	var hitLSBAfter int
+	for i := range mantLow48 {
+		if mantLow48[len(mantLow48)-(i+1)] != 0x00 {
+			break
+		} else {
+			hitLSBAfter++
+		}
+	}
+	useLSBCompaction := hitLSBAfter > hitMSBAfter
+
+	// okay, now ready to start building encoded bytes
+
+	// build COMP-EXPONENT-HIGHS byte CEEEEEEE
+	var compactionStyle byte = 0x00
+	if useLSBCompaction {
+		compactionStyle = 0x80
+	}
+
+	var compExpoHighs byte = compactionStyle | expoHigh7
+
+	// build MIXED byte EEEEMMMM
+	var mixed byte = (expoLow4 << 4) | mantHigh4
+
+	var encMantLows []byte
+	var hitSigByte bool
+	for i := range mantLow48 {
+		mantPart := mantLow48[i]
+		if useLSBCompaction {
+			mantPart = mantLow48[len(mantLow48)-(i+1)]
+		}
+
+		if hitSigByte {
+			if useLSBCompaction {
+				encMantLows = append([]byte{mantPart}, encMantLows...)
+			} else {
+				encMantLows = append(encMantLows, mantPart)
+			}
+		} else if mantPart != 0x00 {
+			hitSigByte = true
+			if useLSBCompaction {
+				encMantLows = append([]byte{mantPart}, encMantLows...)
+			} else {
+				encMantLows = append(encMantLows, mantPart)
+			}
+		}
+	}
+
+	// put it all into enc
+	enc := []byte{compExpoHighs, mixed}
+	enc = append(enc, encMantLows...)
+
+	byteCount := uint8(len(enc))
+
+	// byteCount will never be more than 8 so we can encode sign info in most
+	// significant bit
+	if signPart&ieee754NegativeBits == ieee754NegativeBits {
+		byteCount |= infoBitsSign
+	}
+
+	enc = append([]byte{byteCount}, enc...)
+
+	return enc
+}
+
+func decFloat[E anyFloat](data []byte) (E, int, error) {
+	if len(data) < 1 {
+		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+	}
+
+	byteCount := data[0]
+
+	// special case single-byte 0's check
+	if byteCount == 0 {
+		return E(0.0), 1, nil
+	} else if byteCount == 0x80 {
+		var val float64
+		val *= -1.0
+		return E(val), 1, nil
+	}
+
+	// pull count and sign out of byteCount
+	negative := byteCount&infoBitsSign != 0
+	byteCount &= infoBitsLen
+
+	// interpretation of other parts of the count header is handled in different
+	// functions. skip over all extension bytes
+	numHeaderBytes := 0
+	for data[0]&infoBitsExt != 0 {
+		if len(data[1:]) < 1 {
+			const errFmt = "count header indicates extension byte follows, but at end of data"
+			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			return E(0.0), 0, err
+		}
+		data = data[1:]
+		numHeaderBytes++
+	}
+
+	// done reading count header info; move past the last byte of it and
+	// interpret data bytes
+	data = data[1:]
+	numHeaderBytes++
+
+	// it could still have been a zero or neg zero. check now
+	if int(byteCount) == 0 {
+		var val float64
+		if negative {
+			val *= -1.0
+		}
+		return E(val), numHeaderBytes, nil
+	}
+
+	if int(byteCount) < 2 {
+		// the absolute minimum is 2 if not 0
+		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
+		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
+		return E(0.0), 0, err
+	}
+
+	if len(data) < int(byteCount) {
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return E(0.0), 0, err
+	}
+
+	floatData := data[:byteCount]
+	compExpoHighs := floatData[0]
+	mixed := floatData[1]
+	useLSBCompaction := compExpoHighs&0x80 == 0x80
+
+	// we are about to modify mantissaLows, possibly with append operations. we
+	// must therefore enshore we don't modify the underlying data storage of
+	// data. we will do this by copying into a new slice if we are about to do
+	// an append.
+	var mantissaLows []byte
+	if useLSBCompaction {
+		mantissaLows = make([]byte, len(floatData[2:]))
+		copy(mantissaLows, floatData[2:])
+	} else {
+		// otherwise, perfectly safe to start this as a slice-child of
+		// floatData.
+		mantissaLows = floatData[2:]
+	}
+
+	// put compacted other bytes back in
+	for len(mantissaLows) < 6 {
+		if useLSBCompaction {
+			mantissaLows = append(mantissaLows, 0x00)
+		} else {
+			mantissaLows = append([]byte{0x00}, mantissaLows...)
+		}
+	}
+
+	// now reconstruct original byte layout of the float
+	var signBit byte
+	if negative {
+		signBit = 0x80
+	}
+
+	compExpoHighs &= 0x7f
+	compExpoHighs |= signBit
+
+	// place complete result into a uint64 so we can send it to bit-based
+	// interpretation and to avoid logical shift semantics
+
+	var iVal uint64
+	iVal |= (uint64(compExpoHighs) << 56)
+	iVal |= (uint64(mixed) << 48)
+	iVal |= (uint64(mantissaLows[0]) << 40)
+	iVal |= (uint64(mantissaLows[1]) << 32)
+	iVal |= (uint64(mantissaLows[2]) << 24)
+	iVal |= (uint64(mantissaLows[3]) << 16)
+	iVal |= (uint64(mantissaLows[4]) << 8)
+	iVal |= (uint64(mantissaLows[5]))
+
+	fVal := math.Float64frombits(iVal)
+
+	return E(fVal), int(byteCount) + numHeaderBytes, nil
+}
+
 func encInt[E integral](v E) []byte {
 	if v == 0 {
 		return []byte{0x00}
@@ -498,8 +788,12 @@ func decInt[E integral](data []byte) (E, int, error) {
 		padByte = 0xff
 	}
 	for len(intData) < 8 {
-		// if we're negative, we need to pad with 0xff bytes, otherwise 0x00
+		// if we're negative, we need to pad with 0xff bytes, otherwise 0x00.
 		intData = append([]byte{padByte}, intData...)
+
+		// NOTE: this has no chance of modifying the original data slice bc it
+		// is appending to a brand new slice. if we were appending to the END,
+		// this could modify the underlying storage.
 	}
 
 	// keep value as uint until we return so we avoid logical shift semantics

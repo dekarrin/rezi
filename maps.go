@@ -58,12 +58,16 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 				return uint(u64v1) < uint(u64v2)
 			}
 		}
+	} else if smk.ti.Main == mtFloat {
+		f1 := smk.keys[i].Float()
+		f2 := smk.keys[j].Float()
+		return f1 < f2
 	} else if smk.ti.Main == mtString {
 		s1 := smk.keys[i].String()
 		s2 := smk.keys[j].String()
 		return s1 < s2
 	} else {
-		panic(fmt.Sprintf("invalid map type: %v", smk.ti.Main))
+		panic(fmt.Sprintf("invalid map key type: %v", smk.ti.Main))
 	}
 }
 
