@@ -1,6 +1,7 @@
 package rezi
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,6 +59,56 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 			expect = []byte{
 				0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
 				0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]float64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []float64{-2.02499999999999991118215802999, 256.01220703125, -1.0, math.Inf(0)}
+			expect = []byte{
+				0x01, 0x14, // len=20
+
+				0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, // -2.02499999999999991118215802999
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
+				0x02, 0x7f, 0xf0, // +Inf
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]float32", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []float32{8.38218975067138671875, 256.01220703125, -1.0, float32(math.Inf(-1))}
+			expect = []byte{
+				0x01, 0x11, // len=17
+
+				0x05, 0xc0, 0x20, 0xc3, 0xae, 0x60, // 8.38218975067138671875
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
+				0x82, 0x7f, 0xf0, // -Inf
 			}
 		)
 
@@ -966,6 +1017,64 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 
 		// execute
 		var actual []uint64
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]float64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x11, /* 0x14, // len=20*/
+
+				0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, // -2.02499999999999991118215802999
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x02, 0x7f, 0xf0, // +Inf
+				/*0x82, 0x3f, 0xf0, // -1.0 */
+			}
+			expect         = []float64{-2.02499999999999991118215802999, 256.01220703125, math.Inf(0) /*, -1.0*/}
+			expectConsumed = 22
+		)
+
+		// execute
+		var actual []float64
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]float32", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x11, // len=17
+
+				0x05, 0xc0, 0x20, 0xc3, 0xae, 0x60, // 8.38218975067138671875
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
+				0x82, 0x7f, 0xf0, // -Inf
+			}
+			expect         = []float32{8.38218975067138671875, 256.01220703125, -1.0, float32(math.Inf(-1))}
+			expectConsumed = 19
+		)
+
+		// execute
+		var actual []float32
 		consumed, err := Dec(input, &actual)
 
 		// assert

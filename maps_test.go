@@ -31,9 +31,12 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		// setup
 		assert := assert.New(t)
 		var (
-			input  = map[float64]int{0.25: 1, 8.5: 8}
+			input  = map[float64]int{0.25: 1, 8.5: 8, -1.0: 1}
 			expect = []byte{
-				0x01, 0x0a, // len=10
+				0x01, 0x0f, // len=15
+
+				0x82, 0x3f, 0xf0, // -1.0
+				0x01, 0x01, // 1
 
 				0x02, 0x3f, 0xd0, // 0.25
 				0x01, 0x01, // 1
@@ -1115,6 +1118,74 @@ func Test_Dec_Map_NoIndirection(t *testing.T) {
 			return
 		}
 
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[float64]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x82, 0x3f, 0xf0, // -1.0
+				0x01, 0x01, // 1
+
+				0x02, 0x3f, 0xd0, // 0.25
+				0x01, 0x01, // 1
+
+				0x02, 0x40, 0x21, // 8.5
+				0x01, 0x08, // 8
+			}
+			expect         = map[float64]int{0.25: 1, 8.5: 8, -1.0: 1}
+			expectConsumed = 17
+		)
+
+		// execute
+		var actual map[float64]int
+		consumed, err := Dec(input, &actual)
+
+		// asset
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]float64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x01, 0x01, // 1
+				0x02, 0x3f, 0xd0, // 0.25
+
+				0x01, 0x02, // 2
+				0x82, 0x3f, 0xf0, // -1.0
+
+				0x01, 0x08, // 8
+				0x02, 0x40, 0x21, // 8.5
+			}
+			expect         = map[int]float64{2: -1.0, 1: 0.25, 8: 8.5}
+			expectConsumed = 17
+		)
+
+		// execute
+		var actual map[int]float64
+		consumed, err := Dec(input, &actual)
+
+		// asset
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
