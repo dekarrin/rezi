@@ -48,10 +48,16 @@ type integral interface {
 	anyInt | anyUint
 }
 
-// anyFloat is a union interface that combines float-types. It allows float32
+// float is a union interface that combines float-types. It allows float32
 // and float64.
-type anyFloat interface {
+type float interface {
 	float32 | float64
+}
+
+// complex is a union interface that combines complex-types. It allows complex64
+// and complex128.
+type complex interface {
+	complex64 | complex128
 }
 
 // encCheckedPrim encodes the primitve REZI value as rezi-format bytes. The type
@@ -451,7 +457,26 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
-func encFloat[E anyFloat](v E) []byte {
+func encComplex[E complex](v E) []byte {
+	// go 1.18 compat
+	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
+	v128 := complex128(v)
+
+	rv := real(v128)
+	iv := imag(v128)
+
+	// first off, if both real and imaginary parts are positive 0.0, we can
+	// encode as special 0.0 value.
+	if rv == 0.0 {
+		if math.Signbit(float64(v)) {
+			return []byte{0x80}
+		} else {
+			return []byte{0x00}
+		}
+	}
+}
+
+func encFloat[E float](v E) []byte {
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
 		if math.Signbit(float64(v)) {
@@ -469,7 +494,6 @@ func encFloat[E anyFloat](v E) []byte {
 	mantPart := i & ieee754MantissaBits
 
 	// sign is encoded into the count.
-	//
 	//
 	//	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
 	//  SXNILLLL     CEEEEEEE            EEEEMMMM  MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
@@ -563,7 +587,7 @@ func encFloat[E anyFloat](v E) []byte {
 	return enc
 }
 
-func decFloat[E anyFloat](data []byte) (E, int, error) {
+func decFloat[E float](data []byte) (E, int, error) {
 	if len(data) < 1 {
 		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}

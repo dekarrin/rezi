@@ -261,32 +261,42 @@
 //
 //	Float Values
 //
-//	Layout:
+//	Full Layout:
 //
 //	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
 //	 1 byte          1 byte            1 byte      0..6 bytes
 //
-// A float value is encoded by taking the components of its representation in
-// IEEE-754 double-precision and encoding them across 1 to 9 bytes, using
-// compaction where possible. These components are a 1-bit sign, an 11-bit
-// exponent, and a 52-bit fraction (also known as the mantissa).
+//	Short-Form Layout:
 //
-// Float values begin with an INFO byte. Assuming it does not denote a nil
+//	[ INFO ]
+//	 1 byte
+//
+// A non-zero float value is encoded by taking the components of its
+// representation in IEEE-754 double-precision and encoding them across 1 to 9
+// bytes, using compaction where possible. These components are a 1-bit sign, an
+// 11-bit exponent, and a 52-bit fraction (also known as the mantissa). Float
+// values of 0.0 and -0.0 are instead encoded using an abbreviated "short-form"
+// that consists of only a single byte.
+//
+// All float values begin with an INFO byte. Assuming it does not denote a nil
 // value, the 4 L bits of the info byte give the number of bytes following all
 // header bytes that are used to encode the value, and the S bit represents
-// whether the value is negative, thus encoding the 1-bit sign.
+// whether the value is negative, thus encoding the 1-bit sign. If the L bits
+// give a non-zero value, the float value uses the full encoding layout; if the
+// L bits give a zero value, the float value uses the short-form.
 //
-// The INFO byte is followed by the COMP-EXPONENT-HIGHS byte. This contains two
-// fields, organized in the byte bits as CEEEEEEE. The first field is a 1-bit
-// flag, denoted by "C", that indicates whether compaction of the mantissa is
-// performed from the right or the left side. If set, it is from the right; if
-// not set, it is from the left. The remaining bits in the byte, denoted by "E",
-// are the 7 high-order bits of the exponent component of the represented value.
+// An INFO byte in full-form is followed by the COMP-EXPONENT-HIGHS byte. This
+// contains two fields, organized in the byte bits as CEEEEEEE. The first field
+// is a 1-bit flag, denoted by "C", that indicates whether compaction of the
+// mantissa is performed from the right or the left side. If set, it is from the
+// right; if not set, it is from the left. The remaining bits in the byte,
+// denoted by "E", are the 7 high-order bits of the exponent component of the
+// represented value.
 //
-// The next byte is a MIXED byte containing two fields, organized in the byte
-// bits as EEEEMMMM. The first field, denoted by "E", contains the 4 lower-order
-// bits of the exponent. The second field, denoted by "MMMM", contains the 4
-// high-order bits of the mantissa.
+// The next byte in full-form is a MIXED byte containing two fields, organized
+// in the byte bits as EEEEMMMM. The first field, denoted by "E", contains the 4
+// lower-order bits of the exponent. The second field, denoted by "MMMM",
+// contains the 4 high-order bits of the mantissa.
 //
 // After the MIXED byte, the remaining 48 low-order bits of the mantissa are
 // encoded with compaction similar to that performed on integer values, but with
@@ -304,9 +314,12 @@
 // mantissa; the high 4 bits will always be present in the MIXED byte regardless
 // of their value.
 //
-// The value 0.0 (positive zero) is a special-case that is encoded as a single
-// 0x00 byte. The value -0.0 (negative zero) is also a special case, encoded as
-// a single 0x80 byte.
+// Zero-valued floats, 0.0 and -0.0, are not encoded using the full layout
+// described above, but instead as special cases are encoded in a short-form
+// layout as a single INFO byte whose L bits are all set to 0. 0.0 is encoded in
+// as a single 0x00 byte, and -0.0 is encoded as a single 0x80 byte. These are
+// the only values of float that are encoded in short-form; all others use the
+// full form.
 //
 //	Complex Values
 //
@@ -315,28 +328,50 @@
 //	<-----------COUNT------------> <------REAL PART-------> <----IMAGINARY PART---->
 //	         2..10 bytes                  3..9 bytes               3..9 bytes
 //
-// Complex values are encoded as a count of bytes in the header bytes given as
-// an explicit byte count followed by that many bytes containing first the real
-// component and then the imaginary component in sequence, encoded as float
-// values.
+//	Short-Form Layout:
+//
+//	[ INFO ]
+//	 1 byte
+//
+// Complex values are, in general, encoded as a count of bytes in the header
+// bytes given as an explicit byte count followed by that many bytes containing
+// first the real component and then the imaginary component in sequence,
+// encoded as float values.
+//
+// As special cases, a complex value with a positive 0.0 real part and positive
+// 0.0 imaginary part is encoded using the short-form layout as only a single
+// info byte with a value of 0x00, and a complex value with a negative 0.0 real
+// part and negative 0.0 imaginary part is encoded as only a single info byte with a value of 0x80.
+// This only applies to values of (+0.0)+(+0.0)i and (-0.0)+(-0.0)i; there is no
+// special case for when both are zero but of opposite signs or for when one
+// part is some zero but the other part is not.
 //
 //	String Values
 //
-//	Layout:
+//	Full Layout:
 //
 //	[ INFO ] [ EXT ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
 //	<-----------COUNT------------> <------------CODEPOINTS----------->
 //	         2..10 bytes                       COUNT bytes
 //
+//	Short-Form Layout:
+//
+//	[ INFO ]
+//	 1 byte
+//
 // String values are encoded as a count of bytes in the info header section
 // followed by the Unicode codepoints that make up the string encoded using
-// UTF-8.
+// UTF-8. Non-empty strings will use the full layout; an empty string will use
+// the abbreviated short-form layout.
 //
-// Additionally, a string value's first info byte will have its extension bit
-// set and will indicate explicitly that it uses a byte-based count in the
-// extension byte that follows. This is to distinguish it from the older style
+// A non-empty string value's first info byte will have its extension bit set
+// and will indicate explicitly that it uses a byte-based count in the
+// extension byte that follows. This is to distinguish it from older-style (V0)
 // string encodings, which encoded data length as the count of codepoints rather
 // than bytes.
+//
+// Ann empty string is encoded using the short-form layout as a single info
+// byte, 0x00.
 //
 //	encoding.BinaryMarshaler Values
 //
