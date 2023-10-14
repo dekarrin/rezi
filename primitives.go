@@ -632,9 +632,21 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 	floatData := data[:byteCount]
 	compExpoHighs := floatData[0]
 	mixed := floatData[1]
-	mantissaLows := floatData[2:]
-
 	useLSBCompaction := compExpoHighs&0x80 == 0x80
+
+	// we are about to modify mantissaLows, possibly with append operations. we
+	// must therefore enshore we don't modify the underlying data storage of
+	// data. we will do this by copying into a new slice if we are about to do
+	// an append.
+	var mantissaLows []byte
+	if useLSBCompaction {
+		mantissaLows = make([]byte, len(floatData[2:]))
+		copy(mantissaLows, floatData[2:])
+	} else {
+		// otherwise, perfectly safe to start this as a slice-child of
+		// floatData.
+		mantissaLows = floatData[2:]
+	}
 
 	// put compacted other bytes back in
 	for len(mantissaLows) < 6 {
@@ -776,8 +788,12 @@ func decInt[E integral](data []byte) (E, int, error) {
 		padByte = 0xff
 	}
 	for len(intData) < 8 {
-		// if we're negative, we need to pad with 0xff bytes, otherwise 0x00
+		// if we're negative, we need to pad with 0xff bytes, otherwise 0x00.
 		intData = append([]byte{padByte}, intData...)
+
+		// NOTE: this has no chance of modifying the original data slice bc it
+		// is appending to a brand new slice. if we were appending to the END,
+		// this could modify the underlying storage.
 	}
 
 	// keep value as uint until we return so we avoid logical shift semantics
