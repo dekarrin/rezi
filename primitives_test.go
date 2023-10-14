@@ -1968,6 +1968,23 @@ func Test_Dec_Float(t *testing.T) {
 		})
 	}
 
+	// rly weird case we need a specific test to debug
+	t.Run("Sequential 'weird values' do not corrupt data", func(t *testing.T) {
+		assert := assert.New(t)
+
+		input := []byte{
+			0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+			0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+		}
+
+		var dest float64
+		n, err := Dec(input, &dest)
+		assert.NoError(err)
+
+		assert.Equal(256.01220703125, dest, "read bad")
+		assert.Equal([]byte{0x04, 0xc0, 0x70, 0x00, 0x32}, input[n:], "read corrupted data")
+	})
+
 	// need multiple checks for NaN in particular - neg, qNaN, sNaN, whatever NaN.
 	t.Run("NaN", func(t *testing.T) {
 		assert := assert.New(t)

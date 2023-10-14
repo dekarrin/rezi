@@ -1033,14 +1033,14 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 		assert := assert.New(t)
 		var (
 			input = []byte{
-				0x01, 0x11, /* 0x14, // len=20*/
+				0x01, 0x14, // len=20
 
 				0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, // -2.02499999999999991118215802999
 				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
 				0x02, 0x7f, 0xf0, // +Inf
-				/*0x82, 0x3f, 0xf0, // -1.0 */
 			}
-			expect         = []float64{-2.02499999999999991118215802999, 256.01220703125, math.Inf(0) /*, -1.0*/}
+			expect         = []float64{-2.02499999999999991118215802999, 256.01220703125, -1.0, math.Inf(0)}
 			expectConsumed = 22
 		)
 
