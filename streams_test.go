@@ -129,9 +129,11 @@ func Test_Writer_Enc(t *testing.T) {
 	}
 
 	strData := "NEPETA"
+	floatData := 256.01220703125
 	intData := 413
 	expect = []byte{
 		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+		0x04, 0xc0, 0x70, 0x00, 0x32,
 		0x02, 0x01, 0x9d,
 	}
 
@@ -139,8 +141,12 @@ func Test_Writer_Enc(t *testing.T) {
 	if !assert.NoError(err, "error writing first time") {
 		return
 	}
-	err = w.Enc(intData)
+	err = w.Enc(floatData)
 	if !assert.NoError(err, "error writing second time") {
+		return
+	}
+	err = w.Enc(intData)
+	if !assert.NoError(err, "error writing third time") {
 		return
 	}
 	w.Flush()
