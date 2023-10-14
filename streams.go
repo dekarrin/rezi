@@ -511,7 +511,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		}
 		remByteCount = count
 		totalRead += (n - len(hdrBytes))
-	} else if info.Main != mtIntegral {
+	} else if info.Main != mtIntegral && info.Main != mtFloat {
 		// for non-ints, we need to load the rest of the integer ourselves, then
 		// remByteCount is the value of THAT
 		intBytes, err := r.loadBytes(hdr.Length)
