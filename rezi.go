@@ -454,9 +454,7 @@
 // REZI library versions prior to v2.1.0 encode string data length as the number
 // of Unicode codepoints rather than the number of bytes and do so in the info
 // byte with no info extension byte. These strings can be decoded as normal with
-// [Dec], but are not compatible with [Reader] as it relies on byte-based counts
-// to function properly and make predictions about how many bytes must be read
-// from the underlying data stream.
+// [Dec] and [Reader.Dec].
 package rezi
 
 import (
