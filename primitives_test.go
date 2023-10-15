@@ -415,6 +415,216 @@ func Test_decFloat(t *testing.T) {
 	}
 }
 
+func Test_encComplex(t *testing.T) {
+	// operation on an existing float64 var of 0 mult by -1.0 is only way we
+	// could find to reliably get a signed negative zero! glub
+
+	var negZero = float64(0.0)
+	negZero *= -1.0
+
+	testCases := []struct {
+		name   string
+		input  complex128
+		expect []byte
+	}{
+		{
+			name:   "zeros",
+			input:  complex(0.0, 0.0),
+			expect: []byte{0x00},
+		},
+		{
+			name:   "signed negative zeros",
+			input:  complex(negZero, negZero),
+			expect: []byte{0x80},
+		},
+		{
+			name:  "mixed signed zeros",
+			input: complex(negZero, 0.0),
+			expect: []byte{
+				0x41, 0x80, 0x02, // (explicit byte count) len=2
+
+				0x80, // (-0.0)
+				0x00, // 0.0i
+			},
+		},
+		{
+			name:  "mixed signed zeros (flipped)",
+			input: complex(0.0, negZero),
+			expect: []byte{
+				0x41, 0x80, 0x02, // (explicit byte count) len=2
+
+				0x00, // 0.0
+				0x80, // (-0.0)i
+			},
+		},
+		{
+			name:  "1.0",
+			input: 1.0,
+			expect: []byte{
+				0x41, 0x80, 0x04, // (explicit byte count) len=4
+
+				0x02, 0x3f, 0xf0, // 1.0
+				0x00, // 0.0i
+			},
+		},
+		{
+			name:  "1.0i",
+			input: 1.0i,
+			expect: []byte{
+				0x41, 0x80, 0x04, // (explicit byte count) len=4
+
+				0x00,             // 0.0
+				0x02, 0x3f, 0xf0, // 1.0i
+			},
+		},
+		{
+			name:  "valued r and i parts",
+			input: -1.0 + 8.25i,
+			expect: []byte{
+				0x41, 0x80, 0x07, // (explicit byte count) len=7
+
+				0x82, 0x3f, 0xf0, // -1.0
+				0x03, 0xc0, 0x20, 0x80, // 8.25i
+			},
+		},
+		{
+			name:  "largest possible",
+			input: 2.02499999999999991118215802999 + 2.02499999999999991118215802999i,
+			expect: []byte{
+				0x41, 0x80, 0x12, // (explicit byte count) len=18
+
+				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual := encComplex(tc.input)
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+}
+
+func Test_decComplex(t *testing.T) {
+	// operation on an existing float64 var of 0 mult by -1.0 is only way we
+	// could find to reliably get a signed negative zero! glub
+
+	var negZero = float64(0.0)
+	negZero *= -1.0
+
+	testCases := []struct {
+		name       string
+		input      []byte
+		expect     complex128
+		expectRead int
+		expectErr  bool
+	}{
+		{
+			name:       "zeros",
+			input:      []byte{0x00},
+			expect:     complex(0.0, 0.0),
+			expectRead: 1,
+		},
+		{
+			name:       "signed negative zeros",
+			input:      []byte{0x80},
+			expect:     complex(negZero, negZero),
+			expectRead: 1,
+		},
+		{
+			name: "mixed signed zeros",
+			input: []byte{
+				0x41, 0x80, 0x02, // (explicit byte count) len=2
+
+				0x80, // (-0.0)
+				0x00, // 0.0i
+			},
+			expect:     complex(negZero, 0.0),
+			expectRead: 5,
+		},
+		{
+			name:  "mixed signed zeros (flipped)",
+			input: complex(0.0, negZero),
+			expect: []byte{
+				0x41, 0x80, 0x02, // (explicit byte count) len=2
+
+				0x00, // 0.0
+				0x80, // (-0.0)i
+			},
+		},
+		{
+			name:  "1.0",
+			input: 1.0,
+			expect: []byte{
+				0x41, 0x80, 0x04, // (explicit byte count) len=4
+
+				0x02, 0x3f, 0xf0, // 1.0
+				0x00, // 0.0i
+			},
+		},
+		{
+			name:  "1.0i",
+			input: 1.0i,
+			expect: []byte{
+				0x41, 0x80, 0x04, // (explicit byte count) len=4
+
+				0x00,             // 0.0
+				0x02, 0x3f, 0xf0, // 1.0i
+			},
+		},
+		{
+			name:  "valued r and i parts",
+			input: -1.0 + 8.25i,
+			expect: []byte{
+				0x41, 0x80, 0x07, // (explicit byte count) len=7
+
+				0x82, 0x3f, 0xf0, // -1.0
+				0x03, 0xc0, 0x20, 0x80, // 8.25i
+			},
+		},
+		{
+			name:  "largest possible",
+			input: 2.02499999999999991118215802999 + 2.02499999999999991118215802999i,
+			expect: []byte{
+				0x41, 0x80, 0x12, // (explicit byte count) len=18
+
+				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+			},
+		},
+	}
+
+	// TODO: add sequential cases, ERR cases
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+			expectRBits := math.Float64bits(real(tc.expect))
+			expectIBits := math.Float64bits(imag(tc.expect))
+
+			actual, actualRead, err := decComplex[complex128](tc.input)
+			if tc.expectErr {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+			actualRBits := math.Float64bits(real(actual))
+			actualIBits := math.Float64bits(imag(actual))
+
+			assert.Equal(tc.expect, actual, "complex values differ")
+			assert.Equal(expectRBits, actualRBits, "real-part bit values differ")
+			assert.Equal(expectIBits, actualIBits, "real-part bit values differ")
+			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+		})
+	}
+}
+
 func Test_encString(t *testing.T) {
 	testCases := []struct {
 		name   string
