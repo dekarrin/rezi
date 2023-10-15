@@ -341,10 +341,10 @@
 // As special cases, a complex value with a positive 0.0 real part and positive
 // 0.0 imaginary part is encoded using the short-form layout as only a single
 // info byte with a value of 0x00, and a complex value with a negative 0.0 real
-// part and negative 0.0 imaginary part is encoded as only a single info byte with a value of 0x80.
-// This only applies to values of (+0.0)+(+0.0)i and (-0.0)+(-0.0)i; there is no
-// special case for when both are zero but of opposite signs or for when one
-// part is some zero but the other part is not.
+// part and negative 0.0 imaginary part is encoded as only a single info byte
+// with a value of 0x80. This only applies to values of (+0.0)+(+0.0)i and
+// (-0.0)+(-0.0)i; there is no special case for when both are zero but of
+// opposite signs or for when one part is some zero but the other part is not.
 //
 //	String Values
 //

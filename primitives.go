@@ -48,15 +48,15 @@ type integral interface {
 	anyInt | anyUint
 }
 
-// float is a union interface that combines float-types. It allows float32
+// anyFloat is a union interface that combines anyFloat-types. It allows float32
 // and float64.
-type float interface {
+type anyFloat interface {
 	float32 | float64
 }
 
-// complex is a union interface that combines complex-types. It allows complex64
+// anyComplex is a union interface that combines anyComplex-types. It allows complex64
 // and complex128.
-type complex interface {
+type anyComplex interface {
 	complex64 | complex128
 }
 
@@ -457,26 +457,106 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
-func encComplex[E complex](v E) []byte {
-	// go 1.18 compat
+func encComplex[E anyComplex](v E) []byte {
+	// go 1.18 compat, real() and imag() cannot be done to our E type
+	//
 	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
 	v128 := complex128(v)
 
 	rv := real(v128)
 	iv := imag(v128)
 
-	// first off, if both real and imaginary parts are positive 0.0, we can
-	// encode as special 0.0 value.
-	if rv == 0.0 {
-		if math.Signbit(float64(v)) {
+	// first off, if both real and imaginary parts are +/-0.0, we can encode as
+	// single-byte values
+	if rv == 0.0 && iv == 0.0 {
+		if math.Signbit(rv) && math.Signbit(iv) {
 			return []byte{0x80}
-		} else {
+		} else if !math.Signbit(rv) && !math.Signbit(iv) {
 			return []byte{0x00}
 		}
 	}
+
+	// encode the parts
+	realEnc := encFloat(rv)
+	imagEnc := encFloat(iv)
+
+	hdrEnc := encCount(len(realEnc)+len(imagEnc), &countHeader{ByteLength: true})
+
+	enc := hdrEnc
+	enc = append(enc, realEnc...)
+	enc = append(enc, imagEnc...)
+
+	return enc
 }
 
-func encFloat[E float](v E) []byte {
+func decComplex[E anyComplex](data []byte) (E, int, error) {
+	if len(data) < 1 {
+		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+	}
+
+	// special case single-byte 0's check
+	if data[0] == 0x00 {
+		return E(0.0 + 0.0i), 1, nil
+	} else if data[0] == 0x80 {
+		// only way to reliably get a -0.0 value is by direct calculation on var
+		// (cannot be result of consts, I tried, at least as of Go 1.19.4)
+		var val float64
+		val *= -1.0
+		return E(complex(val, val)), 1, nil
+	}
+
+	// do normal decoding of full-form
+	var n int
+	var err error
+	var offset int
+	var byteCount tLen
+	var rPart float64
+	var iPart float64
+
+	// get the byte count as an int
+	byteCount, n, err = decInt[tLen](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, err
+	}
+	offset += n
+
+	// count check
+	if len(data[offset:]) < byteCount {
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return E(0.0 + 0.0i), 0, err
+	}
+
+	// clamp data to len
+	data = data[:offset+byteCount]
+
+	// real part
+	rPart, n, err = decFloat[float64](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+	}
+	offset += n
+
+	// imaginary part
+	iPart, n, err = decFloat[float64](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+	}
+	offset += n
+
+	var v128 complex128
+	v128 = complex(rPart, iPart)
+
+	return E(v128), offset, nil
+}
+
+func encFloat[E anyFloat](v E) []byte {
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
 		if math.Signbit(float64(v)) {
@@ -587,7 +667,7 @@ func encFloat[E float](v E) []byte {
 	return enc
 }
 
-func decFloat[E float](data []byte) (E, int, error) {
+func decFloat[E anyFloat](data []byte) (E, int, error) {
 	if len(data) < 1 {
 		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -883,7 +963,7 @@ func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	strLength, countLen, err := decInt[int](data)
+	strLength, countLen, err := decInt[tLen](data)
 	if err != nil {
 		return "", 0, errorDecf(0, "decode string byte count: %s", err)
 	}
