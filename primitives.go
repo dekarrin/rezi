@@ -93,9 +93,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), func(r reflect.Value) int64 {
-					return int64(r.Int())
-				})
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), reflect.Value.Int)
 			default:
 				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
@@ -116,9 +114,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), func(r reflect.Value) uint64 {
-					return uint64(r.Uint())
-				})
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
 			default:
 				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
@@ -134,9 +130,18 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 		default:
 			fallthrough
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), func(r reflect.Value) float64 {
-				return r.Float()
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
+		}
+	case mtComplex:
+		switch ti.Bits {
+		case 64:
+			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
+				return complex64(r.Complex())
 			})
+		default:
+			fallthrough
+		case 128:
+			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
 		}
 	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
@@ -315,6 +320,36 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			if ti.Indir == 0 {
 				tVal := v.(*float64)
 				*tVal = f
+			}
+		}
+
+		return n, nil
+	case mtComplex:
+		var n int
+		var err error
+
+		switch ti.Bits {
+		case 64:
+			var c complex64
+			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex64])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*complex64)
+				*tVal = c
+			}
+		default:
+			fallthrough
+		case 128:
+			var c complex128
+			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex128])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*complex128)
+				*tVal = c
 			}
 		}
 
@@ -550,8 +585,7 @@ func decComplex[E anyComplex](data []byte) (E, int, error) {
 	}
 	offset += n
 
-	var v128 complex128
-	v128 = complex(rPart, iPart)
+	var v128 complex128 = complex(rPart, iPart)
 
 	return E(v128), offset, nil
 }
