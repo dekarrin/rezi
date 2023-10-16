@@ -548,58 +548,66 @@ func Test_decComplex(t *testing.T) {
 			expectRead: 5,
 		},
 		{
-			name:  "mixed signed zeros (flipped)",
-			input: complex(0.0, negZero),
-			expect: []byte{
+			name: "mixed signed zeros (flipped)",
+			input: []byte{
 				0x41, 0x80, 0x02, // (explicit byte count) len=2
 
 				0x00, // 0.0
 				0x80, // (-0.0)i
 			},
+			expect:     complex(0.0, negZero),
+			expectRead: 5,
 		},
 		{
-			name:  "1.0",
-			input: 1.0,
-			expect: []byte{
+			name: "1.0",
+			input: []byte{
 				0x41, 0x80, 0x04, // (explicit byte count) len=4
 
 				0x02, 0x3f, 0xf0, // 1.0
 				0x00, // 0.0i
 			},
+			expect:     1.0,
+			expectRead: 7,
 		},
 		{
-			name:  "1.0i",
-			input: 1.0i,
-			expect: []byte{
+			name: "1.0i",
+			input: []byte{
 				0x41, 0x80, 0x04, // (explicit byte count) len=4
 
 				0x00,             // 0.0
 				0x02, 0x3f, 0xf0, // 1.0i
 			},
+			expect:     1.0i,
+			expectRead: 7,
 		},
 		{
-			name:  "valued r and i parts",
-			input: -1.0 + 8.25i,
-			expect: []byte{
+			name: "valued r and i parts",
+			input: []byte{
 				0x41, 0x80, 0x07, // (explicit byte count) len=7
 
 				0x82, 0x3f, 0xf0, // -1.0
 				0x03, 0xc0, 0x20, 0x80, // 8.25i
 			},
+			expect:     -1.0 + 8.25i,
+			expectRead: 10,
 		},
 		{
-			name:  "largest possible",
-			input: 2.02499999999999991118215802999 + 2.02499999999999991118215802999i,
-			expect: []byte{
+			name: "largest possible",
+			input: []byte{
 				0x41, 0x80, 0x12, // (explicit byte count) len=18
 
 				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
 				0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
 			},
+			expect:     2.02499999999999991118215802999 + 2.02499999999999991118215802999i,
+			expectRead: 21,
+		},
+		{
+			name:      "error too short",
+			input:     []byte{0x03, 0x00, 0x01},
+			expectErr: true,
 		},
 	}
-
-	// TODO: add sequential cases, ERR cases
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
