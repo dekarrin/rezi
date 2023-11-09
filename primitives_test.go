@@ -1430,6 +1430,7 @@ func Test_Enc_Complex(t *testing.T) {
 	}{
 		{name: "complex128 0.0+0.0i", input: complex128(0.0), expect: []byte{0x00}},
 		{name: "complex128 (-0.0)+(-0.0)i", input: complex128(complex(negZero64, negZero64)), expect: []byte{0x80}},
+		{name: "complex128 (-0.0)+0.0i", input: complex128(complex(negZero64, 0.0)), expect: []byte{0x41, 0x80, 0x02, 0x80, 0x00}},
 		{name: "complex128 wide pos real", input: complex128(2.02499999999999991118215802999 + 1.0i), expect: []byte{0x41, 0x80, 0x0c /*=len*/, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/}},
 		{name: "complex128 wide neg imag", input: complex128(1.0 + -2.02499999999999991118215802999i), expect: []byte{0x41, 0x80, 0x0c /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=imag*/}},
 		{name: "complex128 1.0", input: complex128(1.0), expect: []byte{0x41, 0x80, 0x04 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x00 /*=imag*/}},
@@ -2594,6 +2595,238 @@ func Test_Dec_Float(t *testing.T) {
 		)
 
 		var actual **float64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+}
+
+func Test_Dec_Complex(t *testing.T) {
+	var negZero64 = float64(0.0)
+	negZero64 *= -1.0
+	var negZero32 = float32(0.0)
+	negZero32 *= -1.0
+
+	type result struct {
+		val      interface{}
+		consumed int
+		err      bool
+	}
+
+	testCases := []struct {
+		name   string
+		input  []byte
+		expect result
+	}{
+		{name: "complex128 0.0+0.0i", input: []byte{0x00}, expect: result{val: complex128(0.0), consumed: 1}},
+		{name: "complex128 (-0.0)+(-0.0)i", input: []byte{0x80}, expect: result{val: complex128(complex(negZero64, negZero64)), consumed: 1}},
+		{name: "complex128 (-0.0)+0.0i", input: []byte{0x41, 0x80, 0x02, 0x80, 0x00}, expect: result{val: complex128(complex(negZero64, 0.0)), consumed: 5}},
+		{name: "complex128 wide pos real", input: []byte{0x41, 0x80, 0x0c /*=len*/, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex128(2.02499999999999991118215802999 + 1.0i), consumed: 15}},
+		{name: "complex128 wide neg imag", input: []byte{0x41, 0x80, 0x0c /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=imag*/}, expect: result{val: complex128(1.0 + -2.02499999999999991118215802999i), consumed: 15}},
+		{name: "complex128 1.0", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x00 /*=imag*/}, expect: result{val: complex128(1.0), consumed: 7}},
+		{name: "complex128 8.25 + 256ish", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x03, 0xc0, 0x20, 0x80 /*=real*/, 0x04, 0xc0, 0x70, 0x00, 0x32 /*=imag*/}, expect: result{val: complex128(8.25 + 256.01220703125i), consumed: 12}},
+		{name: "complex128 -1.0i", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x00 /*=real*/, 0x82, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex128(-1.0i), consumed: 7}},
+		{name: "complex128 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex128(-413.0 + 8.25i), consumed: 7}},
+
+		{name: "complex64 0.0+0.0i", input: []byte{0x00}, expect: result{val: complex64(0.0), consumed: 1}},
+		{name: "complex64 (-0.0)+(-0.0)i", input: []byte{0x80}, expect: result{val: complex64(complex(negZero32, negZero32)), consumed: 1}},
+		{name: "complex64 (-0.0)+0.0i", input: []byte{0x41, 0x80, 0x02, 0x80, 0x00}, expect: result{val: complex64(complex(negZero32, 0.0)), consumed: 5}},
+		{name: "complex64 wide pos real", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x05, 0xc0, 0x20, 0xc3, 0xae, 0x60 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex64(8.38218975067138671875 + 1.0i), consumed: 12}},
+		{name: "complex64 wide neg imag", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x85, 0xc0, 0x20, 0xc3, 0xae, 0x60 /*=imag*/}, expect: result{val: complex64(1.0 + -8.38218975067138671875i), consumed: 12}},
+		{name: "complex64 1.0", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x00 /*=imag*/}, expect: result{val: complex64(1.0), consumed: 7}},
+		{name: "complex64 8.25 + 256ish", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x03, 0xc0, 0x20, 0x80 /*=real*/, 0x04, 0xc0, 0x70, 0x00, 0x32 /*=imag*/}, expect: result{val: complex64(8.25 + 256.01220703125i), consumed: 12}},
+		{name: "complex64 -1.0i", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x00 /*=real*/, 0x82, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex64(-1.0i), consumed: 7}},
+		{name: "complex64 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex64(-413.0 + 8.25i), consumed: 7}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			var actual result
+			var err error
+
+			// we are about to have type examination on our actual pointer
+			// be run, so we'd betta pass it the correct kind of ptr
+			switch tc.expect.val.(type) {
+			case complex64:
+				var v complex64
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			case complex128:
+				var v complex128
+				actual.consumed, err = Dec(tc.input, &v)
+				actual.val = v
+			default:
+				panic("bad test case")
+			}
+
+			if tc.expect.err {
+				assert.Error(err)
+				return
+			} else if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+
+	t.Run("nil *complex64", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *complex64
+			expectConsumed = 1
+		)
+
+		var actual *complex64 = ref(complex64(12.0))
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*complex64", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
+			expectVal      = complex64(8.0 + 8.0i)
+			expect         = &expectVal
+			expectConsumed = 9
+		)
+
+		var actual *complex64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**complex64", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
+			expectVal      = complex64(8.0 + 8.0i)
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 9
+		)
+
+		var actual **complex64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**complex64, but nil complex64 part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **complex64
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
+	t.Run("nil *complex128", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *complex128
+			expectConsumed = 1
+		)
+
+		var actual *complex128 = ref(complex128(12.0))
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*complex128", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
+			expectVal      = complex128(8.0 + 8.0i)
+			expect         = &expectVal
+			expectConsumed = 9
+		)
+
+		var actual *complex128
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**complex128", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
+			expectVal      = complex128(8.0 + 8.0i)
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 9
+		)
+
+		var actual **complex128
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**complex128, but nil complex128 part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **complex128
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
