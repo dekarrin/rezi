@@ -1460,11 +1460,11 @@ func Test_Enc_Complex(t *testing.T) {
 		})
 	}
 
-	t.Run("*float32 (nil)", func(t *testing.T) {
+	t.Run("*complex64 (nil)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			input  *float32
+			input  *complex64
 			expect = []byte{0xa0}
 		)
 
@@ -1476,13 +1476,13 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("*float32", func(t *testing.T) {
+	t.Run("*complex64", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputVal = float32(8.0)
+			inputVal = complex64(8.0 + 8.0i)
 			input    = &inputVal
-			expect   = []byte{0x02, 0x40, 0x20}
+			expect   = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
 		)
 
 		actual, err := Enc(input)
@@ -1493,14 +1493,14 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**float32", func(t *testing.T) {
+	t.Run("**complex64", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputVal = float32(8)
+			inputVal = complex64(8.0 + 8.0i)
 			inputPtr = &inputVal
 			input    = &inputPtr
-			expect   = []byte{0x02, 0x40, 0x20}
+			expect   = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
 		)
 
 		actual, err := Enc(input)
@@ -1511,11 +1511,11 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**float32, but nil float32 part", func(t *testing.T) {
+	t.Run("**complex64, but nil complex64 part", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			ptr    *float32
+			ptr    *complex64
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
@@ -1528,11 +1528,11 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("*float64 (nil)", func(t *testing.T) {
+	t.Run("*complex128 (nil)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			input  *float64
+			input  *complex128
 			expect = []byte{0xa0}
 		)
 
@@ -1544,13 +1544,13 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("*float64", func(t *testing.T) {
+	t.Run("*complex128", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputVal = float64(8.0)
+			inputVal = complex128(8.0 + 8.0i)
 			input    = &inputVal
-			expect   = []byte{0x02, 0x40, 0x20}
+			expect   = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
 		)
 
 		actual, err := Enc(input)
@@ -1561,14 +1561,14 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**float64", func(t *testing.T) {
+	t.Run("**complex128", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputVal = float64(8)
+			inputVal = complex128(8.0 + 8.0i)
 			inputPtr = &inputVal
 			input    = &inputPtr
-			expect   = []byte{0x02, 0x40, 0x20}
+			expect   = []byte{0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20}
 		)
 
 		actual, err := Enc(input)
@@ -1579,11 +1579,11 @@ func Test_Enc_Complex(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**float64, but nil float64 part", func(t *testing.T) {
+	t.Run("**complex128, but nil float64 part", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			ptr    *float64
+			ptr    *complex128
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
