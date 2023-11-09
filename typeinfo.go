@@ -256,7 +256,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 		case reflect.Complex64:
 			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 64, Signed: true}, nil
 		case reflect.Complex128:
-			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 128, Signed: true}, nil
+			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 128, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be decodable.
 			mValType := t.Elem()

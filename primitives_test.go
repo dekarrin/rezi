@@ -2624,7 +2624,7 @@ func Test_Dec_Complex(t *testing.T) {
 		input  []byte
 		expect result
 	}{
-		{name: "complex128 0.0+0.0i", input: []byte{0x00}, expect: result{val: complex128(0.0), consumed: 1}},
+		{name: "complex128 0.0+0.0i", input: []byte{0x00}, expect: result{val: complex128(0.0 + 0.0i), consumed: 1}},
 		{name: "complex128 (-0.0)+(-0.0)i", input: []byte{0x80}, expect: result{val: complex128(complex(negZero64, negZero64)), consumed: 1}},
 		{name: "complex128 (-0.0)+0.0i", input: []byte{0x41, 0x80, 0x02, 0x80, 0x00}, expect: result{val: complex128(complex(negZero64, 0.0)), consumed: 5}},
 		{name: "complex128 wide pos real", input: []byte{0x41, 0x80, 0x0c /*=len*/, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex128(2.02499999999999991118215802999 + 1.0i), consumed: 15}},
@@ -2632,7 +2632,7 @@ func Test_Dec_Complex(t *testing.T) {
 		{name: "complex128 1.0", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x00 /*=imag*/}, expect: result{val: complex128(1.0), consumed: 7}},
 		{name: "complex128 8.25 + 256ish", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x03, 0xc0, 0x20, 0x80 /*=real*/, 0x04, 0xc0, 0x70, 0x00, 0x32 /*=imag*/}, expect: result{val: complex128(8.25 + 256.01220703125i), consumed: 12}},
 		{name: "complex128 -1.0i", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x00 /*=real*/, 0x82, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex128(-1.0i), consumed: 7}},
-		{name: "complex128 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex128(-413.0 + 8.25i), consumed: 7}},
+		{name: "complex128 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex128(-413.0 + 8.25i), consumed: 11}},
 
 		{name: "complex64 0.0+0.0i", input: []byte{0x00}, expect: result{val: complex64(0.0), consumed: 1}},
 		{name: "complex64 (-0.0)+(-0.0)i", input: []byte{0x80}, expect: result{val: complex64(complex(negZero32, negZero32)), consumed: 1}},
@@ -2642,7 +2642,7 @@ func Test_Dec_Complex(t *testing.T) {
 		{name: "complex64 1.0", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x00 /*=imag*/}, expect: result{val: complex64(1.0), consumed: 7}},
 		{name: "complex64 8.25 + 256ish", input: []byte{0x41, 0x80, 0x09 /*=len*/, 0x03, 0xc0, 0x20, 0x80 /*=real*/, 0x04, 0xc0, 0x70, 0x00, 0x32 /*=imag*/}, expect: result{val: complex64(8.25 + 256.01220703125i), consumed: 12}},
 		{name: "complex64 -1.0i", input: []byte{0x41, 0x80, 0x04 /*=len*/, 0x00 /*=real*/, 0x82, 0x3f, 0xf0 /*=imag*/}, expect: result{val: complex64(-1.0i), consumed: 7}},
-		{name: "complex64 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex64(-413.0 + 8.25i), consumed: 7}},
+		{name: "complex64 -413.0 + 8.25i", input: []byte{0x41, 0x80, 0x08 /*=len*/, 0x83, 0xc0, 0x79, 0xd0 /*=real*/, 0x03, 0xc0, 0x20, 0x80 /*=imag*/}, expect: result{val: complex64(-413.0 + 8.25i), consumed: 11}},
 	}
 
 	for _, tc := range testCases {
