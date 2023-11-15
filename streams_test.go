@@ -130,10 +130,12 @@ func Test_Writer_Enc(t *testing.T) {
 
 	strData := "NEPETA"
 	floatData := 256.01220703125
+	complexData := 1.0 + 8.25i
 	intData := 413
 	expect = []byte{
 		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
 		0x04, 0xc0, 0x70, 0x00, 0x32,
+		0x41, 0x80, 0x07, 0x02, 0x3f, 0xf0, 0x03, 0xc0, 0x20, 0x80,
 		0x02, 0x01, 0x9d,
 	}
 
@@ -145,8 +147,12 @@ func Test_Writer_Enc(t *testing.T) {
 	if !assert.NoError(err, "error writing second time") {
 		return
 	}
-	err = w.Enc(intData)
+	err = w.Enc(complexData)
 	if !assert.NoError(err, "error writing third time") {
+		return
+	}
+	err = w.Enc(intData)
+	if !assert.NoError(err, "error writing fourth time") {
 		return
 	}
 	w.Flush()
@@ -497,6 +503,10 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	var dest10Bin testBinary
 	expect10Bin := testBinary{number: 8, data: "ABC"}
 
+	input = append(input, 0x41, 0x80, 0x07, 0x02, 0x3f, 0xf0, 0x03, 0xc0, 0x20, 0x80) // 1.0+8.25i
+	var dest11Complex complex128
+	expect11Complex := 1.0 + 8.25i
+
 	r, err := NewReader(bytes.NewReader(input), nil)
 	if !assert.NoError(err, "creating Reader returned error") {
 		return
@@ -562,6 +572,11 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	}
 	assert.Equal(expect10Bin, dest10Bin, "dest10Bin mismatch")
 
+	err = r.Dec(&dest11Complex)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect11Complex, dest11Complex, "dest11Complex mismatch")
 }
 
 func Test_Reader_Dec_int(t *testing.T) {
@@ -666,6 +681,130 @@ func Test_Reader_Dec_int(t *testing.T) {
 		}
 
 		var dest **int
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
+
+func Test_Reader_Dec_complex(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    complex128
+		expectOff int
+		expectErr bool
+	}{
+		{
+			name:      "normal value - no compaction",
+			input:     []byte{0x41, 0x80, 0x0c /*=len*/, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
+			expect:    2.02499999999999991118215802999 + 1.0i,
+			expectOff: 15,
+		},
+		{
+			name:      "normal value - LSB compaction",
+			input:     []byte{0x41, 0x80, 0x08 /*=len*/, 0x02, 0x3f, 0xf0 /*=real*/, 0x04, 0xc0, 0x70, 0x00, 0x32 /*=imag*/},
+			expect:    1.0 + 256.01220703125i,
+			expectOff: 11,
+		},
+		{
+			name:      "normal value - MSB compaction",
+			input:     []byte{0x41, 0x80, 0x08 /*=len*/, 0x04, 0x3f, 0xf0, 0x1c, 0x00 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
+			expect:    1.00000000000159161572810262442 + 1.0i,
+			expectOff: 11,
+		},
+		{
+			name:      "skip extension bytes",
+			input:     []byte{0x41, 0xc0, 0xbf, 0x06 /*=len*/, 0x82, 0x3f, 0xf0 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
+			expect:    -1.0 + 1.0i,
+			expectOff: 10,
+		},
+
+		{
+			name:      "normal value - multi value",
+			input:     []byte{0x41, 0x80, 0x06 /*=len*/, 0x82, 0x3f, 0xf0 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/, 0x41, 0x80, 0x06 /*=len*/, 0x82, 0x3f, 0xf0 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
+			expect:    -1.0 + 1.0i,
+			expectOff: 9,
+		},
+		{
+			// due to header sniffing for V1, this will fail if second byte has 0x80 bit set
+			name:      "skip extension bytes - multi value",
+			input:     []byte{0x41, 0xc0, 0xbf, 0x06 /*=len*/, 0x82, 0x3f, 0xf0 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/, 0x41, 0xc0, 0xbf, 0x06 /*=len*/, 0x82, 0x3f, 0xf0 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
+			expect:    -1.0 + 1.0i,
+			expectOff: 10,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest complex128
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - single indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x20}
+		expect := nilRef[complex128]()
+		expectOff := 1
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *complex128
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		expectPtr := nilRef[complex128]()
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest **complex128
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return

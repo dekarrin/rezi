@@ -48,10 +48,16 @@ type integral interface {
 	anyInt | anyUint
 }
 
-// anyFloat is a union interface that combines float-types. It allows float32
+// anyFloat is a union interface that combines anyFloat-types. It allows float32
 // and float64.
 type anyFloat interface {
 	float32 | float64
+}
+
+// anyComplex is a union interface that combines anyComplex-types. It allows complex64
+// and complex128.
+type anyComplex interface {
+	complex64 | complex128
 }
 
 // encCheckedPrim encodes the primitve REZI value as rezi-format bytes. The type
@@ -87,9 +93,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), func(r reflect.Value) int64 {
-					return int64(r.Int())
-				})
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), reflect.Value.Int)
 			default:
 				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
@@ -110,9 +114,7 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), func(r reflect.Value) uint64 {
-					return uint64(r.Uint())
-				})
+				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
 			default:
 				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
@@ -128,9 +130,18 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 		default:
 			fallthrough
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), func(r reflect.Value) float64 {
-				return r.Float()
+			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
+		}
+	case mtComplex:
+		switch ti.Bits {
+		case 64:
+			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
+				return complex64(r.Complex())
 			})
+		default:
+			fallthrough
+		case 128:
+			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
 		}
 	case mtBinary:
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
@@ -313,6 +324,36 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 
 		return n, nil
+	case mtComplex:
+		var n int
+		var err error
+
+		switch ti.Bits {
+		case 64:
+			var c complex64
+			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex64])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*complex64)
+				*tVal = c
+			}
+		default:
+			fallthrough
+		case 128:
+			var c complex128
+			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex128])
+			if err != nil {
+				return n, err
+			}
+			if ti.Indir == 0 {
+				tVal := v.(*complex128)
+				*tVal = c
+			}
+		}
+
+		return n, nil
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
@@ -451,6 +492,104 @@ func decBool(data []byte) (bool, int, error) {
 	}
 }
 
+func encComplex[E anyComplex](v E) []byte {
+	// go 1.18 compat, real() and imag() cannot be done to our E type
+	//
+	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
+	v128 := complex128(v)
+
+	rv := real(v128)
+	iv := imag(v128)
+
+	// first off, if both real and imaginary parts are +/-0.0, we can encode as
+	// single-byte values
+	if rv == 0.0 && iv == 0.0 {
+		if math.Signbit(rv) && math.Signbit(iv) {
+			return []byte{0x80}
+		} else if !math.Signbit(rv) && !math.Signbit(iv) {
+			return []byte{0x00}
+		}
+	}
+
+	// encode the parts
+	realEnc := encFloat(rv)
+	imagEnc := encFloat(iv)
+
+	hdrEnc := encCount(len(realEnc)+len(imagEnc), &countHeader{ByteLength: true})
+
+	enc := hdrEnc
+	enc = append(enc, realEnc...)
+	enc = append(enc, imagEnc...)
+
+	return enc
+}
+
+func decComplex[E anyComplex](data []byte) (E, int, error) {
+	if len(data) < 1 {
+		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+	}
+
+	// special case single-byte 0's check
+	if data[0] == 0x00 {
+		return E(0.0 + 0.0i), 1, nil
+	} else if data[0] == 0x80 {
+		// only way to reliably get a -0.0 value is by direct calculation on var
+		// (cannot be result of consts, I tried, at least as of Go 1.19.4)
+		var val float64
+		val *= -1.0
+		return E(complex(val, val)), 1, nil
+	}
+
+	// do normal decoding of full-form
+	var n int
+	var err error
+	var offset int
+	var byteCount tLen
+	var rPart float64
+	var iPart float64
+
+	// get the byte count as an int
+	byteCount, n, err = decInt[tLen](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, err
+	}
+	offset += n
+
+	// count check
+	if len(data[offset:]) < byteCount {
+		s := "s"
+		verbS := ""
+		if len(data) == 1 {
+			s = ""
+			verbS = "s"
+		}
+		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
+		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return E(0.0 + 0.0i), 0, err
+	}
+
+	// clamp data to len
+	data = data[:offset+byteCount]
+
+	// real part
+	rPart, n, err = decFloat[float64](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+	}
+	offset += n
+
+	// imaginary part
+	iPart, n, err = decFloat[float64](data[offset:])
+	if err != nil {
+		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+	}
+	offset += n
+
+	var v128 complex128 = complex(rPart, iPart)
+
+	return E(v128), offset, nil
+}
+
 func encFloat[E anyFloat](v E) []byte {
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
@@ -469,7 +608,6 @@ func encFloat[E anyFloat](v E) []byte {
 	mantPart := i & ieee754MantissaBits
 
 	// sign is encoded into the count.
-	//
 	//
 	//	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
 	//  SXNILLLL     CEEEEEEE            EEEEMMMM  MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
@@ -859,7 +997,7 @@ func decStringV1(data []byte) (string, int, error) {
 	if len(data) < 1 {
 		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	strLength, countLen, err := decInt[int](data)
+	strLength, countLen, err := decInt[tLen](data)
 	if err != nil {
 		return "", 0, errorDecf(0, "decode string byte count: %s", err)
 	}

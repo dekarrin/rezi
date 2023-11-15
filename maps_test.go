@@ -221,6 +221,34 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("map[int]complex128", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]complex128{
+				413: complex128(2.02499999999999991118215802999 + 1.0i),
+				612: complex128(0.0 + 0.0i),
+				100: complex128(8.0 + 8.0i),
+			}
+			expect = []byte{
+				0x01, 0x21, // len=33
+
+				0x01, 0x64, 0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20, // 100: 8.0+8.0i
+				0x02, 0x01, 0x9d, 0x41, 0x80, 0x0c, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x02, 0x3f, 0xf0, // 413: 2.02499999999999991118215802999 + 1.0i
+				0x02, 0x02, 0x64, 0x00, // 612: 0.0+0.0i
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("map[int][]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1186,6 +1214,38 @@ func Test_Dec_Map_NoIndirection(t *testing.T) {
 		}
 
 		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]complex128", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x21, // len=33
+
+				0x01, 0x64, 0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20, // 100: 8.0+8.0i
+				0x02, 0x01, 0x9d, 0x41, 0x80, 0x0c, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x02, 0x3f, 0xf0, // 413: 2.02499999999999991118215802999 + 1.0i
+				0x02, 0x02, 0x64, 0x00, // 612: 0.0+0.0i
+			}
+			expect = map[int]complex128{
+				413: complex128(2.02499999999999991118215802999 + 1.0i),
+				612: complex128(0.0 + 0.0i),
+				100: complex128(8.0 + 8.0i),
+			}
+			expectConsumed = 35
+		)
+
+		// execute
+		var actual map[int]complex128
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})

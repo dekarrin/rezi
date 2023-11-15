@@ -23,6 +23,7 @@ const (
 	mtSlice
 	mtNil
 	mtFloat
+	mtComplex
 )
 
 func (mt mainType) String() string {
@@ -45,6 +46,8 @@ func (mt mainType) String() string {
 		return "mtNil"
 	case mtFloat:
 		return "mtFloat"
+	case mtComplex:
+		return "mtComplex"
 	default:
 		return fmt.Sprintf("mainType(%d)", mt)
 	}
@@ -62,7 +65,7 @@ type typeInfo struct {
 }
 
 func (ti typeInfo) Primitive() bool {
-	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat
+	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat || ti.Main == mtComplex
 }
 
 func canEncode(v interface{}) (typeInfo, error) {
@@ -137,6 +140,10 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 32, Signed: true}, nil
 		case reflect.Float64:
 			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 64, Signed: true}, nil
+		case reflect.Complex64:
+			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 64, Signed: true}, nil
+		case reflect.Complex128:
+			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 128, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be encodable.
 			mValType := t.Elem()
@@ -246,6 +253,10 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 32, Signed: true}, nil
 		case reflect.Float64:
 			return typeInfo{Indir: indirCount, Main: mtFloat, Bits: 64, Signed: true}, nil
+		case reflect.Complex64:
+			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 64, Signed: true}, nil
+		case reflect.Complex128:
+			return typeInfo{Indir: indirCount, Main: mtComplex, Bits: 128, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be decodable.
 			mValType := t.Elem()

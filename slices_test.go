@@ -168,6 +168,34 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[]complex128", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []complex128{
+				complex128(2.02499999999999991118215802999 + 1.0i),
+				complex128(0.0 + 0.0i),
+				complex128(8.0 + 8.0i),
+			}
+			expect = []byte{
+				0x01, 0x19, // len=25
+
+				0x41, 0x80, 0x0c, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x02, 0x3f, 0xf0, // 2.02499999999999991118215802999 + 1.0i
+				0x00,                                                 // 0.0+0.0i
+				0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20, // 8.0+8.0i
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]binary", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1101,6 +1129,38 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 
 		// execute
 		var actual []string
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]complex128", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x19, // len=25
+
+				0x41, 0x80, 0x0c, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x02, 0x3f, 0xf0, // 2.02499999999999991118215802999 + 1.0i
+				0x00,                                                 // 0.0+0.0i
+				0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20, // 8.0+8.0i
+			}
+			expect = []complex128{
+				complex128(2.02499999999999991118215802999 + 1.0i),
+				complex128(0.0 + 0.0i),
+				complex128(8.0 + 8.0i),
+			}
+			expectConsumed = 27
+		)
+
+		// execute
+		var actual []complex128
 		consumed, err := Dec(input, &actual)
 
 		// assert

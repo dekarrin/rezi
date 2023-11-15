@@ -114,16 +114,17 @@
 //
 // # Supported Data Types
 //
-// REZI supports several built-in basic Go types: int (as well as all of its
-// unsigned and specific-size varieties), float32, float64, string, bool, and
-// any type that implements encoding.BinaryMarshaler (for encoding) or whose
-// pointer type implements encoding.BinaryUnmarshaler (for decoding).
-// Implementations of encoding.BinaryUnmarshaler should use [Wrapf] when
-// encountering an error from a REZI function called from within UnmarshalBinary
-// to supply additional offset information, but this is not strictly required.
+// REZI supports all built-in basic Go types: int (as well as all of its
+// unsigned and specific-size varieties), float32, float64, complex64,
+// complex128, string, bool, and any type that implements
+// encoding.BinaryMarshaler (for encoding) or whose pointer type implements
+// encoding.BinaryUnmarshaler (for decoding). Implementations of
+// encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error from
+// a REZI function called from within UnmarshalBinary to supply additional
+// offset information, but this is not strictly required.
 //
-// Complex types are not supported at this time, although they will be added in
-// a future release.
+// Array types are not supported at this time, although they will be added in a
+// future release.
 //
 // Slices and maps are supported with some stipulations. Slices must contain
 // only other supported types (or pointers to them). Maps have the same
@@ -261,32 +262,42 @@
 //
 //	Float Values
 //
-//	Layout:
+//	Full Layout:
 //
 //	[ INFO ] [ COMP-EXPONENT-HIGHS ] [ MIXED ] [ MANTISSA-LOWS ]
-//	 1 byte          1 byte            1 byte      1..6 bytes
+//	 1 byte          1 byte            1 byte      0..6 bytes
 //
-// A float value is encoded by taking the components of its representation in
-// IEEE-754 double-precision and encoding them across 1 to 9 bytes, using
-// compaction where possible. These components are a 1-bit sign, an 11-bit
-// exponent, and a 52-bit fraction (also known as the mantissa).
+//	Short-Form Layout:
 //
-// Float values begin with an INFO byte. Assuming it does not denote a nil
+//	[ INFO ]
+//	 1 byte
+//
+// A non-zero float value is encoded by taking the components of its
+// representation in IEEE-754 double-precision and encoding them across 1 to 9
+// bytes, using compaction where possible. These components are a 1-bit sign, an
+// 11-bit exponent, and a 52-bit fraction (also known as the mantissa). Float
+// values of 0.0 and -0.0 are instead encoded using an abbreviated "short-form"
+// that consists of only a single byte.
+//
+// All float values begin with an INFO byte. Assuming it does not denote a nil
 // value, the 4 L bits of the info byte give the number of bytes following all
 // header bytes that are used to encode the value, and the S bit represents
-// whether the value is negative, thus encoding the 1-bit sign.
+// whether the value is negative, thus encoding the 1-bit sign. If the L bits
+// give a non-zero value, the float value uses the full encoding layout; if the
+// L bits give a zero value, the float value uses the short-form.
 //
-// The INFO byte is followed by the COMP-EXPONENT-HIGHS byte. This contains two
-// fields, organized in the byte bits as CEEEEEEE. The first field is a 1-bit
-// flag, denoted by "C", that indicates whether compaction of the mantissa is
-// performed from the right or the left side. If set, it is from the right; if
-// not set, it is from the left. The remaining bits in the byte, denoted by "E",
-// are the 7 high-order bits of the exponent component of the represented value.
+// An INFO byte in full-form is followed by the COMP-EXPONENT-HIGHS byte. This
+// contains two fields, organized in the byte bits as CEEEEEEE. The first field
+// is a 1-bit flag, denoted by "C", that indicates whether compaction of the
+// mantissa is performed from the right or the left side. If set, it is from the
+// right; if not set, it is from the left. The remaining bits in the byte,
+// denoted by "E", are the 7 high-order bits of the exponent component of the
+// represented value.
 //
-// The next byte is a MIXED byte containing two fields, organized in the byte
-// bits as EEEEMMMM. The first field, denoted by "E", contains the 4 lower-order
-// bits of the exponent. The second field, denoted by "MMMM", contains the 4
-// high-order bits of the mantissa.
+// The next byte in full-form is a MIXED byte containing two fields, organized
+// in the byte bits as EEEEMMMM. The first field, denoted by "E", contains the 4
+// lower-order bits of the exponent. The second field, denoted by "MMMM",
+// contains the 4 high-order bits of the mantissa.
 //
 // After the MIXED byte, the remaining 48 low-order bits of the mantissa are
 // encoded with compaction similar to that performed on integer values, but with
@@ -297,33 +308,71 @@
 // of those 48 bits, whatever would make it more compact. The "C" bit being set
 // in the COMP-EXPONENT-HIGHS byte indicates that they are removed from the
 // right, otherwise they are removed from the left as in compaction of integer
-// values.
+// values. If all 48 low-order bits of the Mantissa are 0x00, they will all be
+// compacted and the entire float will take up only the initial three bytes.
 //
 // Note that the above compaction applies only to the 48 low-order bits of the
 // mantissa; the high 4 bits will always be present in the MIXED byte regardless
 // of their value.
 //
-// The value 0.0 (positive zero) is a special-case that is encoded as a single
-// 0x00 byte. The value -0.0 (negative zero) is also a special case, encoded as
-// a single 0x80 byte.
+// Zero-valued floats, 0.0 and -0.0, are not encoded using the full layout
+// described above, but instead as special cases are encoded in a short-form
+// layout as a single INFO byte whose L bits are all set to 0. 0.0 is encoded in
+// as a single 0x00 byte, and -0.0 is encoded as a single 0x80 byte. These are
+// the only values of float that are encoded in short-form; all others use the
+// full form.
+//
+//	Complex Values
+//
+//	Layout:
+//	[ INFO ] [ EXT ] [ INT VALUE ] [ INFO ] [ FLOAT VALUE ] [ INFO ] [ FLOAT VALUE ]
+//	<-----------COUNT------------> <------REAL PART-------> <----IMAGINARY PART---->
+//	         2..10 bytes                  3..9 bytes               3..9 bytes
+//
+//	Short-Form Layout:
+//
+//	[ INFO ]
+//	 1 byte
+//
+// Complex values are, in general, encoded as a count of bytes in the header
+// bytes given as an explicit byte count followed by that many bytes containing
+// first the real component and then the imaginary component in sequence,
+// encoded as float values.
+//
+// As special cases, a complex value with a positive 0.0 real part and positive
+// 0.0 imaginary part is encoded using the short-form layout as only a single
+// info byte with a value of 0x00, and a complex value with a negative 0.0 real
+// part and negative 0.0 imaginary part is encoded as only a single info byte
+// with a value of 0x80. This only applies to values of (+0.0)+(+0.0)i and
+// (-0.0)+(-0.0)i; there is no special case for when both are zero but of
+// opposite signs or for when one part is some zero but the other part is not.
 //
 //	String Values
 //
-//	Layout:
+//	Full Layout:
 //
 //	[ INFO ] [ EXT ] [ INT VALUE ] [ CODEPOINT 1 ] ... [ CODEPOINT N ]
 //	<-----------COUNT------------> <------------CODEPOINTS----------->
 //	         2..10 bytes                       COUNT bytes
 //
+//	Short-Form Layout:
+//
+//	[ INFO ]
+//	 1 byte
+//
 // String values are encoded as a count of bytes in the info header section
 // followed by the Unicode codepoints that make up the string encoded using
-// UTF-8.
+// UTF-8. Non-empty strings will use the full layout; an empty string will use
+// the abbreviated short-form layout.
 //
-// Additionally, a string value's first info byte will have its extension bit
-// set and will indicate explicitly that it uses a byte-based count in the
-// extension byte that follows. This is to distinguish it from the older style
+// A non-empty string value's first info byte will have its extension bit set
+// and will indicate explicitly that it uses a byte-based count in the
+// extension byte that follows. This is to distinguish it from older-style (V0)
 // string encodings, which encoded data length as the count of codepoints rather
 // than bytes.
+//
+// Ann empty string is encoded using the short-form layout as a single info
+// byte, 0x00.
 //
 //	encoding.BinaryMarshaler Values
 //
@@ -441,9 +490,7 @@
 // REZI library versions prior to v2.1.0 encode string data length as the number
 // of Unicode codepoints rather than the number of bytes and do so in the info
 // byte with no info extension byte. These strings can be decoded as normal with
-// [Dec], but are not compatible with [Reader] as it relies on byte-based counts
-// to function properly and make predictions about how many bytes must be read
-// from the underlying data stream.
+// [Dec] and [Reader.Dec].
 package rezi
 
 import (
