@@ -703,7 +703,7 @@ func Test_Reader_Dec_complex(t *testing.T) {
 			name:      "normal value - no compaction",
 			input:     []byte{0x41, 0x80, 0x0c /*=len*/, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
 			expect:    2.02499999999999991118215802999 + 1.0i,
-			expectOff: 16,
+			expectOff: 15,
 		},
 		{
 			name:      "normal value - LSB compaction",
@@ -714,7 +714,7 @@ func Test_Reader_Dec_complex(t *testing.T) {
 		{
 			name:      "normal value - MSB compaction",
 			input:     []byte{0x41, 0x80, 0x08 /*=len*/, 0x04, 0x3f, 0xf0, 0x1c, 0x00 /*=real*/, 0x02, 0x3f, 0xf0 /*=imag*/},
-			expect:    1.00000000000159161572810262442 + 1.0,
+			expect:    1.00000000000159161572810262442 + 1.0i,
 			expectOff: 11,
 		},
 		{
@@ -755,7 +755,7 @@ func Test_Reader_Dec_complex(t *testing.T) {
 				return
 			}
 
-			var dest float64
+			var dest complex128
 			err = r.Dec(&dest)
 			if tc.expectErr {
 				assert.Error(err, "error not returned")
