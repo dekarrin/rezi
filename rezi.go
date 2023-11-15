@@ -399,6 +399,11 @@
 // special delimiter between the encoded elements; when one ends, the next one
 // begins.
 //
+//	Array Values
+//
+// Arrays are encoded in an identical fashion to slices. They do not record the
+// size of the array type.
+//
 //	Map Values
 //
 //	Layout:
@@ -557,6 +562,8 @@ func Enc(v interface{}) (data []byte, err error) {
 		return encCheckedMap(v, info)
 	} else if info.Main == mtSlice {
 		return encCheckedSlice(v, info)
+	} else if info.Main == mtArray {
+		return encCheckedArray(v, info)
 	} else {
 		panic("no possible encoding")
 	}
@@ -616,6 +623,8 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return decCheckedMap(data, v, info)
 	} else if info.Main == mtSlice {
 		return decCheckedSlice(data, v, info)
+	} else if info.Main == mtArray {
+		return decCheckedArray(data, v, info)
 	} else {
 		panic("no possible decoding")
 	}
