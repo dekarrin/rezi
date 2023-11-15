@@ -182,6 +182,7 @@ func Test_EncAndDec_NontrivialStructure(t *testing.T) {
 			},
 			actions: nil,
 			jobs:    []string{},
+			comp:    8.25 + 1.0i,
 			friend: &testNontrivial{
 				ptr:      ref(413),
 				goodNums: nil,
@@ -325,6 +326,7 @@ type testNontrivial struct {
 	actions  []**uint
 	jobs     []string
 	frac     float64
+	comp     complex128
 }
 
 func (tn testNontrivial) MarshalBinary() ([]byte, error) {
@@ -334,6 +336,7 @@ func (tn testNontrivial) MarshalBinary() ([]byte, error) {
 	enc = append(enc, MustEnc(tn.goodNums)...)
 	enc = append(enc, MustEnc(tn.actions)...)
 	enc = append(enc, MustEnc(tn.jobs)...)
+	enc = append(enc, MustEnc(tn.comp)...)
 	enc = append(enc, MustEnc(tn.frac)...)
 	enc = append(enc, MustEnc(tn.friend)...)
 
@@ -368,6 +371,12 @@ func (tn *testNontrivial) UnmarshalBinary(data []byte) error {
 	n, err = Dec(data[offset:], &newNontriv.jobs)
 	if err != nil {
 		return Wrapf(offset, "jobs: %s", err)
+	}
+	offset += n
+
+	n, err = Dec(data[offset:], &newNontriv.comp)
+	if err != nil {
+		return Wrapf(offset, "comp: %s", err)
 	}
 	offset += n
 
