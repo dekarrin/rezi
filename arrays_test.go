@@ -1093,3 +1093,349 @@ func Test_Enc_Array_ValueIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 }
+
+func Test_Dec_Array_NoIndirection(t *testing.T) {
+
+	t.Run("zero [5]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input          = []byte{0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00}
+			expectConsumed = 7
+		)
+
+		// execute
+		actual := [5]int{1, 2} // start with a value so we can check it is set to empty
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Nil(actual)
+	})
+
+	t.Run("[5]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0c, 0x01, 0x01, 0x01, 0x03, 0x01, 0x04, 0x01, 0xc8,
+				0x03, 0x04, 0x4b, 0x41,
+			}
+			expect         = [5]int{1, 3, 4, 200, 281409}
+			expectConsumed = 14
+		)
+
+		// execute
+		var actual [5]int
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]uint64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x12, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55,
+				0x64, 0x08, 0x8a, 0xd5, 0xd7, 0x50, 0xb3, 0xe3, 0x55, 0x65,
+			}
+			expect         = [2]uint64{10004138888888800612, 10004138888888800613}
+			expectConsumed = 20
+		)
+
+		// execute
+		var actual [2]uint64
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[4]float64", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x14, // len=20
+
+				0x88, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, // -2.02499999999999991118215802999
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
+				0x02, 0x7f, 0xf0, // +Inf
+			}
+			expect         = [4]float64{-2.02499999999999991118215802999, 256.01220703125, -1.0, math.Inf(0)}
+			expectConsumed = 22
+		)
+
+		// execute
+		var actual [4]float64
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[4]float32", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x11, // len=17
+
+				0x05, 0xc0, 0x20, 0xc3, 0xae, 0x60, // 8.38218975067138671875
+				0x04, 0xc0, 0x70, 0x00, 0x32, // 256.01220703125
+				0x82, 0x3f, 0xf0, // -1.0
+				0x82, 0x7f, 0xf0, // -Inf
+			}
+			expect         = [4]float32{8.38218975067138671875, 256.01220703125, -1.0, float32(math.Inf(-1))}
+			expectConsumed = 19
+		)
+
+		// execute
+		var actual [4]float32
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[3]string", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x18, 0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4B, 0x41,
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, 0x06,
+				0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
+			}
+			expect         = [3]string{"VRISKA", "NEPETA", "TEREZI"}
+			expectConsumed = 26
+		)
+
+		// execute
+		var actual [3]string
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[3]complex128", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x19, // len=25
+
+				0x41, 0x80, 0x0c, 0x08, 0x40, 0x00, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x02, 0x3f, 0xf0, // 2.02499999999999991118215802999 + 1.0i
+				0x00,                                                 // 0.0+0.0i
+				0x41, 0x80, 0x06, 0x02, 0x40, 0x20, 0x02, 0x40, 0x20, // 8.0+8.0i
+			}
+			expect = [3]complex128{
+				complex128(2.02499999999999991118215802999 + 1.0i),
+				complex128(0.0 + 0.0i),
+				complex128(8.0 + 8.0i),
+			}
+			expectConsumed = 27
+		)
+
+		// execute
+		var actual [3]complex128
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]binary", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x15,
+
+				0x01, 0x07,
+				0x01, 0x03, 0x73, 0x75, 0x70,
+				0x01, 0x01,
+
+				0x01, 0x0a,
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x53, 0x59,
+				0x01, 0x08,
+			}
+			expect = [2]testBinary{
+				{data: "sup", number: 1},
+				{data: "VRISSY", number: 8},
+			}
+			expectConsumed = 23
+		)
+
+		// execute
+		var actual [2]testBinary
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[3]map[string]bool", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x3a, // len=58
+
+				0x01, 0x1d, // len=29
+				0x01, 0x06, 0x41, 0x52, 0x41, 0x4e, 0x45, 0x41, 0x00, // "ARANEA": false
+				0x01, 0x08, 0x4d, 0x49, 0x4e, 0x44, 0x46, 0x41, 0x4e, 0x47, 0x01, // "MINDFANG": true
+				0x01, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, // "VRISKA": true
+
+				0x01, 0x09, // len=9
+				0x01, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, 0x01, // "NEPETA": true
+
+				0x01, 0x0e, // len=14
+				0x01, 0x04, 0x4a, 0x41, 0x44, 0x45, 0x01, // "JADE": true
+				0x01, 0x04, 0x4a, 0x4f, 0x48, 0x4e, 0x01, // "JOHN": true
+			}
+			expect = [3]map[string]bool{
+				{
+					"VRISKA":   true,
+					"ARANEA":   false,
+					"MINDFANG": true,
+				},
+				{
+					"NEPETA": true,
+				},
+				{
+					"JOHN": true,
+					"JADE": true,
+				},
+			}
+			expectConsumed = 60
+		)
+
+		// execute
+		var actual [3]map[string]bool
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2][]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0d,
+
+				0x01, 0x06,
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x03,
+				0x02, 0x22, 0xb8,
+			}
+			expect = [2][]int{
+				{1, 2, 3},
+				{8888},
+			}
+			expectConsumed = 15
+		)
+
+		// execute
+		var actual [2][]int
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("meta array [2][3]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f,
+
+				0x01, 0x06,
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x05,
+				0x02, 0x22, 0xb8,
+				0x00,
+				0x00,
+			}
+			expect = [2][3]int{
+				{1, 2, 3},
+				{8888},
+			}
+			expectConsumed = 15
+		)
+
+		// execute
+		var actual [2][3]int
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+}
