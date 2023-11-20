@@ -1439,3 +1439,103 @@ func Test_Dec_Array_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 }
+
+func Test_Dec_Array_SelfIndirection(t *testing.T) {
+	t.Run("*[4]int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xa0,
+			}
+			expect         *[4]int
+			expectConsumed = 1
+		)
+
+		var actual *[4]int = &[4]int{1, 2}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*[4]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+			expectVal      = [4]int{1, 2, 8, 8}
+			expect         = &expectVal
+			expectConsumed = 10
+		)
+
+		var actual *[4]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[4]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+			expectVal      = [4]int{1, 2, 8, 8}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 10
+		)
+
+		var actual **[4]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[4]int, but nil [4]int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
+			}
+			expectPtr      *[4]int
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		var actual **[4]int = ref(&[4]int{1, 2, 3})
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+}
