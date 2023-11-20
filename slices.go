@@ -19,8 +19,9 @@ func encCheckedSlice(v interface{}, ti typeInfo) ([]byte, error) {
 
 func encSlice(v interface{}) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
+	isArray := reflect.TypeOf(v).Kind() == reflect.Array
 
-	if v == nil || refVal.IsNil() {
+	if v == nil || (!isArray && refVal.IsNil()) {
 		return encNilHeader(0), nil
 	}
 
@@ -30,7 +31,7 @@ func encSlice(v interface{}) ([]byte, error) {
 		v := refVal.Index(i)
 		encData, err := Enc(v.Interface())
 		if err != nil {
-			if reflect.TypeOf(v).Kind() == reflect.Array {
+			if isArray {
 				return nil, errorf("array item[%d]: %s", i, err)
 			} else {
 				return nil, errorf("slice item[%d]: %s", i, err)
