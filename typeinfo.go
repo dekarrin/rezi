@@ -305,7 +305,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			if err != nil {
 				return typeInfo{}, errorf("array value is not decodable: %s", err)
 			}
-			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &arrValInfo}, nil
+			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

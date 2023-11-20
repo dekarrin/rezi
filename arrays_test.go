@@ -1114,7 +1114,7 @@ func Test_Dec_Array_NoIndirection(t *testing.T) {
 		}
 
 		assert.Equal(expectConsumed, consumed)
-		assert.Nil(actual)
+		assert.Zero(actual)
 	})
 
 	t.Run("[5]int", func(t *testing.T) {
@@ -1423,7 +1423,7 @@ func Test_Dec_Array_NoIndirection(t *testing.T) {
 				{1, 2, 3},
 				{8888},
 			}
-			expectConsumed = 15
+			expectConsumed = 17
 		)
 
 		// execute

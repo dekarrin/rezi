@@ -51,7 +51,7 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 	sl, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
-			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Slice
+			return t.Kind() == reflect.Pointer && ((ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
 		decSlice,
 	))
@@ -77,7 +77,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 
 	refSliceVal := reflect.ValueOf(v)
 	refSliceType := refSliceVal.Type().Elem()
-	isArray := refSliceVal.Kind() == reflect.Array
+	isArray := refSliceType.Kind() == reflect.Array
 	sliceOrArrStr := "slice"
 	var refArrType reflect.Type
 	if isArray {
