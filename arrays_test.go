@@ -1776,7 +1776,7 @@ func Test_Dec_Array_ValueIndirection(t *testing.T) {
 		)
 
 		// execute
-		var actual []*string
+		var actual [3]*string
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
@@ -2054,7 +2054,7 @@ func Test_Dec_Array_ValueIndirection(t *testing.T) {
 				0xa0,
 				0xa0,
 			}
-			expect         = []*map[string]bool{}
+			expect         = [3]*map[string]bool{}
 			expectConsumed = 5
 		)
 
@@ -2198,7 +2198,7 @@ func Test_Dec_Array_ValueIndirection(t *testing.T) {
 				0x00,
 			}
 			expect         = [3]*[4]int{{8, 8, 16, 24}, {1, 2, 3}, {10, 9, 8}}
-			expectConsumed = 28
+			expectConsumed = 30
 		)
 
 		// execute
@@ -2235,7 +2235,7 @@ func Test_Dec_Array_ValueIndirection(t *testing.T) {
 				0x00,
 			}
 			expect         = [3]*[4]int{{8, 8, 16, 24}, nil, {10, 9, 8}}
-			expectConsumed = 21
+			expectConsumed = 22
 		)
 
 		// execute
