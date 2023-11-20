@@ -345,3 +345,89 @@ func Test_Enc_Array_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 }
+
+func Test_Enc_Array_SelfIndirection(t *testing.T) {
+	t.Run("*[4]int (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *[4]int
+			expect = []byte{
+				0xa0,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*[4]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = [4]int{1, 2, 8, 8}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[4]int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = [4]int{1, 2, 8, 8}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x08, // len=8s
+
+				0x01, 0x01, // 1
+				0x01, 0x02, // 2
+				0x01, 0x08, // 8
+				0x01, 0x08, // 8
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**[4]int, but nil [4]int part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *[4]int
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+}
