@@ -65,7 +65,6 @@ type typeInfo struct {
 	Indir   int       // Indir is number of times that the value is deref'd. Used for encoding of ptr-to types.
 	KeyType *typeInfo // only valid for maps
 	ValType *typeInfo // valid for map, slice, and array
-	Len     int       // valid for array only
 }
 
 func (ti typeInfo) Primitive() bool {
@@ -185,8 +184,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			if err != nil {
 				return typeInfo{}, errorf("array value is not encodable: %s", err)
 			}
-			arrLen := t.Len()
-			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo, Len: arrLen}, nil
+			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()
@@ -307,8 +305,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			if err != nil {
 				return typeInfo{}, errorf("array value is not decodable: %s", err)
 			}
-			arrLen := t.Len()
-			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &arrValInfo, Len: arrLen}, nil
+			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &arrValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

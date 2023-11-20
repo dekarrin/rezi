@@ -560,10 +560,8 @@ func Enc(v interface{}) (data []byte, err error) {
 		return encNilHeader(0), nil
 	} else if info.Main == mtMap {
 		return encCheckedMap(v, info)
-	} else if info.Main == mtSlice {
+	} else if info.Main == mtSlice || info.Main == mtArray {
 		return encCheckedSlice(v, info)
-	} else if info.Main == mtArray {
-		return encCheckedArray(v, info)
 	} else {
 		panic("no possible encoding")
 	}
@@ -621,10 +619,8 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return decCheckedPrim(data, v, info)
 	} else if info.Main == mtMap {
 		return decCheckedMap(data, v, info)
-	} else if info.Main == mtSlice {
+	} else if info.Main == mtSlice || info.Main == mtArray {
 		return decCheckedSlice(data, v, info)
-	} else if info.Main == mtArray {
-		return decCheckedArray(data, v, info)
 	} else {
 		panic("no possible decoding")
 	}
