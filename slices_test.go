@@ -274,6 +274,40 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[][3]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = [][3]int{
+				{1, 2, 3},
+				{8888},
+			}
+
+			expect = []byte{
+				0x01, 0x0f,
+
+				0x01, 0x06,
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x05,
+				0x02, 0x22, 0xb8,
+				0x00,
+				0x00,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta slice [][]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -865,6 +899,102 @@ func Test_Enc_Slice_ValueIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[]*[4]int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[4]int{{8, 8, 16, 24}, {1, 2, 3}, {10, 9, 8}}
+			expect = []byte{
+				0x01, 0x1c, // len=28
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0x01, 0x07, // len=7
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+				0x00,
+
+				0x01, 0x07, // len=7
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+				0x00,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[4]int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[4]int{{8, 8, 16, 24}, nil, {10, 9, 8}}
+			expect = []byte{
+				0x01, 0x14, // len=20
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0xa0, // nil
+
+				0x01, 0x07, // len=7
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+				0x00,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[4]int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []*[4]int{nil, nil, nil}
+			expect = []byte{
+				0x01, 0x03,
+
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]*[]int, all non-nil", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1245,6 +1375,43 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 
 		// execute
 		var actual []map[string]bool
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[][3]int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0f,
+
+				0x01, 0x06,
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+
+				0x01, 0x05,
+				0x02, 0x22, 0xb8,
+				0x00,
+				0x00,
+			}
+			expect = [][3]int{
+				{1, 2, 3},
+				{8888},
+			}
+			expectConsumed = 17
+		)
+
+		// execute
+		var actual [][3]int
 		consumed, err := Dec(input, &actual)
 
 		// assert
@@ -1920,6 +2087,111 @@ func Test_Dec_Slice_ValueIndirection(t *testing.T) {
 
 		// execute
 		var actual []*map[string]bool
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[4]int, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x1c, // len=28
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0x01, 0x07, // len=7
+				0x01, 0x01,
+				0x01, 0x02,
+				0x01, 0x03,
+				0x00,
+
+				0x01, 0x07, // len=7
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+				0x00,
+			}
+			expect         = []*[4]int{{8, 8, 16, 24}, {1, 2, 3}, {10, 9, 8}}
+			expectConsumed = 30
+		)
+
+		// execute
+		var actual []*[4]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[4]int, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x14, // len=20
+
+				0x01, 0x08, // len=8
+				0x01, 0x08,
+				0x01, 0x08,
+				0x01, 0x10,
+				0x01, 0x18,
+
+				0xa0,
+
+				0x01, 0x07, // len=7
+				0x01, 0x0a,
+				0x01, 0x09,
+				0x01, 0x08,
+				0x00,
+			}
+			expect         = []*[4]int{{8, 8, 16, 24}, nil, {10, 9, 8}}
+			expectConsumed = 22
+		)
+
+		// execute
+		var actual []*[4]int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*[4]int, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x03, // len=19
+
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+			expect         = []*[4]int{nil, nil, nil}
+			expectConsumed = 5
+		)
+
+		// execute
+		var actual []*[4]int
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
