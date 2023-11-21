@@ -190,9 +190,11 @@ func decMap(data []byte, v interface{}) (int, error) {
 	m := reflect.MakeMap(refMapType)
 
 	var i int
+	refKType := refMapType.Key()
+	refVType := refMapType.Elem()
 	for i < toConsume {
 		// dynamically create the map key type
-		refKey := reflect.New(refMapType.Key())
+		refKey := reflect.New(refKType)
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
 			return totalConsumed, errorDecf(totalConsumed, "map key: %v", err)
@@ -201,7 +203,6 @@ func decMap(data []byte, v interface{}) (int, error) {
 		i += n
 		data = data[n:]
 
-		refVType := refMapType.Elem()
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {

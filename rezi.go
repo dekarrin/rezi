@@ -1,7 +1,8 @@
 // Package rezi provides the ability to encode and decode data in Rarefied
-// Encoding (Compressible) Interchange format. It allows types that implement
-// encoding.BinaryUnmarshaler and encoding.BinaryMarshaler to be easily read
-// from and written to byte slices. It has an interface similar to the json
+// Encoding (Compressible) Interchange format. It allows basic Go types and
+// user-defined types to be easily read from and written to byte slices, with
+// customization possible by implementing encoding.BinaryUnmarshaler and
+// encoding.BinaryMarshaler on a type. It has an interface similar to the json
 // package; one function is used to encode all supported types, and another
 // function receives bytes and a receiver for decoded data and infers how to
 // decode the bytes based on the receiver.
@@ -123,14 +124,11 @@
 // a REZI function called from within UnmarshalBinary to supply additional
 // offset information, but this is not strictly required.
 //
-// Array types are not supported at this time, although they will be added in a
-// future release.
-//
-// Slices and maps are supported with some stipulations. Slices must contain
-// only other supported types (or pointers to them). Maps have the same
-// restrictions on their values, but only maps with a key type of string, int
-// (or any of its unsigned or specific-size varieties), float32, float64, or
-// bool are supported.
+// Slices, arrays, and maps are supported with some stipulations. Slices and
+// arrays must contain only other supported types (or pointers to them). Maps
+// have the same restrictions on their values, but only maps with a key type of
+// string, int (or any of its unsigned or specific-size varieties), float32,
+// float64, or bool are supported.
 //
 // Pointers to any supported type are also accepted, including to other pointer
 // types with any number of indirections. The REZI format encodes information on
@@ -399,6 +397,11 @@
 // special delimiter between the encoded elements; when one ends, the next one
 // begins.
 //
+//	Array Values
+//
+// Arrays are encoded in an identical fashion to slices. They do not record the
+// size of the array type.
+//
 //	Map Values
 //
 //	Layout:
@@ -555,7 +558,7 @@ func Enc(v interface{}) (data []byte, err error) {
 		return encNilHeader(0), nil
 	} else if info.Main == mtMap {
 		return encCheckedMap(v, info)
-	} else if info.Main == mtSlice {
+	} else if info.Main == mtSlice || info.Main == mtArray {
 		return encCheckedSlice(v, info)
 	} else {
 		panic("no possible encoding")
@@ -614,7 +617,7 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return decCheckedPrim(data, v, info)
 	} else if info.Main == mtMap {
 		return decCheckedMap(data, v, info)
-	} else if info.Main == mtSlice {
+	} else if info.Main == mtSlice || info.Main == mtArray {
 		return decCheckedSlice(data, v, info)
 	} else {
 		panic("no possible decoding")

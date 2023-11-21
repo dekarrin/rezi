@@ -24,6 +24,7 @@ const (
 	mtNil
 	mtFloat
 	mtComplex
+	mtArray
 )
 
 func (mt mainType) String() string {
@@ -48,6 +49,8 @@ func (mt mainType) String() string {
 		return "mtFloat"
 	case mtComplex:
 		return "mtComplex"
+	case mtArray:
+		return "mtArray"
 	default:
 		return fmt.Sprintf("mainType(%d)", mt)
 	}
@@ -61,7 +64,7 @@ type typeInfo struct {
 	Signed  bool
 	Indir   int       // Indir is number of times that the value is deref'd. Used for encoding of ptr-to types.
 	KeyType *typeInfo // only valid for maps
-	ValType *typeInfo // valid for map and slice
+	ValType *typeInfo // valid for map, slice, and array
 }
 
 func (ti typeInfo) Primitive() bool {
@@ -174,6 +177,14 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				return typeInfo{}, errorf("slice value is not encodable: %s", err)
 			}
 			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &slValInfo}, nil
+		case reflect.Array:
+			// could be okay, but val type must be encodable.
+			arrValType := t.Elem()
+			arrValInfo, err := encTypeInfo(arrValType)
+			if err != nil {
+				return typeInfo{}, errorf("array value is not encodable: %s", err)
+			}
+			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()
@@ -287,6 +298,14 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				return typeInfo{}, errorf("slice value is not decodable: %s", err)
 			}
 			return typeInfo{Indir: indirCount, Main: mtSlice, ValType: &slValInfo}, nil
+		case reflect.Array:
+			// could be okay, but val type must be encodable
+			arrValType := t.Elem()
+			arrValInfo, err := decTypeInfo(arrValType)
+			if err != nil {
+				return typeInfo{}, errorf("array value is not decodable: %s", err)
+			}
+			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

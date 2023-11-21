@@ -6,7 +6,7 @@
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode several
 built-in Go types to bytes, and automatically handles decoding and encoding of
-types that implement `encoding.BinaryMarshaler` and
+user-defined types that implement `encoding.BinaryMarshaler` and
 `encoding.BinaryUnmarshaler`.
 
 All data is encoded in a deterministic fashion, or as deterministically as
@@ -192,16 +192,13 @@ REZI supports all built-in basic types. Additionally, any type that implements
 `encoding.BinaryMarshaler` can be encoded, and any type that implements
 `encoding.BinaryUnmarshaler` with a pointer receiver can be decoded.
 
-REZI supports slice types and map types whose values are of any supported type
-(including those whose values are themselves slice or map values). Maps must
-additionally have keys of type `string`, `bool`, one of the built-in integer
-types, or one of the built-in float types.
+REZI supports slice, array, and map types whose values are of any supported type
+(including those whose values are themselves slice, array, or map values). Maps
+must additionally have keys of type `string`, `bool`, one of the built-in
+integer types, or one of the built-in float types.
 
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.
-
-Array types (declared as `[n]T` with a specific value for `n`) are not supported
-at this time
 
 #### User-Defined Types
 REZI supports encoding any custom type that implements
