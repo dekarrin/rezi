@@ -18,11 +18,23 @@ var (
 	// errors.Is(err, ErrMarshalBinary).
 	ErrMarshalBinary = errors.New("MarshalBinary() returned an error")
 
+	// ErrMarshalText indicates that calling a MarshalText method on a type that
+	// was being encoded returned a non-nil error. Any error returned from this
+	// package that was caused by this will return true for the expression
+	// errors.Is(err, ErrMarshalText).
+	ErrMarshalText = errors.New("MarshalText() returned an error")
+
 	// ErrUnmarshalBinary indicates that calling an UnmarshalBinary method on a
 	// type that was being decoded returned a non-nil error. Any error returned
 	// from this package that was caused by this will return true for the
 	// expression errors.Is(err, ErrUnmarshalBinary).
 	ErrUnmarshalBinary = errors.New("UnmarshalBinary() returned an error")
+
+	// ErrUnmarshalText indicates that calling an UnmarshalText method on a type
+	// that was being decoded returned a non-nil error. Any error returned from
+	// this package that was caused by this will return true for the expression
+	// errors.Is(err, ErrUnmarshalText).
+	ErrUnmarshalText = errors.New("UnmarshalText() returned an error")
 
 	// ErrInvalidType indicates that the value to be encoded or decoded to is
 	// not of a valid type. Any error returned from this package that was caused
