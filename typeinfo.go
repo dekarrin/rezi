@@ -73,7 +73,7 @@ type typeInfo struct {
 }
 
 func (ti typeInfo) Primitive() bool {
-	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat || ti.Main == mtComplex
+	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat || ti.Main == mtComplex || ti.Main == mtText
 }
 
 func canEncode(v interface{}) (typeInfo, error) {

@@ -3,6 +3,7 @@ package rezi
 import (
 	"encoding"
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -266,8 +267,42 @@ func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler 
 	return marshaledBytesProducer{fn: byteProducer}
 }
 
-// testBinary is a small struct that implements binary.Marshaler and
-// binary.Unmarshaler. It has two fields, that it lays out as such in encoding:
+// testText is a small struct that implements TextMarshaler and TextUnmarshaler.
+// It has three fields, that it lays out as such in encoding: "value", a uint16,
+// followed by "enabled", a bool, followed by "name", a string. Each field is
+// separated with delimiter character ',', and the string field comes last to
+// avoid needing to escape it within.
+type testText struct {
+	enabled bool
+	name    string
+	value   uint16
+}
+
+func (ttv testText) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d,%t,%s", ttv.value, ttv.enabled, ttv.name)), nil
+}
+
+func (ttv *testText) UnmarshalText(data []byte) error {
+	str := string(data)
+
+	var value uint16
+	var enabled bool
+	var name string
+
+	_, err := fmt.Sscanf(str, "%d,%t,%s", &value, &enabled, &name)
+	if err != nil {
+		return fmt.Errorf("could not scan values: %w", err)
+	}
+
+	ttv.value = value
+	ttv.enabled = enabled
+	ttv.name = name
+
+	return nil
+}
+
+// testBinary is a small struct that implements BinaryMarshaler and
+// BinaryUnmarshaler. It has two fields, that it lays out as such in encoding:
 // "data", a string, followed by "number", an int32.
 type testBinary struct {
 	number int32
