@@ -6,7 +6,9 @@ import (
 	"math"
 	"math/big"
 	"net"
+	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -1818,6 +1820,12 @@ func Test_Enc_Bool(t *testing.T) {
 }
 
 func Test_Enc_Binary(t *testing.T) {
+	testURL, err := url.Parse("https://github.com/")
+	if err != nil {
+		panic(fmt.Sprintf("cannot parse test url: %v", err))
+	}
+	testTimeLoc := time.FixedZone("", -8*60*60)
+
 	testCases := []struct {
 		name   string
 		input  encoding.BinaryMarshaler
@@ -1847,6 +1855,21 @@ func Test_Enc_Binary(t *testing.T) {
 			name:   "actual object",
 			input:  testBinary{number: 12, data: "Hello, John!!!!!!!!"},
 			expect: []byte{0x01, 0x18, 0x41, 0x82, 0x13, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x4a, 0x6f, 0x68, 0x6e, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x21, 0x01, 0x0c},
+		},
+		{
+			name:   "url object",
+			input:  testURL,
+			expect: []byte{0x01, 0x13, 0x68, 0x74, 0x74, 0x70, 0x73, 0x3a, 0x2f, 0x2f, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f},
+		},
+		{
+			name:   "time object, UTC loc",
+			input:  time.Date(2009, time.April, 13, 11, 23, 16, 0, time.UTC),
+			expect: []byte{0x01, 0x0f, 0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x17, 0xa4, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff},
+		},
+		{
+			name:   "time object, particular loc",
+			input:  time.Date(2009, time.April, 13, 11, 23, 16, 0, testTimeLoc),
+			expect: []byte{0x01, 0x0f, 0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x88, 0x24, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x20},
 		},
 	}
 
@@ -3228,6 +3251,12 @@ func Test_Dec_Bool(t *testing.T) {
 }
 
 func Test_Dec_Binary(t *testing.T) {
+	testURL, err := url.Parse("https://github.com/")
+	if err != nil {
+		panic(fmt.Sprintf("cannot parse test url: %v", err))
+	}
+	testTimeLoc := time.FixedZone("", -8*60*60)
+
 	// cannot be table-driven easily due to trying different types
 
 	t.Run("normal BinaryUnmarshaler result", func(t *testing.T) {
@@ -3344,6 +3373,146 @@ func Test_Dec_Binary(t *testing.T) {
 		assert.Nil(*actual)   // but the pointer it points to should be nil
 	})
 
+	t.Run("url.URL", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x13, // len=19
+
+				0x68, 0x74, 0x74, 0x70, 0x73, 0x3a, 0x2f, 0x2f, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+			}
+			expect         = testURL
+			expectConsumed = 21
+		)
+
+		var actual *url.URL
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*url.URL", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x13, // len=19
+
+				0x68, 0x74, 0x74, 0x70, 0x73, 0x3a, 0x2f, 0x2f, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
+			}
+			expectVal      = testURL
+			expect         = &expectVal
+			expectConsumed = 21
+		)
+
+		var actual **url.URL
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("time.Time (UTC loc)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x17, 0xa4, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
+			}
+			expect         = time.Date(2009, time.April, 13, 11, 23, 16, 0, time.UTC)
+			expectConsumed = 17
+		)
+
+		var actual time.Time
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*time.Time (UTC loc)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x17, 0xa4, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
+			}
+			expectVal      = time.Date(2009, time.April, 13, 11, 23, 16, 0, time.UTC)
+			expect         = &expectVal
+			expectConsumed = 17
+		)
+
+		var actual *time.Time
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("time.Time (non-UTC loc)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x88, 0x24, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x20,
+			}
+			expect         = time.Date(2009, time.April, 13, 11, 23, 16, 0, testTimeLoc)
+			expectConsumed = 17
+		)
+
+		var actual time.Time
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*time.Time (non-UTC loc)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x0f, // len=15
+
+				0x01, 0x00, 0x00, 0x00, 0x0e, 0xc1, 0x75, 0x88, 0x24, 0x00, 0x00, 0x00, 0x00, 0xfe, 0x20,
+			}
+			expectVal      = time.Date(2009, time.April, 13, 11, 23, 16, 0, testTimeLoc)
+			expect         = &expectVal
+			expectConsumed = 17
+		)
+
+		var actual *time.Time
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
 }
 
 func Test_Dec_Text(t *testing.T) {
