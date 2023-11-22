@@ -4,6 +4,8 @@ import (
 	"encoding"
 	"fmt"
 	"math"
+	"math/big"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -784,6 +786,123 @@ func Test_decStringV1(t *testing.T) {
 			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
 		})
 	}
+}
+
+func Test_encText(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  encoding.TextMarshaler
+		expect []byte
+	}{
+		{
+			name:   "user-defined type",
+			input:  testText{name: "VRISKA", value: 8, enabled: true},
+			expect: []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41},
+		},
+		{
+			name:   "IPv4",
+			input:  net.ParseIP("128.0.0.1"),
+			expect: []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31},
+		},
+		{
+			name:   "IPv6",
+			input:  net.ParseIP("2001:db8::1"),
+			expect: []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31},
+		},
+		{
+			name:   "big.Int",
+			input:  big.NewInt(2023),
+			expect: []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual, _ := encText(tc.input)
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+}
+
+func Test_decText(t *testing.T) {
+	t.Run("user-defined type", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41}
+			expect         = testText{name: "VRISKA", value: 8, enabled: true}
+			expectConsumed = 16
+		)
+
+		var actual testText
+		actualRead, err := decText(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+	})
+
+	t.Run("IPv4", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31}
+			expect         = net.ParseIP("128.0.0.1")
+			expectConsumed = 12
+		)
+
+		var actual net.IP
+		actualRead, err := decText(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+	})
+
+	t.Run("IPv6", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31}
+			expect         = net.ParseIP("2001:db8::1")
+			expectConsumed = 14
+		)
+
+		var actual net.IP
+		actualRead, err := decText(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+	})
+
+	t.Run("big.Int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33}
+			expect         = big.NewInt(2023)
+			expectConsumed = 7
+		)
+
+		actual := big.NewInt(1)
+		actualRead, err := decText(input, actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+	})
 }
 
 func Test_encBinary(t *testing.T) {
@@ -1810,6 +1929,120 @@ func Test_Enc_Binary(t *testing.T) {
 
 		var (
 			ptr    *testBinary
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+}
+
+func Test_Enc_Text(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  encoding.TextMarshaler
+		expect []byte
+	}{
+		{
+			name:   "user-defined type",
+			input:  testText{name: "VRISKA", value: 8, enabled: true},
+			expect: []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41},
+		},
+		{
+			name:   "IPv4",
+			input:  net.ParseIP("128.0.0.1"),
+			expect: []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31},
+		},
+		{
+			name:   "IPv6",
+			input:  net.ParseIP("2001:db8::1"),
+			expect: []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31},
+		},
+		{
+			name:   "big.Int",
+			input:  big.NewInt(2023),
+			expect: []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+
+	t.Run("*text (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *testText
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*text", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testText{value: 8, name: "VRISKA", enabled: true}
+			input    = &inputVal
+			expect   = []byte{
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**text", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testText{value: 8, name: "VRISKA", enabled: true}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**text, but nil binary part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *testText
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
 		)
@@ -3109,6 +3342,258 @@ func Test_Dec_Binary(t *testing.T) {
 
 		assert.NotNil(actual) // actual should *itself* not be nil
 		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
+}
+
+func Test_Dec_Text(t *testing.T) {
+	// cannot be table-driven easily due to trying different types
+
+	t.Run("normal TextUnmarshaler result", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41}
+			expect         = testText{name: "VRISKA", value: 8, enabled: true}
+			expectConsumed = 16
+		)
+
+		// exeucte
+		actual := testText{}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("nil *TextUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *testText
+			expectConsumed = 1
+		)
+
+		var actual *testText = &testText{enabled: true}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*TextUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41}
+			expectVal      = testText{name: "VRISKA", value: 8, enabled: true}
+			expect         = &expectVal
+			expectConsumed = 16
+		)
+
+		var actual *testText
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**TextUnmarshaler", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41}
+			expectVal      = testText{name: "VRISKA", value: 8, enabled: true}
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 16
+		)
+
+		var actual **testText
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**TextUnmarshaler, but nil TextUnmarshaler part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **testText
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
+	t.Run("IPv4", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31}
+			expect         = net.ParseIP("128.0.0.1")
+			expectConsumed = 12
+		)
+
+		var actual net.IP
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*IPv4", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31}
+			expectVal      = net.ParseIP("128.0.0.1")
+			expect         = &expectVal
+			expectConsumed = 12
+		)
+
+		var actual *net.IP
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("IPv6", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31}
+			expect         = net.ParseIP("2001:db8::1")
+			expectConsumed = 14
+		)
+
+		var actual net.IP
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*IPv6", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31}
+			expectVal      = net.ParseIP("2001:db8::1")
+			expect         = &expectVal
+			expectConsumed = 14
+		)
+
+		var actual *net.IP
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("big.Int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		// big.Int is an always-ptr type, so we will make expect be the deref'd
+		// value
+
+		var (
+			input          = []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33}
+			val            = big.NewInt(2023)
+			expect         = *val
+			expectConsumed = 7
+		)
+
+		var actual big.Int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*big.Int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		// big.Int is an always-ptr type, so we need not adjust expect, here.
+
+		var (
+			input          = []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33}
+			expect         = big.NewInt(2023)
+			expectConsumed = 7
+		)
+
+		var actual *big.Int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**big.Int", func(t *testing.T) {
+		assert := assert.New(t)
+
+		// big.Int is an always-ptr type, so even though its a double * check,
+		// expect only needs one level of indir from the expected val.
+
+		var (
+			input          = []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33}
+			expectVal      = big.NewInt(2023)
+			expect         = &expectVal
+			expectConsumed = 7
+		)
+
+		var actual **big.Int
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
 	})
 
 }

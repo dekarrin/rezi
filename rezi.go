@@ -2,10 +2,11 @@
 // Encoding (Compressible) Interchange format. It allows basic Go types and
 // user-defined types to be easily read from and written to byte slices, with
 // customization possible by implementing encoding.BinaryUnmarshaler and
-// encoding.BinaryMarshaler on a type. It has an interface similar to the json
-// package; one function is used to encode all supported types, and another
-// function receives bytes and a receiver for decoded data and infers how to
-// decode the bytes based on the receiver.
+// encoding.BinaryMarshaler on a type, or alternatively by implementing
+// encoding.TextUnmarshaler and encoding.TextMarshaler. REZI has an interface
+// similar to the json package; one function is used to encode all supported
+// types, and another function receives bytes and a receiver for decoded data
+// and infers how to decode the bytes based on the receiver.
 //
 // The [Enc] function is used to encode any supported type to REZI bytes:
 //
@@ -118,8 +119,9 @@
 // REZI supports all built-in basic Go types: int (as well as all of its
 // unsigned and specific-size varieties), float32, float64, complex64,
 // complex128, string, bool, and any type that implements
-// encoding.BinaryMarshaler (for encoding) or whose pointer type implements
-// encoding.BinaryUnmarshaler (for decoding). Implementations of
+// encoding.BinaryMarshaler or encoding.TextMarshaler (for encoding) or whose
+// pointer type implements encoding.BinaryUnmarshaler or
+// encoding.TextUnmarshaler (for decoding). Implementations of
 // encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error from
 // a REZI function called from within UnmarshalBinary to supply additional
 // offset information, but this is not strictly required.
@@ -383,6 +385,22 @@
 // Any type that implements [encoding.BinaryMarshaler] is encoded by taking the
 // result of calling its MarshalBinary() method and prepending it with an
 // integer value giving the number of bytes in it.
+//
+//	encoding.TextMarshaler Values
+//
+//	Layout:
+//
+//	[ INFO ] [ INT VALUE ] [ MARSHALED BYTES ]
+//	<-------COUNT--------> <-MARSHALED BYTES->
+//	      1..9 bytes           COUNT bytes
+//
+// Any type that implements [encoding.TextMarshaler] is encoded by taking the
+// result of calling its MarshalText() method and encoding that value as a
+// string.
+//
+// Note that BinarayMarshaler encoding takes precedence over TextMarshaler
+// encoding; if a type implements both, it will be encoded as a BinaryMarshaler,
+// not a TextMarshaler.
 //
 //	Slice Values
 //

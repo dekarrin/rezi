@@ -167,6 +167,46 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("map[int]text", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: {name: "NEPETA", enabled: false, value: 100},
+			}
+
+			expect = []byte{
+				0x01, 0x3b, // len=59
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("map[int]float64", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -753,6 +793,123 @@ func Test_Enc_Map_ValueIndirection(t *testing.T) {
 				0xa0,
 
 				0x02, 0x02, 0x64, // 612:
+				0xa0,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]*testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: {name: "NEPETA", enabled: false, value: 100},
+			}
+
+			expect = []byte{
+				0x01, 0x3b, // len=59
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]*testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: nil,
+			}
+
+			expect = []byte{
+				0x01, 0x29, // len=41
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// nil
+				0xa0,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = map[int]*testText{
+				8:   nil,
+				413: nil,
+				100: nil,
+			}
+
+			expect = []byte{
+				0x01, 0x0a, // len=10
+
+				// 8
+				0x01, 0x08,
+				0xa0,
+
+				// 100
+				0x01, 0x64,
+				0xa0,
+
+				// 413
+				0x02, 0x01, 0x9d,
 				0xa0,
 			}
 		)
@@ -1397,6 +1554,49 @@ func Test_Dec_Map_NoIndirection(t *testing.T) {
 
 		// execute
 		var actual map[int]testBinary
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]text", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x3b, // len=59
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = map[int]testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: {name: "NEPETA", enabled: false, value: 100},
+			}
+			expectConsumed = 61
+		)
+
+		// execute
+		var actual map[int]testText
 		consumed, err := Dec(input, &actual)
 
 		// assert
@@ -2078,6 +2278,132 @@ func Test_Dec_Map_ValueIndirection(t *testing.T) {
 		}
 
 		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x3b, // len=59
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = map[int]*testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: {name: "NEPETA", enabled: false, value: 100},
+			}
+			expectConsumed = 61
+		)
+
+		// execute
+		var actual map[int]*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x29, // len=41
+
+				// 8
+				0x01, 0x08,
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// 100
+				0x01, 0x64,
+				// nil
+				0xa0,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = map[int]*testText{
+				8:   {name: "VRISKA", value: 8, enabled: true},
+				413: {name: "JOHN", enabled: false, value: 413},
+				100: nil,
+			}
+			expectConsumed = 43
+		)
+
+		// execute
+		var actual map[int]*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("map[int]*text, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x0a, // len=10
+
+				// 8
+				0x01, 0x08,
+				0xa0,
+
+				// 100
+				0x01, 0x64,
+				0xa0,
+
+				// 413
+				0x02, 0x01, 0x9d,
+				0xa0,
+			}
+			expect = map[int]*testText{
+				8:   nil,
+				413: nil,
+				100: nil,
+			}
+			expectConsumed = 12
+		)
+
+		// execute
+		var actual map[int]*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})

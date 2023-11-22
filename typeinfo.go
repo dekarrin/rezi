@@ -9,6 +9,8 @@ import (
 var (
 	refBinaryMarshalerType   = reflect.TypeOf((*encoding.BinaryMarshaler)(nil)).Elem()
 	refBinaryUnmarshalerType = reflect.TypeOf((*encoding.BinaryUnmarshaler)(nil)).Elem()
+	refTextMarshalerType     = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+	refTextUnmarshalerType   = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 )
 
 type mainType int64
@@ -25,6 +27,7 @@ const (
 	mtFloat
 	mtComplex
 	mtArray
+	mtText
 )
 
 func (mt mainType) String() string {
@@ -51,6 +54,8 @@ func (mt mainType) String() string {
 		return "mtComplex"
 	case mtArray:
 		return "mtArray"
+	case mtText:
+		return "mtText"
 	default:
 		return fmt.Sprintf("mainType(%d)", mt)
 	}
@@ -68,7 +73,7 @@ type typeInfo struct {
 }
 
 func (ti typeInfo) Primitive() bool {
-	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat || ti.Main == mtComplex
+	return ti.Main == mtIntegral || ti.Main == mtBool || ti.Main == mtString || ti.Main == mtBinary || ti.Main == mtFloat || ti.Main == mtComplex || ti.Main == mtText
 }
 
 func canEncode(v interface{}) (typeInfo, error) {
@@ -111,6 +116,23 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				// if it's not a pointer type and it implements, there is no
 				// ambiguity.
 				return typeInfo{Indir: indirCount, Main: mtBinary}, nil
+			}
+		} else if t.Implements(refTextMarshalerType) {
+			// same checks as above but for text
+			if t.Kind() == reflect.Pointer {
+				_, definedOnValue := t.Elem().MethodByName("MarshalText")
+
+				// only consider it to be implementing if it is *not* defined
+				// on the value type.
+				if !definedOnValue {
+					return typeInfo{Indir: indirCount, Main: mtText}, nil
+				}
+
+				// implicit deref, wait for next pass
+			} else {
+				// if it's not a pointer type and it implements, there is no
+				// ambiguity.
+				return typeInfo{Indir: indirCount, Main: mtText}, nil
 			}
 		}
 
@@ -165,7 +187,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
-				return typeInfo{}, errorf("map key type must be bool, string, float, or castable to int").wrap(ErrInvalidType)
+				return typeInfo{}, errorf("map key type must be bool, string, float, int, or text-encodable type").wrap(ErrInvalidType)
 			}
 
 			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
@@ -233,6 +255,8 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 		if reflect.PointerTo(t).Implements(refBinaryUnmarshalerType) {
 			return typeInfo{Indir: indirCount, Main: mtBinary}, nil
+		} else if reflect.PointerTo(t).Implements(refTextUnmarshalerType) {
+			return typeInfo{Indir: indirCount, Main: mtText}, nil
 		}
 
 		switch t.Kind() {
@@ -286,7 +310,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			// and with an ordering, which p much means we exclusively support
 			// non-binary primitives.
 			if !mKeyInfo.Primitive() || mKeyInfo.Main == mtBinary {
-				return typeInfo{}, errorf("map key type must be bool, string, float, or castable to int").wrap(ErrInvalidType)
+				return typeInfo{}, errorf("map key type must be bool, string, float, int, or text-encodable type").wrap(ErrInvalidType)
 			}
 
 			return typeInfo{Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil

@@ -399,6 +399,77 @@ func Test_reziError_totalOffset_binary(t *testing.T) {
 	}
 }
 
+func Test_reziError_totalOffset_text(t *testing.T) {
+	testCases := []struct {
+		name              string
+		input             []byte
+		expectTotalOffset int
+		expectErrText     string
+	}{
+		{
+			name: "decode text: bad byte count",
+			input: []byte{
+				0x41, 0x82, 0x0e, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			},
+			expectTotalOffset: 3,
+			expectErrText:     "decoded string byte count",
+		},
+		{
+			name: "decode bin: string error",
+			input: []byte{
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0xc3,
+			},
+			expectTotalOffset: 15,
+			expectErrText:     "decode text: invalid UTF-8 encoding",
+		},
+		{
+			name: "decode bin: number error",
+			input: []byte{
+				0x41, 0x82, 0x0e, 0x38, 0x65, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			},
+			expectTotalOffset: 0,
+			expectErrText:     "invalid syntax",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			var dest testText
+			_, err := Dec(tc.input, &dest)
+			if !assert.Error(err) {
+				return
+			}
+
+			// convert it to known type reziError
+			rErr, ok := err.(reziError)
+			if !assert.Truef(ok, "Dec returned non-reziErr: %v", err) {
+				return
+			}
+
+			// check if the offset is valid
+			actual, ok := rErr.totalOffset()
+			if !assert.Truef(ok, "Dec returned reziErr with no offset: %v", err) {
+				return
+			}
+
+			// assert the offset is the expected
+			assert.Equal(tc.expectTotalOffset, actual)
+
+			// and finally, check the err output
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
+			lowerMsgAct := strings.ToUpper(rErr.Error())
+			lowerMsgExp := strings.ToUpper(tc.expectErrText)
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
+		})
+	}
+}
+
 func Test_reziError_totalOffset_slice(t *testing.T) {
 	stringSlice := func(data []byte) error {
 		var sDest []string

@@ -147,6 +147,10 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
+	case mtText:
+		return encWithNilCheck(value, ti, encText, func(r reflect.Value) encoding.TextMarshaler {
+			return r.Interface().(encoding.TextMarshaler)
+		})
 	default:
 		panic(fmt.Sprintf("%T cannot be encoded as REZI primitive type", value))
 	}
@@ -154,8 +158,9 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 
 // decCheckedPrim decodes a primitive value from rezi-format bytes into the
 // value pointed-to by v. V must point to a REZI primitive value (int, bool,
-// string), or implement encoding.BinaryUnmarshaler, or be a pointer to one of
-// those types with any level of indirection.
+// string, float, complex), or implement encoding.BinaryUnmarshaler, or
+// implement encoding.TextUnmarshaler, or be a pointer to one of those types
+// with any level of indirection.
 func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
@@ -378,6 +383,32 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 			refReceiver := reflect.ValueOf(v)
 			refReceiver.Elem().Set(reflect.ValueOf(bu))
+		}
+		return n, nil
+	case mtText:
+		// if we just got handed a pointer-to TextUnmarshaler, we need to undo
+		// that
+		tu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+			func(t reflect.Type) bool {
+				return t.Implements(refTextUnmarshalerType)
+			},
+			func(b []byte, unwrapped interface{}) (int, error) {
+				recv := unwrapped.(encoding.TextUnmarshaler)
+				return decText(b, recv)
+			},
+		))
+		if err != nil {
+			return n, err
+		}
+		if ti.Indir == 0 {
+			// assume v is a *T, no future-proofing here.
+
+			// due to complicated forcing of decText into the decFunc API,
+			// we do now have a T (as an interface{}). We must use reflection to
+			// assign it.
+
+			refReceiver := reflect.ValueOf(v)
+			refReceiver.Elem().Set(reflect.ValueOf(tu))
 		}
 		return n, nil
 	default:
@@ -1082,6 +1113,38 @@ func decUTF8Codepoint(data []byte) (rune, int, error) {
 		}
 	}
 	return ch, charBytesRead, nil
+}
+
+func encText(t encoding.TextMarshaler) ([]byte, error) {
+	if t == nil {
+		return encNilHeader(0), nil
+	}
+
+	tTextSlice, marshalErr := t.MarshalText()
+	if marshalErr != nil {
+		return nil, errorf("%s: %s", ErrMarshalText, marshalErr)
+	}
+	tText := string(tTextSlice)
+
+	return encString(tText), nil
+}
+
+func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
+	var readBytes int
+	var textData string
+	var err error
+
+	textData, readBytes, err = decString(data)
+	if err != nil {
+		return readBytes, errorDecf(0, "decode text: %s", err).wrap(ErrMalformedData)
+	}
+
+	err = t.UnmarshalText([]byte(textData))
+	if err != nil {
+		return readBytes, errorDecf(0, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
+	}
+
+	return readBytes, nil
 }
 
 func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {

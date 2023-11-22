@@ -3,7 +3,10 @@ package rezi
 import (
 	"encoding"
 	"errors"
+	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -266,8 +269,55 @@ func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler 
 	return marshaledBytesProducer{fn: byteProducer}
 }
 
-// testBinary is a small struct that implements binary.Marshaler and
-// binary.Unmarshaler. It has two fields, that it lays out as such in encoding:
+// testText is a small struct that implements TextMarshaler and TextUnmarshaler.
+// It has three fields, that it lays out as such in encoding: "value", a uint16,
+// followed by "enabled", a bool, followed by "name", a string. Each field is
+// separated with delimiter character ',', and the string field comes last to
+// avoid needing to escape it within.
+type testText struct {
+	enabled bool
+	name    string
+	value   uint16
+}
+
+func (ttv testText) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d,%t,%s", ttv.value, ttv.enabled, ttv.name)), nil
+}
+
+func (ttv *testText) UnmarshalText(data []byte) error {
+	str := string(data)
+
+	var value int64
+	var enabled bool
+	var name string
+	var err error
+
+	parts := strings.SplitN(str, ",", 3)
+	if len(parts) != 3 {
+		return fmt.Errorf("text data does not contain 3 comma-separated fields")
+	}
+
+	value, err = strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("value: %w", err)
+	}
+
+	enabled, err = strconv.ParseBool(parts[1])
+	if err != nil {
+		return fmt.Errorf("enabled: %w", err)
+	}
+
+	name = parts[2]
+
+	ttv.value = uint16(value)
+	ttv.enabled = enabled
+	ttv.name = name
+
+	return nil
+}
+
+// testBinary is a small struct that implements BinaryMarshaler and
+// BinaryUnmarshaler. It has two fields, that it lays out as such in encoding:
 // "data", a string, followed by "number", an int32.
 type testBinary struct {
 	number int32
