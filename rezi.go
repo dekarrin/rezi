@@ -119,8 +119,9 @@
 // REZI supports all built-in basic Go types: int (as well as all of its
 // unsigned and specific-size varieties), float32, float64, complex64,
 // complex128, string, bool, and any type that implements
-// encoding.BinaryMarshaler (for encoding) or whose pointer type implements
-// encoding.BinaryUnmarshaler (for decoding). Implementations of
+// encoding.BinaryMarshaler or encoding.TextMarshaler (for encoding) or whose
+// pointer type implements encoding.BinaryUnmarshaler or
+// encoding.TextUnmarshaler (for decoding). Implementations of
 // encoding.BinaryUnmarshaler should use [Wrapf] when encountering an error from
 // a REZI function called from within UnmarshalBinary to supply additional
 // offset information, but this is not strictly required.
