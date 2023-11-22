@@ -133,6 +133,7 @@ func Test_Writer_Enc(t *testing.T) {
 	complexData := 1.0 + 8.25i
 	intData := 413
 	arrData := [3]string{"VRISKA", "TEREZI"}
+	textData := testText{name: "VRISKA", value: 8, enabled: true}
 	expect = []byte{
 		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
 		0x04, 0xc0, 0x70, 0x00, 0x32,
@@ -143,6 +144,8 @@ func Test_Writer_Enc(t *testing.T) {
 		0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
 		0x41, 0x82, 0x06, 0x54, 0x45, 0x52, 0x45, 0x5a, 0x49,
 		0x00,
+
+		0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
 	}
 
 	err = w.Enc(strData)
@@ -163,6 +166,10 @@ func Test_Writer_Enc(t *testing.T) {
 	}
 	err = w.Enc(arrData)
 	if !assert.NoError(err, "error writing fifth time") {
+		return
+	}
+	err = w.Enc(textData)
+	if !assert.NoError(err, "error writing sixth time") {
 		return
 	}
 	w.Flush()
@@ -527,6 +534,10 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	var dest12Array [4]string
 	expect12Array := [4]string{"ROSE", "KANAYA", "ROXY"}
 
+	input = append(input, 0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41)
+	var dest13Text testText
+	expect13Text := testText{name: "VRISKA", value: 8, enabled: true}
+
 	r, err := NewReader(bytes.NewReader(input), nil)
 	if !assert.NoError(err, "creating Reader returned error") {
 		return
@@ -602,7 +613,13 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	if !assert.NoError(err) {
 		return
 	}
-	assert.Equal(expect12Array, dest12Array, "dest11Complex mismatch")
+	assert.Equal(expect12Array, dest12Array, "dest12Array mismatch")
+
+	err = r.Dec(&dest13Text)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect13Text, dest13Text, "dest13Text mismatch")
 }
 
 func Test_Reader_Dec_int(t *testing.T) {
@@ -1402,6 +1419,134 @@ func Test_Reader_Dec_binary(t *testing.T) {
 		}
 
 		var dest **testBinary
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
+
+func Test_Reader_Dec_text(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    testText
+		expectErr bool
+		expectOff int
+	}{
+		{
+			name: "empty values",
+			input: []byte{
+				// "0,false,"
+				0x41, 0x80, 0x08, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c,
+			},
+			expect:    testText{},
+			expectOff: 11,
+		},
+		{
+			name: "filled values",
+			input: []byte{
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			},
+			expect:    testText{name: "VRISKA", enabled: true, value: 8},
+			expectOff: 16,
+		},
+		{
+			name: "empty values x2",
+			input: []byte{
+				// "0,false,"
+				0x41, 0x80, 0x08, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c,
+
+				// "0,false,"
+				0x41, 0x80, 0x08, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c,
+			},
+			expect:    testText{},
+			expectOff: 11,
+		},
+		{
+			name: "filled values x2",
+			input: []byte{
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			},
+			expect:    testText{name: "VRISKA", enabled: true, value: 8},
+			expectOff: 16,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest testText
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - single indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x20}
+		expect := nilRef[testText]()
+		expectOff := 1
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *testText
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		expectPtr := nilRef[testText]()
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest **testText
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return

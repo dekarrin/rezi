@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -285,16 +287,29 @@ func (ttv testText) MarshalText() ([]byte, error) {
 func (ttv *testText) UnmarshalText(data []byte) error {
 	str := string(data)
 
-	var value uint16
+	var value int64
 	var enabled bool
 	var name string
+	var err error
 
-	_, err := fmt.Sscanf(str, "%d,%t,%s", &value, &enabled, &name)
-	if err != nil {
-		return fmt.Errorf("could not scan values: %w", err)
+	parts := strings.SplitN(str, ",", 3)
+	if len(parts) != 3 {
+		return fmt.Errorf("text data does not contain 3 comma-separated fields")
 	}
 
-	ttv.value = value
+	value, err = strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("value: %w", err)
+	}
+
+	enabled, err = strconv.ParseBool(parts[1])
+	if err != nil {
+		return fmt.Errorf("enabled: %w", err)
+	}
+
+	name = parts[2]
+
+	ttv.value = uint16(value)
 	ttv.enabled = enabled
 	ttv.name = name
 
