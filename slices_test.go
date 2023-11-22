@@ -228,6 +228,40 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[]text", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				{name: "NEPETA", enabled: false, value: 100},
+				{name: "JOHN", enabled: false, value: 413},
+			}
+
+			expect = []byte{
+				0x01, 0x34, // len=52
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]map[string]bool", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -792,6 +826,103 @@ func Test_Enc_Slice_ValueIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[]*text, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				{name: "NEPETA", enabled: false, value: 100},
+				{name: "JOHN", enabled: false, value: 413},
+			}
+
+			expect = []byte{
+				0x01, 0x34, // len=52
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*text, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				nil,
+				{name: "JOHN", enabled: false, value: 413},
+			}
+
+			expect = []byte{
+				0x01, 0x22, // len=34
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// nil
+				0xa0,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*text, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []*testText{
+				nil,
+				nil,
+				nil,
+			}
+
+			expect = []byte{
+				0x01, 0x03, // len=3
+
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]*map[string]bool, all non-nil", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1326,6 +1457,43 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 
 		// execute
 		var actual []testBinary
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]text", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x34, // len=52
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = []testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				{name: "NEPETA", enabled: false, value: 100},
+				{name: "JOHN", enabled: false, value: 413},
+			}
+			expectConsumed = 54
+		)
+
+		// execute
+		var actual []testText
 		consumed, err := Dec(input, &actual)
 
 		// assert
@@ -1973,6 +2141,112 @@ func Test_Dec_Slice_ValueIndirection(t *testing.T) {
 		}
 
 		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*text, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x34, // len=52
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// "100,false,NEPETA"
+				0x41, 0x82, 0x10, 0x31, 0x30, 0x30, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = []*testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				{name: "NEPETA", enabled: false, value: 100},
+				{name: "JOHN", enabled: false, value: 413},
+			}
+			expectConsumed = 54
+		)
+
+		// execute
+		var actual []*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*text, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x22, // len=34
+
+				// "8,true,VRISKA"
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+				// nil
+				0xa0,
+
+				// "413,false,JOHN"
+				0x41, 0x82, 0x0e, 0x34, 0x31, 0x33, 0x2c, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x4a, 0x4f, 0x48, 0x4e,
+			}
+			expect = []*testText{
+				{name: "VRISKA", value: 8, enabled: true},
+				nil,
+				{name: "JOHN", enabled: false, value: 413},
+			}
+			expectConsumed = 36
+		)
+
+		// execute
+		var actual []*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[]*text, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x03, // len=3
+
+				0xa0,
+				0xa0,
+				0xa0,
+			}
+			expect = []*testText{
+				nil,
+				nil,
+				nil,
+			}
+			expectConsumed = 5
+		)
+
+		// execute
+		var actual []*testText
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
