@@ -1141,7 +1141,7 @@ func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
 
 	err = t.UnmarshalText([]byte(textData))
 	if err != nil {
-		return readBytes, errorDecf(readBytes, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
+		return readBytes, errorDecf(0, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
 	}
 
 	return readBytes, nil
