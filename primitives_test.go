@@ -1942,6 +1942,120 @@ func Test_Enc_Binary(t *testing.T) {
 	})
 }
 
+func Test_Enc_Text(t *testing.T) {
+	testCases := []struct {
+		name   string
+		input  encoding.TextMarshaler
+		expect []byte
+	}{
+		{
+			name:   "user-defined type",
+			input:  testText{name: "VRISKA", value: 8, enabled: true},
+			expect: []byte{0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41},
+		},
+		{
+			name:   "IPv4",
+			input:  net.ParseIP("128.0.0.1"),
+			expect: []byte{0x41, 0x82, 0x09, 0x31, 0x32, 0x38, 0x2e, 0x30, 0x2e, 0x30, 0x2e, 0x31},
+		},
+		{
+			name:   "IPv6",
+			input:  net.ParseIP("2001:db8::1"),
+			expect: []byte{0x41, 0x82, 0x0b, 0x32, 0x30, 0x30, 0x31, 0x3a, 0x64, 0x62, 0x38, 0x3a, 0x3a, 0x31},
+		},
+		{
+			name:   "big.Int",
+			input:  big.NewInt(2023),
+			expect: []byte{0x41, 0x82, 0x04, 0x32, 0x30, 0x32, 0x33},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			actual, err := Enc(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, actual)
+		})
+	}
+
+	t.Run("*text (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *testText
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*text", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testText{value: 8, name: "VRISKA", enabled: true}
+			input    = &inputVal
+			expect   = []byte{
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**text", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = testText{value: 8, name: "VRISKA", enabled: true}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**text, but nil binary part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *testText
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+}
+
 func Test_Dec_String(t *testing.T) {
 	type result struct {
 		val      string
