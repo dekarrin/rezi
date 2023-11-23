@@ -1352,6 +1352,90 @@ func Test_Enc_Int(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  = 34 * time.Second
+			expect = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*time.Duration (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *time.Duration
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 34 * time.Second
+			input    = &inputVal
+			expect   = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = 34 * time.Second
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**uint, but nil uint part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			ptr    *time.Duration
+			input  = &ptr
+			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
 }
 
 func Test_Enc_Float(t *testing.T) {

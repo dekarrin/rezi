@@ -665,6 +665,12 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 		}
 		return encFn(convFn(encodeTarget))
 	} else {
+		// if the type we have is actually a new UDT with some underlying basic
+		// Go type, then in fact we want to encode it as the actual kind type.
+		if ti.Underlying {
+			underType := ti.MainReflectType(false)
+			value = reflect.ValueOf(value).Convert(underType).Interface()
+		}
 		return encFn(value.(E))
 	}
 }
