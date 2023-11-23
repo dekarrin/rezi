@@ -1,6 +1,7 @@
 package rezi
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -338,6 +339,37 @@ func Test_Enc_Map_NoIndirection(t *testing.T) {
 				0x02, 0x02, 0x64, // 612:
 				0x01, 0x06, // len=6
 				0x01, 0x06, 0x01, 0x01, 0x01, 0x02, // {6, 1, 2}
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("http.Header (map[string][]string)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = http.Header{
+				"X-Api-Key":    []string{"12345"},
+				"Content-Type": []string{"application/json"},
+			}
+			expect = []byte{
+				0x01, 0x3a, // map len=58
+
+				0x41, 0x82, 0x0c, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2d, 0x54, 0x79, 0x70, 0x65, // "Content-Type":
+				0x01, 0x13, // slice len=19
+				0x41, 0x82, 0x10, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6a, 0x73, 0x6f, 0x6e, // "application/json"
+
+				0x41, 0x82, 0x09, 0x58, 0x2d, 0x41, 0x70, 0x69, 0x2d, 0x4b, 0x65, 0x79, // "X-Api-Key":
+				0x01, 0x08, // slice len=8
+				0x41, 0x82, 0x5, 0x31, 0x32, 0x33, 0x34, 0x35, // "12345"
 			}
 		)
 
@@ -1678,6 +1710,41 @@ func Test_Dec_Map_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("http.Header (map[string][]string)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x3a, // map len=58
+
+				0x41, 0x82, 0x0c, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2d, 0x54, 0x79, 0x70, 0x65, // "Content-Type":
+				0x01, 0x13, // slice len=19
+				0x41, 0x82, 0x10, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6a, 0x73, 0x6f, 0x6e, // "application/json"
+
+				0x41, 0x82, 0x09, 0x58, 0x2d, 0x41, 0x70, 0x69, 0x2d, 0x4b, 0x65, 0x79, // "X-Api-Key":
+				0x01, 0x08, // slice len=8
+				0x41, 0x82, 0x5, 0x31, 0x32, 0x33, 0x34, 0x35, // "12345"
+			}
+			expect = http.Header{
+				"X-Api-Key":    []string{"12345"},
+				"Content-Type": []string{"application/json"},
+			}
+			expectConsumed = 60
+		)
+
+		// execute
+		var actual http.Header
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta map[int]map[int]string", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1814,6 +1881,116 @@ func Test_Dec_Map_SelfIndirection(t *testing.T) {
 		)
 
 		var actual **map[string]int = ref(&map[string]int{"OTHER": 1})
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*http.Header (*map[string][]string) (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xa0,
+			}
+			expect         *http.Header
+			expectConsumed = 1
+		)
+
+		var actual *http.Header = &http.Header{"X-Api-Key": []string{"blah"}}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*http.Header (*map[string][]string)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x3a, // map len=58
+
+				0x41, 0x82, 0x0c, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2d, 0x54, 0x79, 0x70, 0x65, // "Content-Type":
+				0x01, 0x13, // slice len=19
+				0x41, 0x82, 0x10, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6a, 0x73, 0x6f, 0x6e, // "application/json"
+
+				0x41, 0x82, 0x09, 0x58, 0x2d, 0x41, 0x70, 0x69, 0x2d, 0x4b, 0x65, 0x79, // "X-Api-Key":
+				0x01, 0x08, // slice len=8
+				0x41, 0x82, 0x5, 0x31, 0x32, 0x33, 0x34, 0x35, // "12345"
+			}
+			expectVal = http.Header{
+				"X-Api-Key":    []string{"12345"},
+				"Content-Type": []string{"application/json"},
+			}
+			expect         = &expectVal
+			expectConsumed = 60
+		)
+
+		var actual *http.Header
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**http.Header (**map[string][]string)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x3a, // map len=58
+
+				0x41, 0x82, 0x0c, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2d, 0x54, 0x79, 0x70, 0x65, // "Content-Type":
+				0x01, 0x13, // slice len=19
+				0x41, 0x82, 0x10, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x6a, 0x73, 0x6f, 0x6e, // "application/json"
+
+				0x41, 0x82, 0x09, 0x58, 0x2d, 0x41, 0x70, 0x69, 0x2d, 0x4b, 0x65, 0x79, // "X-Api-Key":
+				0x01, 0x08, // slice len=8
+				0x41, 0x82, 0x5, 0x31, 0x32, 0x33, 0x34, 0x35, // "12345"
+			}
+			expectVal = http.Header{
+				"X-Api-Key":    []string{"12345"},
+				"Content-Type": []string{"application/json"},
+			}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 60
+		)
+
+		var actual **http.Header
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**http.Header, but nil http.Header part (**map[string][]string)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
+			}
+			expectPtr      *http.Header
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		var actual **http.Header = ref(&http.Header{"X-Api-Key": []string{"blah"}})
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return

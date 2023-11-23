@@ -156,6 +156,19 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 	}
 }
 
+// zeroIndirAssign performs the assignment of decoded to v, performing a type
+// conversion if needed.
+func zeroIndirAssign[E any](decoded E, v interface{}, ti typeInfo) {
+	if ti.Underlying {
+		// need to get fancier
+		refVal := reflect.ValueOf(v)
+		refVal.Elem().Set(reflect.ValueOf(decoded).Convert(refVal.Type().Elem()))
+	} else {
+		tVal := v.(*E)
+		*tVal = decoded
+	}
+}
+
 // decCheckedPrim decodes a primitive value from rezi-format bytes into the
 // value pointed-to by v. V must point to a REZI primitive value (int, bool,
 // string, float, complex), or implement encoding.BinaryUnmarshaler, or
@@ -172,8 +185,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			return n, err
 		}
 		if ti.Indir == 0 {
-			tVal := v.(*string)
-			*tVal = s
+			zeroIndirAssign(s, v, ti)
 		}
 		return n, nil
 	case mtBool:
@@ -182,8 +194,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			return n, err
 		}
 		if ti.Indir == 0 {
-			tVal := v.(*bool)
-			*tVal = b
+			zeroIndirAssign(b, v, ti)
 		}
 		return n, nil
 	case mtIntegral:
@@ -199,8 +210,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*int64)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 32:
 				var i int32
@@ -209,8 +219,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*int32)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 16:
 				var i int16
@@ -219,8 +228,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*int16)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 8:
 				var i int8
@@ -229,8 +237,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*int8)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			default:
 				var i int
@@ -239,8 +246,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*int)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			}
 		} else {
@@ -252,8 +258,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*uint64)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 32:
 				var i uint32
@@ -262,8 +267,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*uint32)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 16:
 				var i uint16
@@ -272,8 +276,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*uint16)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			case 8:
 				var i uint8
@@ -282,8 +285,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*uint8)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			default:
 				var i uint
@@ -292,8 +294,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 					return n, err
 				}
 				if ti.Indir == 0 {
-					tVal := v.(*uint)
-					*tVal = i
+					zeroIndirAssign(i, v, ti)
 				}
 			}
 		}
@@ -311,8 +312,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return n, err
 			}
 			if ti.Indir == 0 {
-				tVal := v.(*float32)
-				*tVal = f
+				zeroIndirAssign(f, v, ti)
 			}
 		default:
 			fallthrough
@@ -323,8 +323,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return n, err
 			}
 			if ti.Indir == 0 {
-				tVal := v.(*float64)
-				*tVal = f
+				zeroIndirAssign(f, v, ti)
 			}
 		}
 
@@ -341,8 +340,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return n, err
 			}
 			if ti.Indir == 0 {
-				tVal := v.(*complex64)
-				*tVal = c
+				zeroIndirAssign(c, v, ti)
 			}
 		default:
 			fallthrough
@@ -353,8 +351,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 				return n, err
 			}
 			if ti.Indir == 0 {
-				tVal := v.(*complex128)
-				*tVal = c
+				zeroIndirAssign(c, v, ti)
 			}
 		}
 

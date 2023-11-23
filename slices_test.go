@@ -1,6 +1,7 @@
 package rezi
 
 import (
+	"encoding/asn1"
 	"math"
 	"testing"
 
@@ -342,6 +343,31 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("asn1.ObjectIdentifier ([]int)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = asn1.ObjectIdentifier{1024, 0, 2}
+
+			expect = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta slice [][]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -450,6 +476,90 @@ func Test_Enc_Slice_SelfIndirection(t *testing.T) {
 			ptr    *[]int
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*asn1.ObjectIdentifier (*[]int) (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *asn1.ObjectIdentifier
+			expect = []byte{
+				0xa0,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*asn1.ObjectIdentifier (*[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = asn1.ObjectIdentifier{1024, 0, 2}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**asn1.ObjectIdentifier (**[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = asn1.ObjectIdentifier{1024, 0, 2}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**asn1.ObjectIdentifier, but nil asn1.ObjectIdentifier part (**[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputPtr *asn1.ObjectIdentifier
+			input    = &inputPtr
+			expect   = []byte{
+				0xb0, 0x01, 0x01,
+			}
 		)
 
 		actual, err := Enc(input)
@@ -1591,6 +1701,34 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("asn1.ObjectIdentifier ([]int)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+			expect         = asn1.ObjectIdentifier{1024, 0, 2}
+			expectConsumed = 8
+		)
+
+		// execute
+		var actual asn1.ObjectIdentifier
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta slice [][]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1717,6 +1855,102 @@ func Test_Dec_Slice_SelfIndirection(t *testing.T) {
 		)
 
 		var actual **[]int = ref(&[]int{1, 2, 3})
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*asn1.ObjectIdentifier (*[]int) (nil)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xa0,
+			}
+			expect         *asn1.ObjectIdentifier
+			expectConsumed = 1
+		)
+
+		var actual *asn1.ObjectIdentifier = &asn1.ObjectIdentifier{1, 2}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*asn1.ObjectIdentifier (*[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+			expectVal      = asn1.ObjectIdentifier{1024, 0, 2}
+			expect         = &expectVal
+			expectConsumed = 8
+		)
+
+		var actual *asn1.ObjectIdentifier
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**asn1.ObjectIdentifier (**[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x06,
+
+				0x02, 0x04, 0x00,
+				0x00,
+				0x01, 0x02,
+			}
+			expectVal      = asn1.ObjectIdentifier{1024, 0, 2}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 8
+		)
+
+		var actual **asn1.ObjectIdentifier
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**asn1.ObjectIdentifier, but nil asn1.ObjectIdentifier part (**[]int)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
+			}
+			expectPtr      *asn1.ObjectIdentifier
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		var actual **asn1.ObjectIdentifier = ref(&asn1.ObjectIdentifier{1, 2, 3})
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return

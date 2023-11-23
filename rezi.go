@@ -138,6 +138,14 @@
 // not have any concept of two different pointer variables pointing to the same
 // data.
 //
+// Besides the above listed types, all types whose underlying type is a
+// supported type are themselves supported as well. For example, time.Duration
+// has an underlying type of int64, and is therefore supported in REZI. This
+// does not apply to marshaler implementors; a type whose underlying type is
+// only supported in REZI via implementation of one of the marshaler or
+// unmarshaler interfaces must itself implement that interface
+// in order to be fully supported.
+//
 // # Binary Data Format
 //
 // REZI uses a binary format for all supported types. Other than bool, which is
@@ -665,6 +673,11 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 		}
 		return encFn(convFn(encodeTarget))
 	} else {
+		// if the type we have is actually a new UDT with some underlying basic
+		// Go type, then in fact we want to encode it as the actual kind type.
+		if ti.Underlying {
+			value = convFn(reflect.ValueOf(value))
+		}
 		return encFn(value.(E))
 	}
 }
@@ -711,7 +724,11 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		}
 
 		if !hdr.IsNil() {
-			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+			refDecoded := reflect.ValueOf(decoded)
+			if ti.Underlying {
+				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
+			}
+			assignTarget.Elem().Set(refDecoded)
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)
