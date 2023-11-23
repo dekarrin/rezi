@@ -566,6 +566,8 @@ func MustEnc(v interface{}) []byte {
 // ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
 // error from its MarshalBinary method (additionally, the returned error will
 // match the same types that the error returned from MarshalBinary would match).
+// ErrMarshalText if an implementor of encoding.TextMarshal returns an error
+// from its MarshalText method.
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -623,10 +625,12 @@ func MustDec(data []byte, v interface{}) int {
 // if v is a nil pointer. ErrUnmarshalBinary if an implementor of
 // encoding.BinaryUnmarshaler returns an error from its UnmarshalBinary method
 // (additionally, the returned error will match the same types that the error
-// returned from UnmarshalBinary would match). io.ErrUnexpectedEOF if there are
-// fewer bytes than necessary to decode the value. ErrMalformedData if there is
-// any problem with the data itself (including there being fewer bytes than
-// necessary to decode the value).
+// returned from UnmarshalBinary would match). ErrUnmarshalText if an
+// implementor of encoding.TextUnmarshaler returns an error from its
+// UnmarshalText method. io.ErrUnexpectedEOF if there are fewer bytes than
+// necessary to decode the value. ErrMalformedData if there is any problem with
+// the data itself (including there being fewer bytes than necessary to decode
+// the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
