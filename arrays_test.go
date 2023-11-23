@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type underlyingArray [5]bool
+
 func Test_Enc_Array_NoIndirection(t *testing.T) {
 	// different types, can't rly be table driven easily
 
@@ -345,6 +347,28 @@ func Test_Enc_Array_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("underlyingArray ([5]bool)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = underlyingArray{true, true, false, false, true}
+
+			expect = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta array [2][3]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -455,6 +479,84 @@ func Test_Enc_Array_SelfIndirection(t *testing.T) {
 			ptr    *[4]int
 			input  = &ptr
 			expect = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*underlyingArray (*[5]bool) (nil)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  *underlyingArray
+			expect = []byte{
+				0xa0,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*underlyingArray (*[5]bool)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			inputVal = underlyingArray{true, true, false, false, true}
+			input    = &inputVal
+			expect   = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**underlyingArray (**[5]bool)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputVal = underlyingArray{true, true, false, false, true}
+			inputPtr = &inputVal
+			input    = &inputPtr
+			expect   = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**underlyingArray, but nil underlyingArray part (**[5]bool)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputPtr *underlyingArray
+			input    = &inputPtr
+			expect   = []byte{
+				0xb0, 0x01, 0x01,
+			}
 		)
 
 		actual, err := Enc(input)
@@ -1566,6 +1668,31 @@ func Test_Dec_Array_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("underlyingArray ([5]bool)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+			expect         = underlyingArray{true, true, false, false, true}
+			expectConsumed = 7
+		)
+
+		// execute
+		var actual underlyingArray
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("meta array [2][3]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1694,6 +1821,102 @@ func Test_Dec_Array_SelfIndirection(t *testing.T) {
 		)
 
 		var actual **[4]int = ref(&[4]int{1, 2, 3})
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*underlyingArray (*[5]bool) (nil)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0xa0,
+			}
+			expect         *underlyingArray
+			expectConsumed = 1
+		)
+
+		// execute
+		var actual *underlyingArray
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*underlyingArray (*[5]bool)", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+			expectVal      = underlyingArray{true, true, false, false, true}
+			expect         = &expectVal
+			expectConsumed = 7
+		)
+
+		// execute
+		var actual *underlyingArray
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**underlyingArray (**[5]bool)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x05,
+				0x01, 0x01, 0x00, 0x00, 0x01,
+			}
+			expectVal      = underlyingArray{true, true, false, false, true}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 7
+		)
+
+		var actual **underlyingArray
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**underlyingArray, but nil underlyingArray part (**[5]bool)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0xb0, 0x01, 0x01,
+			}
+			expectPtr      *underlyingArray
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		var actual **underlyingArray = ref(&underlyingArray{true})
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
