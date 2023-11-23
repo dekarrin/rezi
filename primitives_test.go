@@ -1419,7 +1419,7 @@ func Test_Enc_Int(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
-	t.Run("**uint, but nil uint part", func(t *testing.T) {
+	t.Run("**time.Duration, but nil time.Duration part", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
@@ -2621,6 +2621,105 @@ func Test_Dec_Int(t *testing.T) {
 		)
 
 		var actual **uint
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+
+		assert.NotNil(actual) // actual should *itself* not be nil
+		assert.Nil(*actual)   // but the pointer it points to should be nil
+	})
+
+	t.Run("time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+			expect         = 34 * time.Second
+			expectConsumed = 6
+		)
+
+		var actual time.Duration
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("nil *time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xa0}
+			expect         *time.Duration
+			expectConsumed = 1
+		)
+
+		var actual *time.Duration = ref(1 * time.Second)
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("*time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+			expectVal      = 34 * time.Second
+			expect         = &expectVal
+			expectConsumed = 6
+		)
+
+		var actual *time.Duration
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**time.Duration", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0x05, 0x07, 0xea, 0x8e, 0xd4, 0x00}
+			expectVal      = 34 * time.Second
+			expectValPtr   = &expectVal
+			expect         = &expectValPtr
+			expectConsumed = 6
+		)
+
+		var actual **time.Duration
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("**time.Duration, but nil time.Duration part", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectConsumed = 3
+		)
+
+		var actual **time.Duration
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return

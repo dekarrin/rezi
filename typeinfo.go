@@ -389,39 +389,46 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			return typeInfo{Dec: true, Indir: indirCount, Main: mtText}, nil
 		}
 
+		var under bool
+		if pkt, ok := refPrimitiveKindTypes[t.Kind()]; ok {
+			// TODO: second check probs not needed; if t.Kind() == X, X(t(val)) should always be valid i think.
+			// Verify. Check in Laws of Reflection?
+			under = t != pkt && t.ConvertibleTo(pkt)
+		}
+
 		switch t.Kind() {
 		case reflect.String:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtString}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtString}, nil
 		case reflect.Bool:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtBool}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtBool}, nil
 		case reflect.Uint8:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: false}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 8, Signed: false}, nil
 		case reflect.Uint16:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: false}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 16, Signed: false}, nil
 		case reflect.Uint32:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: false}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 32, Signed: false}, nil
 		case reflect.Uint64:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: false}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 64, Signed: false}, nil
 		case reflect.Uint:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: false}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 0, Signed: false}, nil
 		case reflect.Int8:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 8, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 8, Signed: true}, nil
 		case reflect.Int16:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 16, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 16, Signed: true}, nil
 		case reflect.Int32:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 32, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 32, Signed: true}, nil
 		case reflect.Int64:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 64, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 64, Signed: true}, nil
 		case reflect.Int:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtIntegral, Bits: 0, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtIntegral, Bits: 0, Signed: true}, nil
 		case reflect.Float32:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtFloat, Bits: 32, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtFloat, Bits: 32, Signed: true}, nil
 		case reflect.Float64:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtFloat, Bits: 64, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtFloat, Bits: 64, Signed: true}, nil
 		case reflect.Complex64:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtComplex, Bits: 64, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtComplex, Bits: 64, Signed: true}, nil
 		case reflect.Complex128:
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtComplex, Bits: 128, Signed: true}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtComplex, Bits: 128, Signed: true}, nil
 		case reflect.Map:
 			// could be okay, but key and value types must be decodable.
 			mValType := t.Elem()
@@ -443,7 +450,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				return typeInfo{}, errorf("map key type must be bool, string, float, int, or text-encodable type").wrap(ErrInvalidType)
 			}
 
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtMap, KeyType: &mKeyInfo, ValType: &mValInfo}, nil
 		case reflect.Slice:
 			// could be okay, but val type must be encodable
 			slValType := t.Elem()
@@ -451,7 +458,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			if err != nil {
 				return typeInfo{}, errorf("slice value is not decodable: %s", err)
 			}
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtSlice, ValType: &slValInfo}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtSlice, ValType: &slValInfo}, nil
 		case reflect.Array:
 			// could be okay, but val type must be encodable
 			arrValType := t.Elem()
@@ -460,7 +467,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				return typeInfo{}, errorf("array value is not decodable: %s", err)
 			}
 			arrLen := t.Len()
-			return typeInfo{Dec: true, Indir: indirCount, Main: mtArray, ValType: &arrValInfo, Len: arrLen}, nil
+			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtArray, ValType: &arrValInfo, Len: arrLen}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

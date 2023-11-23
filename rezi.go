@@ -620,11 +620,11 @@ func MustDec(data []byte, v interface{}) int {
 // any problem with the data itself (including there being fewer bytes than
 // necessary to decode the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errorf("%v", r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		err = errorf("%v", r)
+	// 	}
+	// }()
 
 	info, err := canDecode(v)
 	if err != nil {
@@ -668,8 +668,7 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 		// if the type we have is actually a new UDT with some underlying basic
 		// Go type, then in fact we want to encode it as the actual kind type.
 		if ti.Underlying {
-			underType := ti.MainReflectType(false)
-			value = reflect.ValueOf(value).Convert(underType).Interface()
+			value = convFn(reflect.ValueOf(value))
 		}
 		return encFn(value.(E))
 	}
@@ -717,7 +716,11 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		}
 
 		if !hdr.IsNil() {
-			assignTarget.Elem().Set(reflect.ValueOf(decoded))
+			refDecoded := reflect.ValueOf(decoded)
+			if ti.Underlying {
+				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
+			}
+			assignTarget.Elem().Set(refDecoded)
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)
