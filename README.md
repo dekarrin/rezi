@@ -4,9 +4,10 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi/v2.svg)](https://pkg.go.dev/github.com/dekarrin/rezi/v2)
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
-binary marshaling of data to REZI-format bytes. It can encode and decode several
-built-in Go types to bytes, and handles decoding and encoding of user-defined
-types that implement `encoding.BinaryMarshaler` or `encoding.TextMarshaler`.
+binary marshaling of data to REZI-format bytes. It can encode and decode most
+simple (non-struct) built-in Go types to bytes, and handles customization of
+decoding and encoding of user-defined types that implement
+`encoding.BinaryMarshaler` or `encoding.TextMarshaler`.
 
 All data is encoded in a deterministic fashion, or as deterministically as
 possible. Any non-determinism in the resulting encoded value will arise from
@@ -203,6 +204,9 @@ integer types, or one of the built-in float types.
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.
 
+On top of all of the above, REZI supports any type whose underlying type is
+supported.
+
 #### User-Defined Types
 REZI supports encoding any custom type that implements
 `encoding.BinaryMarshaler`, and it supports decoding any custom type that
@@ -210,10 +214,11 @@ implements `encoding.BinaryUnmarshaler` with a pointer receiver. In fact, the
 lack of built-in facilities in Go for binary encoding of user-defined types is
 partially why REZI exists.
 
-REZI does not perform any automatic inference of a user-defined type's encoding
-such as what the `json` library is capable of. User-defined types that do not
-implement BinaryMarshaler are not supported for encoding, and those that do not
-implement BinaryUnmarshaler are not supported for decoding.
+REZI does not perform any automatic inference of a user-defined struct type's
+encoding such as what the `json` library is capable of. User-defined types that
+do not implement BinaryMarshaler or TextMarshaler are only supported for
+encoding if their underlying type is one supported by REZI, and vice-versa for
+the corresponding unmarshal methods when decoding.
 
 Within the `MarshalBinary` method, you can encode the data in whichever format
 you wish, though these examples will have that function use REZI to encode the
@@ -273,11 +278,11 @@ func (p Person) MarshalBinary() ([]byte, error) {
 }
 ```
 
-Decoding of user-defined types is handled with the UnmarshalBinary method. The
-bytes that were returned by MarshalBinary while decoding are picked up by REZI
-and passed into UnmarshalBinary. Note that unlike the MarshalBinary method,
-which must be defined with a value receiver for the type, REZI requires the
-UnmarshalBinary to be defined with a pointer receiver.
+Custom decoding of user-defined types is handled with the UnmarshalBinary
+method. The bytes that were returned by MarshalBinary while decoding are picked
+up by REZI and passed into UnmarshalBinary. Note that unlike the MarshalBinary
+method, which must be defined with a value receiver for the type, REZI requires
+the UnmarshalBinary to be defined with a pointer receiver.
 
 ```golang
 // UnmarshalBinary takes in bytes and decodes them into a new Person object,
