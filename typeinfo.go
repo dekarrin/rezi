@@ -428,7 +428,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				}
 				fieldValInfo, err := encTypeInfo(sf.Type)
 				if err != nil {
-					return typeInfo{}, errorf("struct field %s is not encodeable: %s", sf.Name, err)
+					return typeInfo{}, errorf("field %s is not encodeable: %s", sf.Name, err)
 				}
 				fi := fieldInfo{Index: i, Name: sf.Name, Anonymous: sf.Anonymous, Type: fieldValInfo}
 				fieldsData.ByName[fi.Name] = fi
@@ -577,7 +577,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				if !sf.IsExported() {
 					continue
 				}
-				fieldValInfo, err := encTypeInfo(sf.Type)
+				fieldValInfo, err := decTypeInfo(sf.Type)
 				if err != nil {
 					return typeInfo{}, errorf("struct field %s is not encodeable: %s", sf.Name, err)
 				}
