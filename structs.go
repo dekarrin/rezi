@@ -19,10 +19,6 @@ func encCheckedStruct(v interface{}, ti typeInfo) ([]byte, error) {
 func encStruct(v interface{}, ti typeInfo) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
-	if v == nil || refVal.IsNil() {
-		return encNilHeader(0), nil
-	}
-
 	enc := make([]byte, 0)
 
 	for _, fi := range ti.Fields.ByOrder {
