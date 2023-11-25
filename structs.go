@@ -1,129 +1,54 @@
 package rezi
 
 import (
-	"fmt"
 	"io"
 	"reflect"
-	"sort"
 )
 
-// ti must containt a main type of mtIntegral, mtBool, mtFloat, or mtString
-type sortableMapKeys struct {
-	keys []reflect.Value
-	ti   typeInfo
-}
-
-func (smk sortableMapKeys) Len() int {
-	return len(smk.keys)
-}
-
-func (smk sortableMapKeys) Swap(i, j int) {
-	smk.keys[i], smk.keys[j] = smk.keys[j], smk.keys[i]
-}
-
-func (smk sortableMapKeys) Less(i, j int) bool {
-	if smk.ti.Main == mtBool {
-		b1 := smk.keys[i].Bool()
-		b2 := smk.keys[j].Bool()
-		return !b1 && b2
-	} else if smk.ti.Main == mtIntegral {
-		if smk.ti.Signed {
-			i64v1 := smk.keys[i].Int()
-			i64v2 := smk.keys[j].Int()
-			switch smk.ti.Bits {
-			case 64:
-				return i64v1 < i64v2
-			case 32:
-				return int32(i64v1) < int32(i64v2)
-			case 16:
-				return int16(i64v1) < int16(i64v2)
-			case 8:
-				return int8(i64v1) < int8(i64v2)
-			default:
-				return int(i64v1) < int(i64v2)
-			}
-		} else {
-			u64v1 := smk.keys[i].Uint()
-			u64v2 := smk.keys[j].Uint()
-			switch smk.ti.Bits {
-			case 64:
-				return u64v1 < u64v2
-			case 32:
-				return uint32(u64v1) < uint32(u64v2)
-			case 16:
-				return uint16(u64v1) < uint16(u64v2)
-			case 8:
-				return uint8(u64v1) < uint8(u64v2)
-			default:
-				return uint(u64v1) < uint(u64v2)
-			}
-		}
-	} else if smk.ti.Main == mtFloat {
-		f1 := smk.keys[i].Float()
-		f2 := smk.keys[j].Float()
-		return f1 < f2
-	} else if smk.ti.Main == mtString {
-		s1 := smk.keys[i].String()
-		s2 := smk.keys[j].String()
-		return s1 < s2
-	} else {
-		panic(fmt.Sprintf("invalid map key type: %v", smk.ti.Main))
-	}
-}
-
-// encCheckedMap encodes a compatible map as a REZI map.
-func encCheckedMap(v interface{}, ti typeInfo) ([]byte, error) {
-	if ti.Main != mtMap {
-		panic("not a map type")
+// encCheckedStruct encodes a compatible struct as a REZI .
+func encCheckedStruct(v interface{}, ti typeInfo) ([]byte, error) {
+	if ti.Main != mtStruct {
+		panic("not a struct type")
 	}
 
 	return encWithNilCheck(v, ti, func(val interface{}) ([]byte, error) {
-		return encMap(val, *ti.KeyType)
+		return encStruct(val, ti)
 	}, reflect.Value.Interface)
 }
 
-func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
+func encStruct(v interface{}, ti typeInfo) ([]byte, error) {
 	refVal := reflect.ValueOf(v)
 
 	if v == nil || refVal.IsNil() {
 		return encNilHeader(0), nil
 	}
 
-	mapKeys := refVal.MapKeys()
-	keysToSort := sortableMapKeys{
-		keys: mapKeys,
-		ti:   keyType,
-	}
-	sort.Sort(keysToSort)
-	mapKeys = keysToSort.keys
-
 	enc := make([]byte, 0)
 
-	for i := range mapKeys {
-		k := mapKeys[i]
-		v := refVal.MapIndex(k)
-
-		keyData, err := Enc(k.Interface())
+	for _, fi := range ti.Fields.ByOrder {
+		v := refVal.Field(fi.Index)
+		fValData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, errorf("map key %v: %v", k.Interface(), err)
+			return nil, errorf("field .%s: %v", fi.Name, err)
 		}
-		valData, err := Enc(v.Interface())
+		fNameData, err := Enc(fi.Name)
 		if err != nil {
-			return nil, errorf("map value[%v]: %v", k.Interface(), err)
+			return nil, errorf("field name .%s: %s", fi.Name, err)
 		}
 
-		enc = append(enc, keyData...)
-		enc = append(enc, valData...)
+		enc = append(enc, fNameData...)
+		enc = append(enc, fValData...)
 	}
 
 	enc = append(encInt(tLen(len(enc))), enc...)
 	return enc, nil
 }
 
-// decCheckedMap decodes a REZI map as a compatible map type.
-func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
-	if ti.Main != mtMap {
-		panic("not a map type")
+// decCheckedStruct decodes a REZI bytes representation of a struct into a
+// compatible struct type.
+func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
+	if ti.Main != mtStruct {
+		panic("not a struct type")
 	}
 
 	m, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
@@ -142,7 +67,7 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 	return n, err
 }
 
-func decMap(data []byte, v interface{}) (int, error) {
+func decStruct(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
 	toConsume, n, err := decInt[tLen](data)
