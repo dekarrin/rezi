@@ -89,7 +89,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		emptyStruct := reflect.New(refStructType)
 
 		// set it to the value
-		refVal.Elem().Set(emptyStruct)
+		refVal.Elem().Set(emptyStruct.Elem())
 		return totalConsumed, nil
 	}
 
