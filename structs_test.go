@@ -1,4 +1,4 @@
-package rezi_test
+package rezi
 
 // putting this in rezi_test and not rezi because we need to create a public
 // type in it and we don't want to pollute the rezi package with it.
@@ -7,13 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dekarrin/rezi/v2"
 	"github.com/stretchr/testify/assert"
 )
-
-type TestStructToEmbed struct {
-	Value int
-}
 
 type testStructEmpty struct{}
 
@@ -52,18 +47,24 @@ type testStructManyFields struct {
 	enabled *sync.Mutex
 }
 
-type testStructWithEmbedded struct {
-	TestStructToEmbed
-	Name string
-}
-
-type testStructWithEmbeddedOverlap struct {
-	TestStructToEmbed
-	Name  string
-	Value float64
-}
-
 func Test_Enc_Struct(t *testing.T) {
+	// we require an exported struct in order to test embedded struct fields.
+	// we will declare it and other struct types it is embedded in here in this
+	// function to avoid adding a new exported type to the rezi package.
+	type TestStructToEmbed struct {
+		Value int
+	}
+	type testStructWithEmbedded struct {
+		TestStructToEmbed
+		Name string
+	}
+
+	type testStructWithEmbeddedOverlap struct {
+		TestStructToEmbed
+		Name  string
+		Value float64
+	}
+
 	runEncTests(t, "empty struct", testStructEmpty{}, []byte{0x00})
 	runEncTests(t, "one member", testStructOneMember{Value: 4}, []byte{
 		0x01, 0x0a, // len=10
@@ -162,7 +163,7 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 
 		input := inputVal
 
-		actual, err := rezi.Enc(input)
+		actual, err := Enc(input)
 		if !assert.NoError(err) {
 			return
 		}
@@ -176,7 +177,7 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 
 		input := &inputVal
 
-		actual, err := rezi.Enc(input)
+		actual, err := Enc(input)
 		if !assert.NoError(err) {
 			return
 		}
@@ -191,7 +192,7 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 		var input *E
 		var nilExp = []byte{0xa0}
 
-		actual, err := rezi.Enc(input)
+		actual, err := Enc(input)
 		if !assert.NoError(err) {
 			return
 		}
@@ -206,7 +207,7 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 		inputPtr := &inputVal
 		input := &inputPtr
 
-		actual, err := rezi.Enc(input)
+		actual, err := Enc(input)
 		if !assert.NoError(err) {
 			return
 		}
@@ -222,7 +223,7 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 		var input = &inputPtr
 		var nilFirstLevelExp = []byte{0xb0, 0x01, 0x01}
 
-		actual, err := rezi.Enc(input)
+		actual, err := Enc(input)
 		if !assert.NoError(err) {
 			return
 		}
@@ -232,6 +233,23 @@ func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
 }
 
 func Test_Dec_Struct(t *testing.T) {
+	// we require an exported struct in order to test embedded struct fields.
+	// we will declare it and other struct types it is embedded in here in this
+	// function to avoid adding a new exported type to the rezi package.
+	type TestStructToEmbed struct {
+		Value int
+	}
+	type testStructWithEmbedded struct {
+		TestStructToEmbed
+		Name string
+	}
+
+	type testStructWithEmbeddedOverlap struct {
+		TestStructToEmbed
+		Name  string
+		Value float64
+	}
+
 	runDecTests(t, "no-member struct", []byte{0x00}, testStructEmpty{}, 1)
 
 	runDecTests(t, "one-member struct", []byte{
@@ -346,7 +364,7 @@ func Test_Dec_Struct(t *testing.T) {
 			expectConsumed = 18
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -369,7 +387,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed = filledExpectConsumed
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -389,7 +407,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed = 1
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -410,7 +428,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed = filledExpectConsumed
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -430,7 +448,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed = 1
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -452,7 +470,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed = filledExpectConsumed
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
@@ -474,7 +492,7 @@ func runDecTests[E any](t *testing.T, name string, filledInput []byte, filledExp
 			expectConsumed   = 3
 		)
 
-		consumed, err := rezi.Dec(input, &actual)
+		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
 			return
 		}
