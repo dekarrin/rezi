@@ -1083,6 +1083,129 @@ func Test_Enc_Array_ValueIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("[2]*struct, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = [2]*testStructManyFields{
+				{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true, hidden: make(chan int, 3), enabled: &sync.Mutex{}, inc: 48},
+				{Name: "ROSE", Value: 12, Factor: 0.00390625, Enabled: false, hidden: make(chan int), enabled: nil, inc: 12},
+			}
+
+			expect = []byte{
+				0x01, 0x64, // len=100
+
+				// "KANAYA" struct:
+
+				0x01, 0x31, // struct len=49
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x01, // true
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0xd0, // 0.25
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+
+				// "ROSE" struct:
+
+				0x01, 0x2f, // struct len=47
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x00, // false
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0x70, // 0.00390625
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x04, 0x52, 0x4f, 0x53, 0x45, // "ROSE"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x0c, // 12
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]*struct, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = [2]*testStructManyFields{
+				{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true, hidden: make(chan int, 3), enabled: &sync.Mutex{}, inc: 48},
+			}
+
+			expect = []byte{
+				0x01, 0x34, // len=52
+
+				// "KANAYA" struct:
+
+				0x01, 0x31, // struct len=49
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x01, // true
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0xd0, // 0.25
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+
+				// "ROSE" struct:
+
+				0xa0, // nil
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]*struct, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = [2]*testStructManyFields{}
+
+			expect = []byte{
+				0x01, 0x02, // len=2
+
+				0xa0,
+				0xa0,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[3]*map[string]bool, all non-nil", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -2555,6 +2678,138 @@ func Test_Dec_Array_ValueIndirection(t *testing.T) {
 			return
 		}
 
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]*struct, all non-nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x64, // len=100
+
+				// "KANAYA" struct:
+
+				0x01, 0x31, // struct len=49
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x01, // true
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0xd0, // 0.25
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+
+				// "ROSE" struct:
+
+				0x01, 0x2f, // struct len=47
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x00, // false
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0x70, // 0.00390625
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x04, 0x52, 0x4f, 0x53, 0x45, // "ROSE"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x0c, // 12
+			}
+			expect = [2]*testStructManyFields{
+				{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true, hidden: nil, enabled: nil, inc: 0},
+				{Name: "ROSE", Value: 12, Factor: 0.00390625, Enabled: false, hidden: nil, enabled: nil, inc: 0},
+			}
+			expectConsumed = 102
+		)
+
+		// execute
+		var actual [2]*testStructManyFields
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]*struct, one nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x34, // len=52
+
+				// "KANAYA" struct:
+
+				0x01, 0x31, // struct len=49
+
+				0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+				0x01, // true
+
+				0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+				0x02, 0x3f, 0xd0, // 0.25
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+
+				// "ROSE" struct:
+
+				0xa0, // nil
+			}
+			expect = [2]*testStructManyFields{
+				{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true, hidden: nil, enabled: nil, inc: 0},
+			}
+			expectConsumed = 54
+		)
+
+		// execute
+		var actual [2]*testStructManyFields
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expectConsumed, consumed)
+		assert.Equal(expect, actual)
+	})
+
+	t.Run("[2]*struct, all nil", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+
+		var (
+			input = []byte{
+				0x01, 0x02, // len=2
+
+				0xa0,
+				0xa0,
+			}
+			expect         = [2]*testStructManyFields{}
+			expectConsumed = 4
+		)
+
+		// execute
+		var actual [2]*testStructManyFields
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
 		assert.Equal(expectConsumed, consumed)
 		assert.Equal(expect, actual)
 	})
