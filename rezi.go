@@ -531,7 +531,9 @@ type (
 	tLen      = int
 	tNilLevel = int
 
-	decFunc[E any] func([]byte) (E, int, error)
+	// the interface{} in decFunc is any additional info needed for further
+	// stages of decode, nil in all cases except for struct decoding.
+	decFunc[E any] func([]byte) (E, interface{}, int, error)
 	encFunc[E any] func(E) ([]byte, error)
 )
 
@@ -707,8 +709,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	countHeaderBytes := n
 	effectiveExtraIndirs := hdr.ExtraNilIndirections()
 
+	var extraInfo interface{}
+
 	if !hdr.IsNil() {
-		decoded, n, err = decFn(data)
+		decoded, extraInfo, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
@@ -732,6 +736,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		}
 
 		if !hdr.IsNil() {
+			// TODO: extraInfo use here IF it is a struct
 			refDecoded := reflect.ValueOf(decoded)
 			if ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
@@ -746,8 +751,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	return decoded, n, nil
 }
 
-func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
-	return func(data []byte) (interface{}, int, error) {
+// decToUnwrappedFn takes the encoded bytes and an interface to decode to and
+// returns any extra data (may be nil), bytes consumed, and error status.
+func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
+	return func(data []byte) (interface{}, interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		receiverType := reflect.TypeOf(wrapped)
 
@@ -771,7 +778,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return nil, nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
@@ -783,10 +790,10 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 		var decoded interface{}
 
 		receiver := receiverValue.Interface()
-		decConsumed, decErr := decToUnwrappedFn(data, receiver)
+		extraInfo, decConsumed, decErr := decToUnwrappedFn(data, receiver)
 
 		if decErr != nil {
-			return nil, decConsumed, decErr
+			return nil, extraInfo, decConsumed, decErr
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
@@ -795,7 +802,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			decoded = receiver
 		}
 
-		return decoded, decConsumed, decErr
+		return decoded, extraInfo, decConsumed, decErr
 	}
 }
 
@@ -987,7 +994,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// all extension bytes processed, now decode any indirection level int if
 	// present
 	if infoByte&infoBitsIndir != 0 {
-		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
+		extraIndirs, _, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
 			return errorDecf(decoded.DecodedCount, "%s", err)
 		}

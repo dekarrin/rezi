@@ -501,7 +501,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 			return decodable, errorDecf(totalRead, "%s", err)
 		}
 
-		count, n, err := decInt[int](buf)
+		count, _, n, err := decInt[int](buf)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
 			return decodable, errorDecf(totalRead, "header byte-count int: %s", err)
@@ -524,7 +524,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		}
 
 		// okay, we have complete header and int bytes, decode to int type
-		count, n, err := decInt[int](decodable)
+		count, _, n, err := decInt[int](decodable)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
 			return decodable, errorDecf(0, "count header: %s", err)
@@ -579,7 +579,7 @@ func (r *Reader) loadV0StringBytes(hdr countHeader, hdrBytes []byte) ([]byte, er
 	}
 
 	// okay, we have complete header and int bytes, decode to int type
-	runeCount, n, err := decInt[int](loaded)
+	runeCount, _, n, err := decInt[int](loaded)
 	// do not preserve this error, it will never be io.EOF.
 	if err != nil {
 		return loaded, errorDecf(0, "count header: %s", err)

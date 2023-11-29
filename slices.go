@@ -53,7 +53,10 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && ((ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
-		decSlice,
+		func(b []byte, i interface{}) (interface{}, int, error) {
+			decN, err := decSlice(b, i)
+			return nil, decN, err
+		},
 	))
 	if err != nil {
 		return n, err
@@ -68,7 +71,7 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 func decSlice(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt[tLen](data)
+	toConsume, _, n, err := decInt[tLen](data)
 	if err != nil {
 		return 0, errorDecf(0, "decode byte count: %s", err)
 	}

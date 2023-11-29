@@ -56,26 +56,32 @@ func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		panic("not a struct type")
 	}
 
+	var extraInfo []fieldInfo
 	st, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
 			// TODO: might need to remove reflect.Pointer
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
-		func(data []byte, v interface{}) (int, error) {
-			return decStruct(data, v, ti)
+		func(data []byte, v interface{}) (interface{}, int, error) {
+			fi, n, err := decStruct(data, v, ti)
+			extraInfo = fi
+			return fi, n, err
 		},
 	))
 	if err != nil {
 		return n, err
 	}
 	if ti.Indir == 0 {
+		// TODO: extraInfo use here
 		refReceiver := reflect.ValueOf(v)
 		refReceiver.Elem().Set(reflect.ValueOf(st))
 	}
 	return n, err
 }
 
-func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
+// the fieldInfo is the successfully decoded fields.
+func decStruct(data []byte, v interface{}, ti typeInfo) ([]fieldInfo, int, error) {
+	var decFields []fieldInfo
 	var totalConsumed int
 
 	refVal := reflect.ValueOf(v)
@@ -85,9 +91,9 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		msgTypeName = "(anonymous type)"
 	}
 
-	toConsume, n, err := decInt[tLen](data)
+	toConsume, _, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorDecf(0, "decode %s byte count: %s", msgTypeName, err)
+		return decFields, 0, errorDecf(0, "decode %s byte count: %s", msgTypeName, err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -98,7 +104,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyStruct.Elem())
-		return totalConsumed, nil
+		return decFields, totalConsumed, nil
 	}
 
 	if len(data) < toConsume {
@@ -110,7 +116,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		}
 		const errFmt = "decoded %s byte count is %d but only %d byte%s remain%s in data at offset"
 		err := errorDecf(totalConsumed, errFmt, msgTypeName, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return totalConsumed, err
+		return decFields, totalConsumed, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -123,7 +129,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		var fNameVal string
 		n, err = Dec(data, &fNameVal)
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "decode %s field name: %s", msgTypeName, err)
+			return decFields, totalConsumed, errorDecf(totalConsumed, "decode %s field name: %s", msgTypeName, err)
 		}
 		totalConsumed += n
 		i += n
@@ -132,17 +138,18 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		// get field info from name
 		fi, ok := ti.Fields.ByName[fNameVal]
 		if !ok {
-			return totalConsumed, errorDecf(totalConsumed, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
+			return decFields, totalConsumed, errorDecf(totalConsumed, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
 		}
 		fieldPtr := target.Field(fi.Index).Addr()
 		n, err = Dec(data, fieldPtr.Interface())
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "%s.%s: %v", msgTypeName, fi.Name, err)
+			return decFields, totalConsumed, errorDecf(totalConsumed, "%s.%s: %v", msgTypeName, fi.Name, err)
 		}
 		totalConsumed += n
 		i += n
 		data = data[n:]
+		decFields = append(decFields, fi)
 	}
 
-	return totalConsumed, nil
+	return decFields, totalConsumed, nil
 }

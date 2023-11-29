@@ -363,9 +363,10 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (int, error) {
+			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
 				recv := unwrapped.(encoding.BinaryUnmarshaler)
-				return decBinary(b, recv)
+				decN, err := decBinary(b, recv)
+				return nil, decN, err
 			},
 		))
 		if err != nil {
@@ -389,9 +390,10 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (int, error) {
+			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
 				recv := unwrapped.(encoding.TextUnmarshaler)
-				return decText(b, recv)
+				decN, err := decText(b, recv)
+				return nil, decN, err
 			},
 		))
 		if err != nil {
@@ -506,17 +508,19 @@ func encBool(b bool) []byte {
 	return enc
 }
 
-func decBool(data []byte) (bool, int, error) {
+// returned interface{} is only there to implement decFunc and will always be
+// nil
+func decBool(data []byte) (bool, interface{}, int, error) {
 	if len(data) < 1 {
-		return false, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return false, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	if data[0] == 0 {
-		return false, 1, nil
+		return false, nil, 1, nil
 	} else if data[0] == 1 {
-		return true, 1, nil
+		return true, nil, 1, nil
 	} else {
-		return false, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
+		return false, nil, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
 	}
 }
 
@@ -552,20 +556,21 @@ func encComplex[E anyComplex](v E) []byte {
 	return enc
 }
 
-func decComplex[E anyComplex](data []byte) (E, int, error) {
+// return interface is just to implement decFunc and will always be nils
+func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
 	if len(data) < 1 {
-		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0.0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case single-byte 0's check
 	if data[0] == 0x00 {
-		return E(0.0 + 0.0i), 1, nil
+		return E(0.0 + 0.0i), nil, 1, nil
 	} else if data[0] == 0x80 {
 		// only way to reliably get a -0.0 value is by direct calculation on var
 		// (cannot be result of consts, I tried, at least as of Go 1.19.4)
 		var val float64
 		val *= -1.0
-		return E(complex(val, val)), 1, nil
+		return E(complex(val, val)), nil, 1, nil
 	}
 
 	// do normal decoding of full-form
@@ -577,9 +582,9 @@ func decComplex[E anyComplex](data []byte) (E, int, error) {
 	var iPart float64
 
 	// get the byte count as an int
-	byteCount, n, err = decInt[tLen](data[offset:])
+	byteCount, _, n, err = decInt[tLen](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), 0, err
+		return E(0.0 + 0.0i), nil, 0, err
 	}
 	offset += n
 
@@ -593,29 +598,29 @@ func decComplex[E anyComplex](data []byte) (E, int, error) {
 		}
 		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0 + 0.0i), 0, err
+		return E(0.0 + 0.0i), nil, 0, err
 	}
 
 	// clamp data to len
 	data = data[:offset+byteCount]
 
 	// real part
-	rPart, n, err = decFloat[float64](data[offset:])
+	rPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+		return E(0.0 + 0.0i), nil, 0, errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	// imaginary part
-	iPart, n, err = decFloat[float64](data[offset:])
+	iPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), 0, errorDecf(offset, "%s", err)
+		return E(0.0 + 0.0i), nil, 0, errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	var v128 complex128 = complex(rPart, iPart)
 
-	return E(v128), offset, nil
+	return E(v128), nil, offset, nil
 }
 
 func encFloat[E anyFloat](v E) []byte {
@@ -729,20 +734,21 @@ func encFloat[E anyFloat](v E) []byte {
 	return enc
 }
 
-func decFloat[E anyFloat](data []byte) (E, int, error) {
+// returned interface{} is just to implement decFunc; will always be nil
+func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 	if len(data) < 1 {
-		return 0.0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0.0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	// special case single-byte 0's check
 	if byteCount == 0 {
-		return E(0.0), 1, nil
+		return E(0.0), nil, 1, nil
 	} else if byteCount == 0x80 {
 		var val float64
 		val *= -1.0
-		return E(val), 1, nil
+		return E(val), nil, 1, nil
 	}
 
 	// pull count and sign out of byteCount
@@ -756,7 +762,7 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return E(0.0), 0, err
+			return E(0.0), nil, 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -773,14 +779,14 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 		if negative {
 			val *= -1.0
 		}
-		return E(val), numHeaderBytes, nil
+		return E(val), nil, numHeaderBytes, nil
 	}
 
 	if int(byteCount) < 2 {
 		// the absolute minimum is 2 if not 0
 		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
 		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
-		return E(0.0), 0, err
+		return E(0.0), nil, 0, err
 	}
 
 	if len(data) < int(byteCount) {
@@ -792,7 +798,7 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 		}
 		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0), 0, err
+		return E(0.0), nil, 0, err
 	}
 
 	floatData := data[:byteCount]
@@ -847,7 +853,7 @@ func decFloat[E anyFloat](data []byte) (E, int, error) {
 
 	fVal := math.Float64frombits(iVal)
 
-	return E(fVal), int(byteCount) + numHeaderBytes, nil
+	return E(fVal), nil, int(byteCount) + numHeaderBytes, nil
 }
 
 func encInt[E integral](v E) []byte {
@@ -900,15 +906,18 @@ func encInt[E integral](v E) []byte {
 // assumes that first byte specifies a non-nil integer whose L field gives
 // number of bytes to decode after all count header bytes and interprets it as
 // such. does not do further checks on count header.
-func decInt[E integral](data []byte) (E, int, error) {
+//
+// returned interface{} is included only to implement decFunc and will always be
+// nil
+func decInt[E integral](data []byte) (E, interface{}, int, error) {
 	if len(data) < 1 {
-		return 0, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	if byteCount == 0 {
-		return 0, 1, nil
+		return 0, nil, 1, nil
 	}
 
 	// pull count and sign out of byteCount
@@ -922,7 +931,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return 0, 0, err
+			return 0, nil, 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -942,7 +951,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 		}
 		const errFmt = "decoded int byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return 0, 0, err
+		return 0, nil, 0, err
 	}
 
 	intData := data[:byteCount]
@@ -973,7 +982,7 @@ func decInt[E integral](data []byte) (E, int, error) {
 	iVal |= (uint64(intData[6]) << 8)
 	iVal |= (uint64(intData[7]))
 
-	return E(iVal), int(byteCount) + numHeaderBytes, nil
+	return E(iVal), nil, int(byteCount) + numHeaderBytes, nil
 }
 
 func encString(s string) []byte {
@@ -998,19 +1007,21 @@ func encString(s string) []byte {
 }
 
 // decString decodes a string of any version. Assumes header is not nil.
-func decString(data []byte) (string, int, error) {
+//
+// returned interface{} is only to implement decFunc and will always be nil
+func decString(data []byte) (string, interface{}, int, error) {
 	if len(data) < 1 {
-		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case; 0x00 is the empty string in all variants
 	if data[0] == 0 {
-		return "", 1, nil
+		return "", nil, 1, nil
 	}
 
 	hdr, _, err := decCountHeader(data)
 	if err != nil {
-		return "", 0, err
+		return "", nil, 0, err
 	}
 
 	// compatibility with older format
@@ -1021,18 +1032,19 @@ func decString(data []byte) (string, int, error) {
 	return decStringV1(data)
 }
 
-func decStringV1(data []byte) (string, int, error) {
+// returned interface{} is only to implement decFunc and will always be nil
+func decStringV1(data []byte) (string, interface{}, int, error) {
 	if len(data) < 1 {
-		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	strLength, countLen, err := decInt[tLen](data)
+	strLength, _, countLen, err := decInt[tLen](data)
 	if err != nil {
-		return "", 0, errorDecf(0, "decode string byte count: %s", err)
+		return "", nil, 0, errorDecf(0, "decode string byte count: %s", err)
 	}
 	data = data[countLen:]
 
 	if strLength < 0 {
-		return "", 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
+		return "", nil, 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
 	}
 
 	if len(data) < strLength {
@@ -1044,7 +1056,7 @@ func decStringV1(data []byte) (string, int, error) {
 		}
 		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(countLen, errFmt, strLength, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return "", 0, err
+		return "", nil, 0, err
 	}
 	// clamp it
 	data = data[:strLength]
@@ -1055,7 +1067,7 @@ func decStringV1(data []byte) (string, int, error) {
 	for readBytes-countLen < strLength {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", 0, errorDecf(readBytes, "%s", err)
+			return "", nil, 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1063,21 +1075,22 @@ func decStringV1(data []byte) (string, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), readBytes, nil
+	return sb.String(), nil, readBytes, nil
 }
 
-func decStringV0(data []byte) (string, int, error) {
+// returned interface{} is only to implement decFunc and will always be nil
+func decStringV0(data []byte) (string, interface{}, int, error) {
 	if len(data) < 1 {
-		return "", 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	runeCount, n, err := decInt[int](data)
+	runeCount, _, n, err := decInt[int](data)
 	if err != nil {
-		return "", 0, errorDecf(0, "decode string rune count: %s", err)
+		return "", nil, 0, errorDecf(0, "decode string rune count: %s", err)
 	}
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
+		return "", nil, 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
 	}
 
 	readBytes := n
@@ -1087,7 +1100,7 @@ func decStringV0(data []byte) (string, int, error) {
 	for i := 0; i < runeCount; i++ {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", 0, errorDecf(readBytes, "%s", err)
+			return "", nil, 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1095,7 +1108,7 @@ func decStringV0(data []byte) (string, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), readBytes, nil
+	return sb.String(), nil, readBytes, nil
 }
 
 func decUTF8Codepoint(data []byte) (rune, int, error) {
@@ -1131,7 +1144,7 @@ func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
 	var textData string
 	var err error
 
-	textData, readBytes, err = decString(data)
+	textData, _, readBytes, err = decString(data)
 	if err != nil {
 		return readBytes, errorDecf(0, "decode text: %s", err).wrap(ErrMalformedData)
 	}
@@ -1164,7 +1177,7 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 	var byteLen int
 	var err error
 
-	byteLen, readBytes, err = decInt[tLen](data)
+	byteLen, _, readBytes, err = decInt[tLen](data)
 	if err != nil {
 		return 0, errorDecf(0, "decode byte count: %s", err)
 	}
