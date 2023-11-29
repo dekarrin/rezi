@@ -5,8 +5,8 @@
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode most
-simple (non-struct) built-in Go types to bytes, and handles customization of
-decoding and encoding of user-defined types that implement
+simple built-in Go types and structs that contain those types to bytes. It
+further allows customization of decoding and encoding of user-defined types via
 `encoding.BinaryMarshaler` or `encoding.TextMarshaler`.
 
 All data is encoded in a deterministic fashion, or as deterministically as
@@ -204,10 +204,43 @@ integer types, or one of the built-in float types.
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.
 
-On top of all of the above, REZI supports any type whose underlying type is
-supported.
+On top of all of the above, REZI automatically supports any type whose
+underlying type is supported, as well as any struct whose exported fields are
+all of supported types.
 
-#### User-Defined Types
+#### Struct Support
+
+Much like the `json` package, REZI can encode and decode most simple structs
+out of the box without requiring any further customization. Simple in this case
+means that all of its exported fields are a supported type. As only the exported
+fields are encoded and decoded to bytes, it's okay if an unexported field is of
+an unsupported type.
+
+```golang
+(example simple struct that is supported)
+
+(example struct NOT supported w func member)
+
+(example struct with unexported func member, supported)
+```
+
+Unexported fields of a struct are ignored when encoding, and will not be in the
+resulting values. As a result of how REZI decodes structs, any struct that has
+unexported fields will have those fields set to their zero-values when a value
+of that struct is decoded.
+
+```golang
+(example struct that has unexported values, encode it)
+
+(a new struct with values set for unexported, decode to it)
+```
+
+If this is a concern, it is recommended that struct encoding be cu-
+
+// WIP: also update below section
+
+### Customizing Encoding And Decoding
+
 REZI supports encoding any custom type that implements
 `encoding.BinaryMarshaler`, and it supports decoding any custom type that
 implements `encoding.BinaryUnmarshaler` with a pointer receiver. In fact, the
