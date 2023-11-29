@@ -134,6 +134,7 @@ func Test_Writer_Enc(t *testing.T) {
 	intData := 413
 	arrData := [3]string{"VRISKA", "TEREZI"}
 	textData := testText{name: "VRISKA", value: 8, enabled: true}
+	structData := testStructManyFields{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true}
 	expect = []byte{
 		0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41,
 		0x04, 0xc0, 0x70, 0x00, 0x32,
@@ -146,6 +147,16 @@ func Test_Writer_Enc(t *testing.T) {
 		0x00,
 
 		0x41, 0x82, 0x0d, 0x38, 0x2c, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41,
+
+		0x01, 0x31, // struct len=49
+		0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+		0x01,                                                 // true
+		0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+		0x02, 0x3f, 0xd0, // 0.25
+		0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+		0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+		0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+		0x01, 0x08, // 8
 	}
 
 	err = w.Enc(strData)
@@ -170,6 +181,10 @@ func Test_Writer_Enc(t *testing.T) {
 	}
 	err = w.Enc(textData)
 	if !assert.NoError(err, "error writing sixth time") {
+		return
+	}
+	err = w.Enc(structData)
+	if !assert.NoError(err, "error writing seventh time") {
 		return
 	}
 	w.Flush()
@@ -538,6 +553,24 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 	var dest13Text testText
 	expect13Text := testText{name: "VRISKA", value: 8, enabled: true}
 
+	input = append(input,
+		0x01, 0x31, // struct len=49
+
+		0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+		0x01, // true
+
+		0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+		0x02, 0x3f, 0xd0, // 0.25
+
+		0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+		0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+		0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+		0x01, 0x08, // 8
+	)
+	var dest14Struct testStructManyFields
+	expect14Struct := testStructManyFields{Name: "KANAYA", Value: 8, Factor: 0.25, Enabled: true}
+
 	r, err := NewReader(bytes.NewReader(input), nil)
 	if !assert.NoError(err, "creating Reader returned error") {
 		return
@@ -620,6 +653,12 @@ func Test_Reader_Dec_sequential(t *testing.T) {
 		return
 	}
 	assert.Equal(expect13Text, dest13Text, "dest13Text mismatch")
+
+	err = r.Dec(&dest14Struct)
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Equal(expect14Struct, dest14Struct, "dest14Struct mismatch")
 }
 
 func Test_Reader_Dec_int(t *testing.T) {
@@ -1419,6 +1458,156 @@ func Test_Reader_Dec_binary(t *testing.T) {
 		}
 
 		var dest **testBinary
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+}
+
+func Test_Reader_Dec_struct(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []byte
+		expect    testStructMultiMember
+		expectErr bool
+		expectOff int
+	}{
+		{
+			name: "empty values",
+			input: []byte{
+				0x01, 0x11, // len=17
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x00, // ""
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x00, // 0
+			},
+			expect:    testStructMultiMember{},
+			expectOff: 19,
+		},
+		{
+			name: "filled values",
+			input: []byte{
+				0x01, 0x1a, // len=26
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+			},
+			expect:    testStructMultiMember{Name: "KANAYA", Value: 8},
+			expectOff: 28,
+		},
+		{
+			name: "empty values x2",
+			input: []byte{
+				0x01, 0x11, // len=17
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x00,                                           // ""
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x00, // 0
+
+				0x01, 0x11, // len=17
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x00,                                           // ""
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x00, // 0
+			},
+			expect:    testStructMultiMember{},
+			expectOff: 19,
+		},
+		{
+			name: "filled values x2",
+			input: []byte{
+				0x01, 0x1a, // len=26
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+
+				0x01, 0x1a, // len=26
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41, // "KANAYA"
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x08, // 8
+			},
+			expect:    testStructMultiMember{Name: "KANAYA", Value: 8},
+			expectOff: 28,
+		},
+		{
+			// error - invalid (nil) count
+			name:      "error - invalid indir count int",
+			input:     []byte{0x70, 0x00, 0x20},
+			expectErr: true,
+			expectOff: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			r, err := NewReader(bytes.NewReader(tc.input), nil)
+			if !assert.NoError(err, "creating Reader returned error") {
+				return
+			}
+
+			var dest testStructMultiMember
+			err = r.Dec(&dest)
+			if tc.expectErr {
+				assert.Error(err, "error not returned")
+				assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+				return
+			}
+			if !assert.NoError(err) {
+				return
+			}
+
+			assert.Equal(tc.expect, dest, "dest not expected value")
+			assert.Equal(tc.expectOff, r.offset, "offset mismatch")
+		})
+	}
+
+	t.Run("nil value - single indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x20}
+		expect := nilRef[testStructMultiMember]()
+		expectOff := 1
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest *testStructMultiMember
+		err = r.Dec(&dest)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, dest, "dest not expected value")
+		assert.Equal(expectOff, r.offset, "offset mismatch")
+	})
+
+	t.Run("nil value - multi indir", func(t *testing.T) {
+		assert := assert.New(t)
+		input := []byte{0x30, 0x01, 0x01}
+		expectPtr := nilRef[testStructMultiMember]()
+		expect := &expectPtr
+		expectOff := 3
+
+		r, err := NewReader(bytes.NewReader(input), nil)
+		if !assert.NoError(err, "creating Reader returned error") {
+			return
+		}
+
+		var dest **testStructMultiMember
 		err = r.Dec(&dest)
 		if !assert.NoError(err) {
 			return
