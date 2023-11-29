@@ -3,6 +3,7 @@ package rezi
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -366,6 +367,96 @@ func Test_reziError_totalOffset_binary(t *testing.T) {
 			assert := assert.New(t)
 
 			var dest testBinary
+			_, err := Dec(tc.input, &dest)
+			if !assert.Error(err) {
+				return
+			}
+
+			// convert it to known type reziError
+			rErr, ok := err.(reziError)
+			if !assert.Truef(ok, "Dec returned non-reziErr: %v", err) {
+				return
+			}
+
+			// check if the offset is valid
+			actual, ok := rErr.totalOffset()
+			if !assert.Truef(ok, "Dec returned reziErr with no offset: %v", err) {
+				return
+			}
+
+			// assert the offset is the expected
+			assert.Equal(tc.expectTotalOffset, actual)
+
+			// and finally, check the err output
+			expectOffsetHex := fmt.Sprintf("%x", tc.expectTotalOffset)
+			if len(expectOffsetHex)%2 != 0 {
+				expectOffsetHex = "0" + expectOffsetHex
+			}
+			lowerMsgAct := strings.ToUpper(rErr.Error())
+			lowerMsgExp := strings.ToUpper(tc.expectErrText)
+			assert.Contains(rErr.Error(), expectOffsetHex, "message does not contain offset: %q", rErr.Error())
+			assert.Contains(lowerMsgAct, lowerMsgExp, "message does not contain %q: %q", tc.expectErrText, rErr.Error())
+		})
+	}
+}
+
+func Test_reziError_totalOffset_struct(t *testing.T) {
+	refName := reflect.ValueOf(testStructMultiMember{}).Type().Name()
+	testCases := []struct {
+		name              string
+		input             []byte
+		expectTotalOffset int
+		expectErrText     string
+	}{
+		{
+			name: "decode struct: bad byte count",
+			input: []byte{
+				/* byte count = 27 */ 0x01, 0x1b,
+
+				/* "Name" */ 0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65,
+				/* "KANAYA" */ 0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41,
+
+				/* "Value" */ 0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65,
+				/* 8 */ 0x01, 0x08,
+			},
+			expectTotalOffset: 2,
+			expectErrText:     "decoded " + refName + " byte count",
+		},
+		{
+			name: "decode struct: string error",
+			input: []byte{
+				/* byte count = 24 */ 0x01, 0x18,
+
+				/* "Name" */ 0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65,
+				0x41, 0x80, 0x04, 0x41, 0x42, 0x43, 0xc3, // "ABC" followed by invalid seq
+
+				/* "Value" */ 0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65,
+				/* 8 */ 0x01, 0x08,
+			},
+			expectTotalOffset: 15,
+			expectErrText:     refName + ".Name: invalid UTF-8 encoding",
+		},
+		{
+			name: "decode struct: number error",
+			input: []byte{
+				/* byte count = 25 */ 0x01, 0x19,
+
+				/* "Name" */ 0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65,
+				/* "KANAYA" */ 0x41, 0x82, 0x06, 0x4b, 0x41, 0x4e, 0x41, 0x59, 0x41,
+
+				/* "Value" */ 0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65,
+				0x01, // a length but no actual num
+			},
+			expectTotalOffset: 27,
+			expectErrText:     refName + ".Value: decoded int byte count",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			var dest testStructMultiMember
 			_, err := Dec(tc.input, &dest)
 			if !assert.Error(err) {
 				return

@@ -26,11 +26,19 @@ func encStruct(v interface{}, ti typeInfo) ([]byte, error) {
 
 		fNameData, err := Enc(fi.Name)
 		if err != nil {
-			return nil, errorf("field name .%s: %s", fi.Name, err)
+			msgTypeName := reflect.ValueOf(v).Type().Name()
+			if msgTypeName == "" {
+				msgTypeName = "(anonymous type)"
+			}
+			return nil, errorf("%s.%s field name: %s", msgTypeName, fi.Name, err)
 		}
 		fValData, err := Enc(v.Interface())
 		if err != nil {
-			return nil, errorf("field .%s: %v", fi.Name, err)
+			msgTypeName := reflect.ValueOf(v).Type().Name()
+			if msgTypeName == "" {
+				msgTypeName = "(anonymous type)"
+			}
+			return nil, errorf("%s.%s: %v", msgTypeName, fi.Name, err)
 		}
 
 		enc = append(enc, fNameData...)
@@ -115,7 +123,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		var fNameVal string
 		n, err = Dec(data, &fNameVal)
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "decode field name: %s", err)
+			return totalConsumed, errorDecf(totalConsumed, "decode %s field name: %s", msgTypeName, err)
 		}
 		totalConsumed += n
 		i += n
@@ -124,12 +132,12 @@ func decStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		// get field info from name
 		fi, ok := ti.Fields.ByName[fNameVal]
 		if !ok {
-			return totalConsumed, errorDecf(totalConsumed, "decoded field name .%s does not exist in decoded-to struct", fNameVal).wrap(ErrMalformedData, ErrInvalidType)
+			return totalConsumed, errorDecf(totalConsumed, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
 		}
 		fieldPtr := target.Field(fi.Index).Addr()
 		n, err = Dec(data, fieldPtr.Interface())
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "field .%s: %v", fi.Name, err)
+			return totalConsumed, errorDecf(totalConsumed, "%s.%s: %v", msgTypeName, fi.Name, err)
 		}
 		totalConsumed += n
 		i += n
