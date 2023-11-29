@@ -217,9 +217,20 @@ fields are encoded and decoded to bytes, it's okay if an unexported field is of
 an unsupported type.
 
 ```golang
-(example simple struct that is supported)
+
+// AnimalInfo is fully supported; all fields will be encoded and decoded.
+type AnimalInfo struct {
+    Name string
+    Taxonomy []string
+    AverageAge int
+}
+
+type Animal struct {
+    Info 
+}
 
 (example struct NOT supported w func member)
+
 
 (example struct with unexported func member, supported)
 ```
@@ -235,9 +246,22 @@ of that struct is decoded.
 (a new struct with values set for unexported, decode to it)
 ```
 
-If this is a concern, it is recommended that struct encoding be cu-
+Embedded structs within structs are supported if the embedded struct type is
+exported; this is because it will be turned into a field with the same name as
+the embedded type, and if it is exported, the field name will correspondingly
+be exported. Likewise, embedded structs whose type is unexported will be ignored
+during encoding and will not be encoded to.
 
-// WIP: also update below section
+```
+(example struct that has exported embedded)
+
+(example struct that has exported embedded)
+```
+
+If any of the above limitations are a concern, you can customize the encoding of
+user-defined types by implementing one of the marshaler types
+`encoding.BinaryMarshaler` or `encoding.TextMarshaler` (and their corresponding
+unmarshler interfaces for decoding) as described in the next section.
 
 ### Customizing Encoding And Decoding
 
