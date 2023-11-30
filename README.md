@@ -5,9 +5,9 @@
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode most
-simple built-in Go types and structs that contain those types to bytes. It
-further allows customization of decoding and encoding of user-defined types via
-`encoding.BinaryMarshaler` or `encoding.TextMarshaler`.
+simple Go types to bytes. It further allows customization of decoding and
+encoding of user-defined types via `encoding.BinaryMarshaler` or
+`encoding.TextMarshaler`.
 
 All data is encoded in a deterministic fashion, or as deterministically as
 possible. Any non-determinism in the resulting encoded value will arise from
@@ -314,7 +314,7 @@ user-defined types by implementing one of the marshaler types
 `encoding.BinaryMarshaler` or `encoding.TextMarshaler` (and their corresponding
 unmarshler interfaces for decoding) as described in the next section.
 
-### Customizing Encoding And Decoding
+### Custom Encoding And Decoding
 
 REZI supports encoding any custom type that implements
 `encoding.BinaryMarshaler`, and it supports decoding any custom type that

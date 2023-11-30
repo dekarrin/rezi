@@ -140,10 +140,7 @@
 //
 // All non-struct types whose underlying type is a supported type are themselves
 // supported as well. For example, time.Duration has an underlying type of
-// int64, and is therefore supported in REZI. This does not apply to marshaler
-// implementors; a type whose underlying type is only supported in REZI via
-// implementation of one of the marshaler or unmarshaler interfaces must itself
-// implement that interface in order to be fully supported.
+// int64, and is therefore supported in REZI.
 //
 // Struct types are supported even if they do not implement text or binary
 // marshaling functions, provided all of their exported fields are of a

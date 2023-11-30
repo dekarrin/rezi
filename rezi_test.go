@@ -12,6 +12,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testUnsupportedOOB struct {
+	Name        string
+	unsupported func()
+}
+
+func (oob testUnsupportedOOB) MarshalBinary() ([]byte, error) {
+	return Enc(oob.Name)
+}
+
+func (oob *testUnsupportedOOB) UnmarshalBinary(data []byte) error {
+	_, err := Dec(data, &(oob.Name))
+	return err
+}
+
+type testUnsupportedOOBLevel2 testUnsupportedOOB
+
+func Test_Underlying_Supported_Via_Marshal(t *testing.T) {
+	assert := assert.New(t)
+
+	myData := testUnsupportedOOBLevel2{Name: "Jack", unsupported: nil}
+
+	data, err := Enc(myData)
+	if !assert.NoError(err, "encode error") {
+		return
+	}
+
+	var decodeTo testUnsupportedOOBLevel2
+	_, err = Dec(data, &decodeTo)
+	if !assert.NoError(err, "decode error") {
+		return
+	}
+
+	assert.Equal(myData, decodeTo)
+}
+
 func Test_Enc_Errors(t *testing.T) {
 	dummyTyped := make(chan struct{})
 
