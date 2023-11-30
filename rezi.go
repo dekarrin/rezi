@@ -636,11 +636,11 @@ func MustDec(data []byte, v interface{}) int {
 // the data itself (including there being fewer bytes than necessary to decode
 // the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errorf("%v", r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		err = errorf("%v", r)
+	// 	}
+	// }()
 
 	info, err := canDecode(v)
 	if err != nil {
@@ -724,6 +724,13 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		assignTarget := reflect.ValueOf(v)
 		// assignTarget is a **string but we want a *string
 
+		// if it's a struct, we must get the original value, if one exists, in order
+		// to preserve the original member values
+		var origStructVal reflect.Value
+		if ti.Main == mtStruct {
+			origStructVal = unwrapOriginalStructValue(assignTarget)
+		}
+
 		for i := 0; i < ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
@@ -731,23 +738,21 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 
 			// **string     // *string  // string
 			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
-			newTarget.Set(assignTarget.Elem())
 			assignTarget.Elem().Set(newTarget)
 			assignTarget = newTarget
 		}
 
 		if !hdr.IsNil() {
-			// TODO: extraInfo use here IF it is a struct
 			refDecoded := reflect.ValueOf(decoded)
 			if ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
 
-			if ti.Main == mtStruct {
-				setStructMembers(assignTarget, refDecoded, extraInfo.([]fieldInfo))
-			} else {
-				assignTarget.Elem().Set(refDecoded)
+			if ti.Main == mtStruct && origStructVal.IsValid() {
+				refDecoded = setStructMembers(origStructVal, refDecoded, extraInfo.([]fieldInfo))
 			}
+
+			assignTarget.Elem().Set(refDecoded)
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)

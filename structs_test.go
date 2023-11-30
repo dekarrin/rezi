@@ -157,6 +157,7 @@ func Test_Enc_Struct(t *testing.T) {
 }
 
 func runEncTests[E any](t *testing.T, name string, inputVal E, expect []byte) {
+	// TODO: too complicated, just make the test cases instead of going off to a function
 	// normal value test
 	t.Run(name, func(t *testing.T) {
 		assert := assert.New(t)
@@ -250,31 +251,34 @@ func Test_Dec_Struct(t *testing.T) {
 		Value float64
 	}
 
-	// runDecTests(t, "no-member struct", []byte{0x00}, testStructEmpty{}, 1, nil)
+	runDecTests(t, "no-member struct", nil, []byte{0x00}, testStructEmpty{}, nil, 1)
 
-	// runDecTests(t, "one-member struct", []byte{
-	// 	0x01, 0x0a, // len=10
+	runDecTests(t, "one-member struct", nil,
+		[]byte{
+			0x01, 0x0a, // len=10
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
-	// }, testStructOneMember{Value: 4}, 12, nil)
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
+		}, testStructOneMember{Value: 4}, nil, 12)
 
-	// runDecTests(t, "multi-member struct", []byte{
-	// 	0x01, 0x1a, // len=26
+	runDecTests(t, "multi-member struct", nil,
+		[]byte{
+			0x01, 0x1a, // len=26
 
-	// 	0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
-	// 	0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+			0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
-	// }, testStructMultiMember{Value: 4, Name: "NEPETA"}, 28, nil)
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
+		}, testStructMultiMember{Value: 4, Name: "NEPETA"}, nil, 28)
 
-	// runDecTests(t, "with unexported", []byte{
-	// 	0x01, 0x0a, // len=10
+	runDecTests(t, "with unexported", nil,
+		[]byte{
+			0x01, 0x0a, // len=10
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
-	// }, testStructWithUnexported{Value: 4, unexported: 0}, 12, nil)
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
+		}, testStructWithUnexported{Value: 4, unexported: 0}, nil, 12)
 
 	runDecTests(t, "with unexported values set", &testStructWithUnexported{unexported: 12},
 		[]byte{
@@ -284,159 +288,165 @@ func Test_Dec_Struct(t *testing.T) {
 			0x01, 0x04, // 4
 		}, testStructWithUnexported{Value: 4, unexported: 12}, &testStructWithUnexported{unexported: 12}, 12)
 
-	// runDecTests(t, "with unexported case distinguished", []byte{
-	// 	0x01, 0x0a, // len=10
+	runDecTests(t, "with unexported case distinguished", nil,
+		[]byte{
+			0x01, 0x0a, // len=10
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
-	// }, testStructWithUnexportedCaseDistinguished{Value: 4, value: 0}, 12, nil)
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
+		}, testStructWithUnexportedCaseDistinguished{Value: 4, value: 0}, nil, 12)
 
-	// runDecTests(t, "only unexported", []byte{0x00}, testStructOnlyUnexported{value: 0, name: ""}, 1, nil)
+	runDecTests(t, "only unexported", nil, []byte{0x00}, testStructOnlyUnexported{value: 0, name: ""}, nil, 1)
 
-	// runDecTests(t, "many fields", []byte{
-	// 	0x01, 0x39, // len=57
+	runDecTests(t, "many fields", nil,
+		[]byte{
+			0x01, 0x39, // len=57
 
-	// 	0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
-	// 	0x01, // true
+			0x41, 0x82, 0x07, 0x45, 0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, // "Enabled"
+			0x01, // true
 
-	// 	0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
-	// 	0x03, 0xc0, 0x20, 0x80, // 8.25
+			0x41, 0x82, 0x06, 0x46, 0x61, 0x63, 0x74, 0x6f, 0x72, // "Factor"
+			0x03, 0xc0, 0x20, 0x80, // 8.25
 
-	// 	0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
-	// 	0x41, 0x82, 0x0c, 0x52, 0x6f, 0x73, 0x65, 0x20, 0x4c, 0x61, 0x6c, 0x6f, 0x6e, 0x64, 0x65, // "Rose Lalonde"
+			0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+			0x41, 0x82, 0x0c, 0x52, 0x6f, 0x73, 0x65, 0x20, 0x4c, 0x61, 0x6c, 0x6f, 0x6e, 0x64, 0x65, // "Rose Lalonde"
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x02, 0x01, 0x9d, // 413
-	// }, testStructManyFields{
-	// 	Value:   413,
-	// 	Name:    "Rose Lalonde",
-	// 	Enabled: true,
-	// 	Factor:  8.25,
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x02, 0x01, 0x9d, // 413
+		}, testStructManyFields{
+			Value:   413,
+			Name:    "Rose Lalonde",
+			Enabled: true,
+			Factor:  8.25,
 
-	// 	hidden:  nil,
-	// 	inc:     0,
-	// 	enabled: nil,
-	// }, 59, nil)
+			hidden:  nil,
+			inc:     0,
+			enabled: nil,
+		}, nil, 59)
 
-	// runDecTests(t, "with embedded", []byte{
-	// 	0x01, 0x30, // len=48
+	runDecTests(t, "with embedded", nil,
+		[]byte{
+			0x01, 0x30, // len=48
 
-	// 	0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
-	// 	0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+			0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
 
-	// 	0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
-	// 	0x01, 0x0a, // len=10
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
-	// }, testStructWithEmbedded{
-	// 	TestStructToEmbed: TestStructToEmbed{
-	// 		Value: 4,
-	// 	},
-	// 	Name: "NEPETA",
-	// }, 50, nil)
+			0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
+			0x01, 0x0a, // len=10
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
+		}, testStructWithEmbedded{
+			TestStructToEmbed: TestStructToEmbed{
+				Value: 4,
+			},
+			Name: "NEPETA",
+		}, nil, 50)
 
-	// runDecTests(t, "with embedded overlap", []byte{
-	// 	0x01, 0x3c, // len=60
+	runDecTests(t, "with embedded overlap", nil,
+		[]byte{
+			0x01, 0x3c, // len=60
 
-	// 	0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
-	// 	0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+			0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
 
-	// 	0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
-	// 	0x01, 0x0a, // len=10
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x01, 0x04, // 4
+			0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
+			0x01, 0x0a, // len=10
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x01, 0x04, // 4
 
-	// 	0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-	// 	0x03, 0xc0, 0x20, 0x80, // 8.25
-	// }, testStructWithEmbeddedOverlap{
-	// 	TestStructToEmbed: TestStructToEmbed{
-	// 		Value: 4,
-	// 	},
-	// 	Value: 8.25,
-	// 	Name:  "NEPETA",
-	// }, 62, nil)
+			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+			0x03, 0xc0, 0x20, 0x80, // 8.25
+		}, testStructWithEmbeddedOverlap{
+			TestStructToEmbed: TestStructToEmbed{
+				Value: 4,
+			},
+			Value: 8.25,
+			Name:  "NEPETA",
+		}, nil, 62)
 
 	// // specialized test we cannot abstract easily
-	// t.Run("missing values in encoded are set to default", func(t *testing.T) {
-	// 	assert := assert.New(t)
+	t.Run("missing values in encoded are left alone", func(t *testing.T) {
+		assert := assert.New(t)
 
-	// 	var (
-	// 		actual = testStructMultiMember{Value: 8, Name: "JOHN"}
-	// 		input  = []byte{
-	// 			0x01, 0x10, // len=16
+		var (
+			actual = testStructMultiMember{Value: 8, Name: "JOHN"}
+			input  = []byte{
+				0x01, 0x10, // len=16
 
-	// 			0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
-	// 			0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
-	// 		}
-	// 		expect         = testStructMultiMember{Value: 0, Name: "NEPETA"}
-	// 		expectConsumed = 18
-	// 	)
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+			}
+			expect         = testStructMultiMember{Value: 8, Name: "NEPETA"}
+			expectConsumed = 18
+		)
 
-	// 	consumed, err := Dec(input, &actual)
-	// 	if !assert.NoError(err) {
-	// 		return
-	// 	}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-	// 	assert.Equal(expect, actual, "value mismatch")
-	// 	assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
-	// })
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 }
 
 // expectConsumed used only in sub-tests where expect is the actual expected.
 //
 // if initVal is nil it will be set to an empty value
 func runDecTests[E any](t *testing.T, name string, initVal *E, filledInput []byte, filledExpect E, emptyExpect *E, filledExpectConsumed int) {
+	// TODO: too complicated, just make the test cases instead of going off to a function
+
 	// normal value test
-	// t.Run(name, func(t *testing.T) {
-	// 	assert := assert.New(t)
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
 
-	// 	var (
-	// 		actual         E
-	// 		input          = filledInput
-	// 		expect         = filledExpect
-	// 		expectConsumed = filledExpectConsumed
-	// 	)
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
 
-	// 	if initVal != nil {
-	// 		actual = *initVal
-	// 	}
+		if initVal != nil {
+			actual = *initVal
+		}
 
-	// 	consumed, err := Dec(input, &actual)
-	// 	if !assert.NoError(err) {
-	// 		return
-	// 	}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-	// 	assert.Equal(expect, actual, "value mismatch")
-	// 	assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
-	// })
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
-	// // 0-len struct
-	// t.Run(name+", no values encoded", func(t *testing.T) {
-	// 	assert := assert.New(t)
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
 
-	// 	var (
-	// 		actual         E
-	// 		input          = []byte{0x00}
-	// 		expect         E
-	// 		expectConsumed = 1
-	// 	)
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
 
-	// 	if initVal != nil {
-	// 		actual = *initVal
-	// 	}
+		if initVal != nil {
+			actual = *initVal
+		}
 
-	// 	if emptyExpect != nil {
-	// 		expect = *emptyExpect
-	// 	}
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
 
-	// 	consumed, err := Dec(input, &actual)
-	// 	if !assert.NoError(err) {
-	// 		return
-	// 	}
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
 
-	// 	assert.Equal(expect, actual, "value mismatch")
-	// 	assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
-	// })
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	// single pointer, filled
 	t.Run("*("+name+")", func(t *testing.T) {

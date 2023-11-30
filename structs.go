@@ -59,7 +59,6 @@ func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 	var extraInfo []fieldInfo
 	st, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
 		func(t reflect.Type) bool {
-			// TODO: might need to remove reflect.Pointer
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
 		func(data []byte, v interface{}) (interface{}, int, error) {
@@ -72,14 +71,22 @@ func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 		return n, err
 	}
 	if ti.Indir == 0 {
-		// TODO: extraInfo use here
 		refReceiver := reflect.ValueOf(v)
 
+		// if it's a struct, we must get the original value, if one exists, in order
+		// to preserve the original member values
+		var origStructVal reflect.Value
 		if ti.Main == mtStruct {
-			setStructMembers(refReceiver, reflect.ValueOf(st), extraInfo)
-		} else {
-			refReceiver.Elem().Set(reflect.ValueOf(st))
+			origStructVal = unwrapOriginalStructValue(refReceiver)
 		}
+
+		refSt := reflect.ValueOf(st)
+
+		if ti.Main == mtStruct && origStructVal.IsValid() {
+			refSt = setStructMembers(origStructVal, refSt, extraInfo)
+		}
+
+		refReceiver.Elem().Set(refSt)
 	}
 	return n, err
 }
@@ -159,10 +166,34 @@ func decStruct(data []byte, v interface{}, ti typeInfo) ([]fieldInfo, int, error
 	return decFields, totalConsumed, nil
 }
 
-func setStructMembers(target, decoded reflect.Value, decodedFields []fieldInfo) {
+func setStructMembers(initial, decoded reflect.Value, decodedFields []fieldInfo) reflect.Value {
+	newVal := reflect.New(initial.Type())
+	newVal.Elem().Set(initial)
+
 	for _, fi := range decodedFields {
-		destPtr := target.Elem().Field(fi.Index).Addr()
+		destPtr := newVal.Elem().Field(fi.Index).Addr()
 		fieldVal := decoded.Field(fi.Index)
 		destPtr.Elem().Set(fieldVal)
 	}
+
+	return newVal.Elem()
+}
+
+// this will return nil if v does not end up in a struct value after
+// dereferences are made
+func unwrapOriginalStructValue(refVal reflect.Value) reflect.Value {
+	// TODO: move all this to type analysis
+
+	// the user may have passed in a ptr-ptr-to, make shore we get actual
+	// target
+	for refVal.Kind() == reflect.Pointer && !refVal.IsNil() {
+		refVal = refVal.Elem()
+	}
+
+	// only pick up orig value if we ended up at a struct type
+	if refVal.Kind() == reflect.Struct {
+		return refVal
+	}
+
+	return reflect.Value{}
 }
