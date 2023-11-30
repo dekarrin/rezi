@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"fmt"
 	"reflect"
+	"sort"
 )
 
 var (
@@ -47,6 +48,7 @@ const (
 	mtComplex
 	mtArray
 	mtText
+	mtStruct
 )
 
 func (mt mainType) String() string {
@@ -75,9 +77,72 @@ func (mt mainType) String() string {
 		return "mtArray"
 	case mtText:
 		return "mtText"
+	case mtStruct:
+		return "mtStruct"
 	default:
 		return fmt.Sprintf("mainType(%d)", mt)
 	}
+}
+
+// fieldInfo holds REZI-specific type info on fieldds of a struct
+type fieldInfo struct {
+	Name      string
+	Index     int // position in fields by index
+	Type      typeInfo
+	Anonymous bool // TODO: check if this actually needed on completion of #61
+}
+
+type fields struct {
+	ByName  map[string]fieldInfo
+	ByOrder []fieldInfo
+}
+
+// sortableFields can sort a slice of fieldInfo. select whether by Name or by
+// Index with the alpha property.
+type sortableFields struct {
+	fields []fieldInfo
+	alpha  bool // if alpha is false, it's sorted by Index of the fields in fs. else by Name.
+}
+
+// Len implements sort.Interface
+func (sf *sortableFields) Len() int {
+	return len(sf.fields)
+}
+
+// Less implements sort.Interface
+func (sf *sortableFields) Less(i, j int) bool {
+	f1 := sf.fields[i]
+	f2 := sf.fields[j]
+
+	if sf.alpha {
+		return f1.Name < f2.Name
+	}
+	return f1.Index < f2.Index
+}
+
+// Swap implements sort.Interface
+func (sf *sortableFields) Swap(i, j int) {
+	f1 := sf.fields[i]
+	f2 := sf.fields[j]
+
+	sf.fields[i] = f2
+	sf.fields[j] = f1
+}
+
+// does not sort in place; makes complete copy
+func sortFieldsByName(fields []fieldInfo) []fieldInfo {
+	sorting := &sortableFields{fields: make([]fieldInfo, len(fields)), alpha: true}
+	copy(sorting.fields, fields)
+	sort.Sort(sorting)
+	return sorting.fields
+}
+
+// does not sort in place; makes complete copy
+func sortFieldsByIndex(fields []fieldInfo) []fieldInfo {
+	sorting := &sortableFields{fields: make([]fieldInfo, len(fields)), alpha: false}
+	copy(sorting.fields, fields)
+	sort.Sort(sorting)
+	return sorting.fields
 }
 
 // typeInfo holds REZI-specific type info on types that can be encoded and
@@ -92,6 +157,7 @@ type typeInfo struct {
 	ValType    *typeInfo // valid for map, slice, and array
 	Len        int       // only valid for array
 	Dec        bool      // whether the info is for a decoded value. if false, it's for an encoded one.
+	Fields     fields    // valid for struct only
 }
 
 // MainReflectType returns the reflect.Type that represents the main type of the
@@ -183,6 +249,19 @@ func (ti typeInfo) MainReflectType(indirected bool) reflect.Type {
 		t = reflect.SliceOf(vrt)
 	case mtString:
 		t = refPrimitiveKindTypes[reflect.String]
+	case mtStruct:
+		sorted := sortFieldsByIndex(ti.Fields.ByOrder)
+		refFields := []reflect.StructField{}
+		for _, fi := range sorted {
+			structRefType := fi.Type.MainReflectType(true)
+			sf := reflect.StructField{
+				Name:      fi.Name,
+				Anonymous: fi.Anonymous,
+				Type:      structRefType,
+			}
+			refFields = append(refFields, sf)
+		}
+		t = reflect.StructOf(refFields)
 	}
 
 	if t != nil && indirected {
@@ -337,6 +416,26 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			}
 			arrLen := t.Len()
 			return typeInfo{Indir: indirCount, Main: mtArray, ValType: &arrValInfo, Len: arrLen}, nil
+		case reflect.Struct:
+			// could be okay, but all exported fields must be encodable.
+			// check while building lists of fields
+			fieldsData := fields{ByName: map[string]fieldInfo{}}
+
+			for i := 0; i < t.NumField(); i++ {
+				sf := t.Field(i)
+				if !sf.IsExported() {
+					continue
+				}
+				fieldValInfo, err := encTypeInfo(sf.Type)
+				if err != nil {
+					return typeInfo{}, errorf("field .%s is not encodeable: %s", sf.Name, err)
+				}
+				fi := fieldInfo{Index: i, Name: sf.Name, Anonymous: sf.Anonymous, Type: fieldValInfo}
+				fieldsData.ByName[fi.Name] = fi
+				fieldsData.ByOrder = append(fieldsData.ByOrder, fi)
+			}
+			fieldsData.ByOrder = sortFieldsByName(fieldsData.ByOrder)
+			return typeInfo{Indir: indirCount, Main: mtStruct, Fields: fieldsData}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()
@@ -468,6 +567,27 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 			}
 			arrLen := t.Len()
 			return typeInfo{Dec: true, Indir: indirCount, Underlying: under, Main: mtArray, ValType: &arrValInfo, Len: arrLen}, nil
+		case reflect.Struct:
+			// could be okay, but all exported fields must be encodable.
+			// check while building lists of fields
+			fieldsData := fields{ByName: map[string]fieldInfo{}}
+
+			for i := 0; i < t.NumField(); i++ {
+				sf := t.Field(i)
+				if !sf.IsExported() {
+					continue
+				}
+				fieldValInfo, err := decTypeInfo(sf.Type)
+				if err != nil {
+					return typeInfo{}, errorf("field .%s is not decodeable: %s", sf.Name, err)
+				}
+				fi := fieldInfo{Index: i, Name: sf.Name, Anonymous: sf.Anonymous, Type: fieldValInfo}
+				fieldsData.ByName[fi.Name] = fi
+				fieldsData.ByOrder = append(fieldsData.ByOrder, fi)
+			}
+			fieldsData.ByOrder = sortFieldsByName(fieldsData.ByOrder)
+			// doesn't make sense to set Underlying for a struct; it will ALWAYS be the 'underlying' type.
+			return typeInfo{Dec: true, Indir: indirCount, Main: mtStruct, Fields: fieldsData}, nil
 		case reflect.Pointer:
 			// try removing one level of indrection and checking THAT
 			t = t.Elem()

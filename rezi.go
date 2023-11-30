@@ -1,5 +1,5 @@
 // Package rezi provides the ability to encode and decode data in Rarefied
-// Encoding (Compressible) Interchange format. It allows basic Go types and
+// Encoding (Compressible) Interchange format. It allows Go types and
 // user-defined types to be easily read from and written to byte slices, with
 // customization possible by implementing encoding.BinaryUnmarshaler and
 // encoding.BinaryMarshaler on a type, or alternatively by implementing
@@ -138,13 +138,18 @@
 // not have any concept of two different pointer variables pointing to the same
 // data.
 //
-// Besides the above listed types, all types whose underlying type is a
-// supported type are themselves supported as well. For example, time.Duration
-// has an underlying type of int64, and is therefore supported in REZI. This
-// does not apply to marshaler implementors; a type whose underlying type is
-// only supported in REZI via implementation of one of the marshaler or
-// unmarshaler interfaces must itself implement that interface
-// in order to be fully supported.
+// All non-struct types whose underlying type is a supported type are themselves
+// supported as well. For example, time.Duration has an underlying type of
+// int64, and is therefore supported in REZI. This does not apply to marshaler
+// implementors; a type whose underlying type is only supported in REZI via
+// implementation of one of the marshaler or unmarshaler interfaces must itself
+// implement that interface in order to be fully supported.
+//
+// Struct types are supported even if they do not implement text or binary
+// marshaling functions, provided all of their exported fields are of a
+// supported type. Both decoding and encoding ignore all unexported fields. If a
+// field is not present in the given bytes during decoding, its original value
+// is left intact, even if it is exported.
 //
 // # Binary Data Format
 //
@@ -410,6 +415,25 @@
 // encoding; if a type implements both, it will be encoded as a BinaryMarshaler,
 // not a TextMarshaler.
 //
+//	Struct Values
+//
+//	Layout:
+//
+//	[ INFO ] [ INT VALUE ] [ FIELD 1 ] [ VALUE 1 ] ... [ FIELD N ] [ VALUE N ]
+//	<-------COUNT--------> <---------------------VALUES---------------------->
+//	      1..9 bytes                           COUNT bytes
+//
+// Structs that do not implement binary marshaling or text marshaling funcitons
+// are encoded as a count of all bytes that make up the entire struct, followed
+// by pairs of the names and associated values for each exported field of the
+// struct. Each pair consists of the case-sensitive name of the field encoded as
+// a string, followed immediately by the encoded value of that field. There is
+// no special delimiter between name-value pairs or between the name and value
+// in a pair; where one ends, the next one begins.
+//
+// The encoded names are placed in a consistent order; encoding the same struct
+// will result in the same encoding.
+//
 //	Slice Values
 //
 //	Layout:
@@ -531,7 +555,9 @@ type (
 	tLen      = int
 	tNilLevel = int
 
-	decFunc[E any] func([]byte) (E, int, error)
+	// the interface{} in decFunc is any additional info needed for further
+	// stages of decode, nil in all cases except for struct decoding.
+	decFunc[E any] func([]byte) (E, interface{}, int, error)
 	encFunc[E any] func(E) ([]byte, error)
 )
 
@@ -588,6 +614,8 @@ func Enc(v interface{}) (data []byte, err error) {
 		return encCheckedMap(v, info)
 	} else if info.Main == mtSlice || info.Main == mtArray {
 		return encCheckedSlice(v, info)
+	} else if info.Main == mtStruct {
+		return encCheckedStruct(v, info)
 	} else {
 		panic("no possible encoding")
 	}
@@ -632,11 +660,11 @@ func MustDec(data []byte, v interface{}) int {
 // the data itself (including there being fewer bytes than necessary to decode
 // the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errorf("%v", r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		err = errorf("%v", r)
+	// 	}
+	// }()
 
 	info, err := canDecode(v)
 	if err != nil {
@@ -649,6 +677,8 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return decCheckedMap(data, v, info)
 	} else if info.Main == mtSlice || info.Main == mtArray {
 		return decCheckedSlice(data, v, info)
+	} else if info.Main == mtStruct {
+		return decCheckedStruct(data, v, info)
 	} else {
 		panic("no possible decoding")
 	}
@@ -703,8 +733,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	countHeaderBytes := n
 	effectiveExtraIndirs := hdr.ExtraNilIndirections()
 
+	var extraInfo interface{}
+
 	if !hdr.IsNil() {
-		decoded, n, err = decFn(data)
+		decoded, extraInfo, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
@@ -715,6 +747,13 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 		// the user has passed in a ptr-ptr-to. We cannot directly assign.
 		assignTarget := reflect.ValueOf(v)
 		// assignTarget is a **string but we want a *string
+
+		// if it's a struct, we must get the original value, if one exists, in order
+		// to preserve the original member values
+		var origStructVal reflect.Value
+		if ti.Main == mtStruct {
+			origStructVal = unwrapOriginalStructValue(assignTarget)
+		}
 
 		for i := 0; i < ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
@@ -732,6 +771,11 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 			if ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
+
+			if ti.Main == mtStruct && origStructVal.IsValid() {
+				refDecoded = setStructMembers(origStructVal, refDecoded, extraInfo.([]fieldInfo))
+			}
+
 			assignTarget.Elem().Set(refDecoded)
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
@@ -742,8 +786,10 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	return decoded, n, nil
 }
 
-func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (int, error)) decFunc[interface{}] {
-	return func(data []byte) (interface{}, int, error) {
+// decToUnwrappedFn takes the encoded bytes and an interface to decode to and
+// returns any extra data (may be nil), bytes consumed, and error status.
+func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
+	return func(data []byte) (interface{}, interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		receiverType := reflect.TypeOf(wrapped)
 
@@ -767,7 +813,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return nil, nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 			receiverValue = reflect.New(receiverType.Elem())
@@ -779,10 +825,10 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 		var decoded interface{}
 
 		receiver := receiverValue.Interface()
-		decConsumed, decErr := decToUnwrappedFn(data, receiver)
+		extraInfo, decConsumed, decErr := decToUnwrappedFn(data, receiver)
 
 		if decErr != nil {
-			return nil, decConsumed, decErr
+			return nil, extraInfo, decConsumed, decErr
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
@@ -791,7 +837,7 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			decoded = receiver
 		}
 
-		return decoded, decConsumed, decErr
+		return decoded, extraInfo, decConsumed, decErr
 	}
 }
 
@@ -983,7 +1029,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// all extension bytes processed, now decode any indirection level int if
 	// present
 	if infoByte&infoBitsIndir != 0 {
-		extraIndirs, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
+		extraIndirs, _, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
 			return errorDecf(decoded.DecodedCount, "%s", err)
 		}

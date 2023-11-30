@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Enc_Errors(t *testing.T) {
-	type dummyType struct{}
+	dummyTyped := make(chan struct{})
 
 	ErrFakeMarshal := errors.New("fake marshal error")
 
@@ -24,12 +24,12 @@ func Test_Enc_Errors(t *testing.T) {
 	}{
 		{
 			name:      "unknown type - Error",
-			input:     dummyType{},
+			input:     dummyTyped,
 			expectErr: Error,
 		},
 		{
 			name:      "unknown type - ErrInvalidType",
-			input:     dummyType{},
+			input:     dummyTyped,
 			expectErr: ErrInvalidType,
 		},
 		{
@@ -61,7 +61,7 @@ func Test_Enc_Errors(t *testing.T) {
 }
 
 func Test_Dec_Errors(t *testing.T) {
-	type dummyType struct{}
+	dummyTyped := make(chan struct{})
 
 	testCases := []struct {
 		name      string
@@ -91,12 +91,12 @@ func Test_Dec_Errors(t *testing.T) {
 		},
 		{
 			name:      "receiver is unsupported type - Error",
-			recv:      ref(dummyType{}),
+			recv:      ref(dummyTyped),
 			expectErr: Error,
 		},
 		{
 			name:      "receiver is unsupported type - ErrInvalidType",
-			recv:      ref(dummyType{}),
+			recv:      ref(dummyTyped),
 			expectErr: ErrInvalidType,
 		},
 		{

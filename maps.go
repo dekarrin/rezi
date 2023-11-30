@@ -7,7 +7,7 @@ import (
 	"sort"
 )
 
-// ti must containt a main type of tIntegral, tBool, or tString
+// ti must containt a main type of mtIntegral, mtBool, mtFloat, or mtString
 type sortableMapKeys struct {
 	keys []reflect.Value
 	ti   typeInfo
@@ -130,7 +130,10 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},
-		decMap,
+		func(b []byte, i interface{}) (interface{}, int, error) {
+			decN, err := decMap(b, i)
+			return nil, decN, err
+		},
 	))
 	if err != nil {
 		return n, err
@@ -145,7 +148,7 @@ func decCheckedMap(data []byte, v interface{}, ti typeInfo) (int, error) {
 func decMap(data []byte, v interface{}) (int, error) {
 	var totalConsumed int
 
-	toConsume, n, err := decInt[tLen](data)
+	toConsume, _, n, err := decInt[tLen](data)
 	if err != nil {
 		return 0, errorDecf(0, "decode byte count: %s", err)
 	}

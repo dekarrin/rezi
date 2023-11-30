@@ -5,8 +5,8 @@
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
 binary marshaling of data to REZI-format bytes. It can encode and decode most
-simple (non-struct) built-in Go types to bytes, and handles customization of
-decoding and encoding of user-defined types that implement
+simple built-in Go types and structs that contain those types to bytes. It
+further allows customization of decoding and encoding of user-defined types via
 `encoding.BinaryMarshaler` or `encoding.TextMarshaler`.
 
 All data is encoded in a deterministic fashion, or as deterministically as
@@ -204,29 +204,137 @@ integer types, or one of the built-in float types.
 REZI can also handle encoding and decoding pointers to any supported type, with
 any level of indirection.
 
-On top of all of the above, REZI supports any type whose underlying type is
-supported.
+On top of all of the above, REZI automatically supports any type whose
+underlying type is supported, as well as any struct whose exported fields are
+all of supported types.
 
-#### User-Defined Types
+#### Struct Support
+
+Much like the `json` package, REZI can encode and decode most simple structs
+out of the box without requiring any further customization. Simple in this case
+means that all of its exported fields are a supported type. As only the exported
+fields are encoded and decoded to bytes, it's okay if an unexported field is of
+an unsupported type.
+
+```golang
+
+// AnimalInfo is fully supported; all fields will be encoded and decoded.
+type AnimalInfo struct {
+    Name string
+    Taxonomy []string
+    AverageAge int
+}
+
+// Animal is *not* supported; despite field Info being of a supported type,
+// Counter is a channel, which is unsupported.
+type Animal struct {
+    Info AnimalInfo
+    Counter chan int
+}
+
+// HiddenCounterAnimal is supported. Even though field counter is of an
+// unsupported type, it is unexported and so it will be ignored.
+type HiddenCounterAnimal struct {
+    Info AnimalInfo
+    counter chan int
+}
+```
+
+Unexported fields of a struct are ignored when encoding and decoding. Any struct
+that has unexported fields will keep their original values if a pointer to that
+struct is passed in to be decoded.
+
+```golang
+type Player struct {
+    Name string
+    Classpect string
+
+    echeladder string
+}
+
+john := Player{Name: "John Egbert", Classpect: "Heir of Breath", echeladder: "Plucky Tot"}
+
+// the encoded bytes will only contain Name and Classpect; echeladder is not
+// exported so it is ignored
+data, err := rezi.Enc(john)
+if err != nil {
+    panic(err)
+}
+
+// now we will decode the bytes to two structs, one with the unexported member
+// pre-set
+var playerWithoutEcheladder Player
+var playerWithEcheladder Player = Player{echeladder: "Plucky Tot"}
+
+_, err = rezi.Dec(data, &playerWithoutEcheladder)
+if err != nil {
+    panic(err)
+}
+_, err = rezi.Dec(data, &playerWithEcheladder)
+if err != nil {
+    panic(err)
+}
+
+fmt.Println(playerWithoutEcheladder.echeladder) // ""
+fmt.Println(playerWithEcheladder.echeladder) // "Plucky Tot"
+```
+
+Embedded structs within structs are supported if the embedded struct type is
+exported; this is because it will be turned into a field with the same name as
+the embedded type, and if it is exported, the field name will correspondingly
+be exported. Likewise, embedded structs whose type is unexported will be ignored
+during encoding and will not be encoded to.
+
+```golang
+type InternalRecord struct {
+    ID int
+    Location string
+}
+
+type secret struct {
+    BigSecret string
+}
+
+// All fields of Employee will be marshaled and unmarshaled to; InternalRecord
+// is exported
+type Employee struct {
+    InternalRecord
+    Name string
+}
+
+// Only Name will be encoded and decoded to; secret is an unexported type.
+type KeyData struct {
+    secret
+    Name string
+}
+```
+
+If any of the above limitations are a concern, you can customize the encoding of
+user-defined types by implementing one of the marshaler types
+`encoding.BinaryMarshaler` or `encoding.TextMarshaler` (and their corresponding
+unmarshler interfaces for decoding) as described in the next section.
+
+### Customizing Encoding And Decoding
+
 REZI supports encoding any custom type that implements
 `encoding.BinaryMarshaler`, and it supports decoding any custom type that
 implements `encoding.BinaryUnmarshaler` with a pointer receiver. In fact, the
 lack of built-in facilities in Go for binary encoding of user-defined types is
 partially why REZI exists.
 
-REZI does not perform any automatic inference of a user-defined struct type's
-encoding such as what the `json` library is capable of. User-defined types that
-do not implement BinaryMarshaler or TextMarshaler are only supported for
-encoding if their underlying type is one supported by REZI, and vice-versa for
-the corresponding unmarshal methods when decoding.
+REZI can perform automatic inference of a user-defined struct type's encoding,
+similar to what the `json` library is capable of. User-defined types that
+do not implement BinaryMarshaler or TextMarshaler are supported for encoding if
+their underlying type is one supported by REZI, or if it is a struct type, if
+all of its exported fields are supported, and vice-versa for decoding.
 
-Within the `MarshalBinary` method, you can encode the data in whichever format
-you wish, though these examples will have that function use REZI to encode the
-members of the types. The contents of the slice that MarshalBinary returns are
-completely opaque to REZI, which will consider only the slice's length. Do note
-that this means that returning a nil slice or an empty but initialized slice
-will both be interpreted the same by REZI and will not result in different
-encodings.
+Within the `MarshalBinary` method, you can customize encoding the data to
+whichever format you wish, though these examples will have that function use
+REZI to encode the members of the types. The contents of the slice that
+MarshalBinary returns are completely opaque to REZI, which will consider only
+the slice's length. Do note that this means that returning a nil slice or an
+empty but initialized slice will both be interpreted the same by REZI and will
+not result in different encodings.
 
 ```golang
 // Person is an example of a user-defined type that REZI can encode and decode.

@@ -95,7 +95,7 @@ func Test_decBool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decBool(tc.input)
+			actualValue, _, actualRead, err := decBool(tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -224,7 +224,7 @@ func Test_decInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decInt[int](tc.input)
+			actualValue, _, actualRead, err := decInt[int](tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -403,7 +403,7 @@ func Test_decFloat(t *testing.T) {
 			assert := assert.New(t)
 			expectBits := math.Float64bits(tc.expect)
 
-			actual, actualRead, err := decFloat[float64](tc.input)
+			actual, _, actualRead, err := decFloat[float64](tc.input)
 			if tc.expectErr {
 				assert.Error(err)
 				return
@@ -619,7 +619,7 @@ func Test_decComplex(t *testing.T) {
 			expectRBits := math.Float64bits(real(tc.expect))
 			expectIBits := math.Float64bits(imag(tc.expect))
 
-			actual, actualRead, err := decComplex[complex128](tc.input)
+			actual, _, actualRead, err := decComplex[complex128](tc.input)
 			if tc.expectErr {
 				assert.Error(err)
 				return
@@ -715,7 +715,7 @@ func Test_decStringV0(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decStringV0(tc.input)
+			actualValue, _, actualRead, err := decStringV0(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
@@ -775,7 +775,7 @@ func Test_decStringV1(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, actualRead, err := decStringV1(tc.input)
+			actualValue, _, actualRead, err := decStringV1(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
