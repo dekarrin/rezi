@@ -731,6 +731,7 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 
 			// **string     // *string  // string
 			newTarget := reflect.New(assignTarget.Type().Elem().Elem())
+			newTarget.Set(assignTarget.Elem())
 			assignTarget.Elem().Set(newTarget)
 			assignTarget = newTarget
 		}
@@ -741,7 +742,12 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 			if ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
-			assignTarget.Elem().Set(refDecoded)
+
+			if ti.Main == mtStruct {
+				setStructMembers(assignTarget, refDecoded, extraInfo.([]fieldInfo))
+			} else {
+				assignTarget.Elem().Set(refDecoded)
+			}
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)

@@ -74,7 +74,12 @@ func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if ti.Indir == 0 {
 		// TODO: extraInfo use here
 		refReceiver := reflect.ValueOf(v)
-		refReceiver.Elem().Set(reflect.ValueOf(st))
+
+		if ti.Main == mtStruct {
+			setStructMembers(refReceiver, reflect.ValueOf(st), extraInfo)
+		} else {
+			refReceiver.Elem().Set(reflect.ValueOf(st))
+		}
 	}
 	return n, err
 }
@@ -152,4 +157,12 @@ func decStruct(data []byte, v interface{}, ti typeInfo) ([]fieldInfo, int, error
 	}
 
 	return decFields, totalConsumed, nil
+}
+
+func setStructMembers(target, decoded reflect.Value, decodedFields []fieldInfo) {
+	for _, fi := range decodedFields {
+		destPtr := target.Elem().Field(fi.Index).Addr()
+		fieldVal := decoded.Field(fi.Index)
+		destPtr.Elem().Set(fieldVal)
+	}
 }
