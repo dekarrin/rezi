@@ -1,5 +1,5 @@
 // Package rezi provides the ability to encode and decode data in Rarefied
-// Encoding (Compressible) Interchange format. It allows basic Go types and
+// Encoding (Compressible) Interchange format. It allows Go types and
 // user-defined types to be easily read from and written to byte slices, with
 // customization possible by implementing encoding.BinaryUnmarshaler and
 // encoding.BinaryMarshaler on a type, or alternatively by implementing
@@ -138,13 +138,18 @@
 // not have any concept of two different pointer variables pointing to the same
 // data.
 //
-// Besides the above listed types, all types whose underlying type is a
-// supported type are themselves supported as well. For example, time.Duration
-// has an underlying type of int64, and is therefore supported in REZI. This
-// does not apply to marshaler implementors; a type whose underlying type is
-// only supported in REZI via implementation of one of the marshaler or
-// unmarshaler interfaces must itself implement that interface
-// in order to be fully supported.
+// All non-struct types whose underlying type is a supported type are themselves
+// supported as well. For example, time.Duration has an underlying type of
+// int64, and is therefore supported in REZI. This does not apply to marshaler
+// implementors; a type whose underlying type is only supported in REZI via
+// implementation of one of the marshaler or unmarshaler interfaces must itself
+// implement that interface in order to be fully supported.
+//
+// Struct types are supported even if they do not implement text or binary
+// marshaling functions, provided all of their exported fields are of a
+// supported type. Both decoding and encoding ignore all unexported fields. If a
+// field is not present in the given bytes during decoding, its original value
+// is left intact, even if it is exported.
 //
 // # Binary Data Format
 //
@@ -409,6 +414,25 @@
 // Note that BinarayMarshaler encoding takes precedence over TextMarshaler
 // encoding; if a type implements both, it will be encoded as a BinaryMarshaler,
 // not a TextMarshaler.
+//
+//	Struct Values
+//
+//	Layout:
+//
+//	[ INFO ] [ INT VALUE ] [ FIELD 1 ] [ VALUE 1 ] ... [ FIELD N ] [ VALUE N ]
+//	<-------COUNT--------> <---------------------VALUES---------------------->
+//	      1..9 bytes                           COUNT bytes
+//
+// Structs that do not implement binary marshaling or text marshaling funcitons
+// are encoded as a count of all bytes that make up the entire struct, followed
+// by pairs of the names and associated values for each exported field of the
+// struct. Each pair consists of the case-sensitive name of the field encoded as
+// a string, followed immediately by the encoded value of that field. There is
+// no special delimiter between name-value pairs or between the name and value
+// in a pair; where one ends, the next one begins.
+//
+// The encoded names are placed in a consistent order; encoding the same struct
+// will result in the same encoding.
 //
 //	Slice Values
 //
