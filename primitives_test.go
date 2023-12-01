@@ -955,56 +955,34 @@ func Test_encBinary(t *testing.T) {
 }
 
 func Test_decBinary(t *testing.T) {
-	var received []byte
-
-	sendToReceived := func(b []byte) error {
-		received = make([]byte, len(b))
-		copy(received, b)
-		return nil
-	}
-
 	testCases := []struct {
-		name          string
-		input         []byte
-		expectReceive []byte
-		expectRead    int
-		expectError   bool
-		consumerFunc  func([]byte) error
+		name        string
+		input       []byte
+		expect      testBinary
+		expectRead  int
+		expectError bool
 	}{
 		{
-			name:          "empty",
-			input:         []byte{0x00},
-			expectReceive: []byte{},
-			expectRead:    1,
-			consumerFunc:  sendToReceived,
+			name:       "empty",
+			input:      []byte{0x01, 0x02, 0x00, 0x00},
+			expect:     testBinary{},
+			expectRead: 4,
 		},
 		{
-			name:          "nil",
-			input:         []byte{0x00},
-			expectReceive: []byte{},
-			expectRead:    1,
-			consumerFunc:  sendToReceived,
+			name:       "filled",
+			input:      []byte{0x01, 0x0b, 0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, 0x08},
+			expect:     testBinary{number: 8, data: "VRISKA"},
+			expectRead: 13,
 		},
 		{
-			name:          "1 byte",
-			input:         []byte{0x01, 0x01, 0xff},
-			expectReceive: []byte{0xff},
-			expectRead:    3,
-			consumerFunc:  sendToReceived,
+			name:       "filled, followed by unrelated",
+			input:      []byte{0x01, 0x0b, 0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, 0x08, 0x01, 0x02, 0x03},
+			expect:     testBinary{number: 8, data: "VRISKA"},
+			expectRead: 13,
 		},
 		{
-			name:          "several bytes, followed by unrelated",
-			input:         []byte{0x01, 0x05, 0xff, 0x0a, 0x0b, 0x0c, 0x0e, 0xff},
-			expectReceive: []byte{0xff, 0x0a, 0x0b, 0x0c, 0x0e},
-			expectRead:    7,
-			consumerFunc:  sendToReceived,
-		},
-		{
-			name:  "several bytes, but it will error",
-			input: []byte{0x01, 0x05, 0xff, 0x0a, 0x0b, 0x0c, 0x0e},
-			consumerFunc: func(b []byte) error {
-				return fmt.Errorf("error")
-			},
+			name:        "several bytes, but it will error",
+			input:       []byte{0x01, 0x05, 0xff, 0x0a, 0x0b, 0x0c, 0x0e},
 			expectError: true,
 		},
 	}
@@ -1013,9 +991,12 @@ func Test_decBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			unmarshalTo := valueThatUnmarshalsWith(tc.consumerFunc)
+			var actual testBinary
+			if tc.expectError {
+				actual.decErr = "error"
+			}
 
-			actualRead, err := decBinary(tc.input, unmarshalTo)
+			actualRead, err := decBinary(tc.input, &actual)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -1023,7 +1004,7 @@ func Test_decBinary(t *testing.T) {
 				return
 			}
 
-			assert.Equal(tc.expectReceive, received)
+			assert.Equal(tc.expect, actual)
 			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
 		})
 	}

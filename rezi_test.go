@@ -296,10 +296,6 @@ func (m testMarshaler) MarshalBinary() ([]byte, error) {
 	return m()
 }
 
-func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnmarshaler {
-	return marshaledBytesConsumer{fn: byteConsumer}
-}
-
 func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler {
 	return marshaledBytesProducer{fn: byteProducer}
 }
@@ -352,14 +348,22 @@ func (ttv *testText) UnmarshalText(data []byte) error {
 }
 
 // testBinary is a small struct that implements BinaryMarshaler and
-// BinaryUnmarshaler. It has two fields, that it lays out as such in encoding:
-// "data", a string, followed by "number", an int32.
+// BinaryUnmarshaler. It has two fields that it lays out as such in encoding:
+// "data", a string, followed by "number", an int32. decErr is an error string
+// to return from UnmarshalBinary via errors.New(decErr) instead of decoding, if
+// left blank no error is returned; same with encErr but for encoding. Neither
+// err field is encoded.
 type testBinary struct {
 	number int32
 	data   string
+	decErr string
+	encErr string
 }
 
 func (tbv testBinary) MarshalBinary() ([]byte, error) {
+	if tbv.encErr != "" {
+		return nil, errors.New(tbv.encErr)
+	}
 	var b []byte
 	b = append(b, MustEnc(tbv.data)...)
 	b = append(b, MustEnc(tbv.number)...)
@@ -367,6 +371,9 @@ func (tbv testBinary) MarshalBinary() ([]byte, error) {
 }
 
 func (tbv *testBinary) UnmarshalBinary(data []byte) error {
+	if tbv.decErr != "" {
+		return errors.New(tbv.decErr)
+	}
 	var n int
 	var err error
 
@@ -383,16 +390,6 @@ func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	}
 
 	return nil
-}
-
-// TODO: see if we can't eliminate marshaledBytesConsumer and marsaledBytesProducer in tests
-// at some point; feels like there's a lot of duplication in these fixtures.
-type marshaledBytesConsumer struct {
-	fn func([]byte) error
-}
-
-func (mv marshaledBytesConsumer) UnmarshalBinary(b []byte) error {
-	return mv.fn(b)
 }
 
 type marshaledBytesProducer struct {
