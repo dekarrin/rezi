@@ -2,6 +2,7 @@ package rezi
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -908,38 +909,42 @@ func Test_decText(t *testing.T) {
 }
 
 func Test_encBinary(t *testing.T) {
+	var nilSlice []byte
+
 	testCases := []struct {
 		name   string
 		input  encoding.BinaryMarshaler
 		expect []byte
 	}{
 		{
-			name: "nil bytes",
-			input: valueThatMarshalsWith(func() []byte {
-				return nil
-			}),
+			name:   "nil bytes",
+			input:  testBinary{encOverride: &nilSlice},
 			expect: []byte{0x00},
 		},
 		{
-			name: "empty bytes",
-			input: valueThatMarshalsWith(func() []byte {
-				return []byte{}
-			}),
+			name:   "empty bytes",
+			input:  testBinary{encOverride: ref([]byte{})},
 			expect: []byte{0x00},
 		},
 		{
-			name: "1 byte",
-			input: valueThatMarshalsWith(func() []byte {
-				return []byte{0xff}
-			}),
+			name:   "1 byte",
+			input:  testBinary{encOverride: ref([]byte{0xff})},
 			expect: []byte{0x01, 0x01, 0xff},
 		},
 		{
-			name: "several bytes",
-			input: valueThatMarshalsWith(func() []byte {
-				return []byte{0xff, 0x0a, 0x0b, 0x0c, 0x0e}
-			}),
+			name:   "several bytes",
+			input:  testBinary{encOverride: ref([]byte{0xff, 0x0a, 0x0b, 0x0c, 0x0e})},
 			expect: []byte{0x01, 0x05, 0xff, 0x0a, 0x0b, 0x0c, 0x0e},
+		},
+		{
+			name:   "filled values",
+			input:  testBinary{number: 8, data: "VRISKA"},
+			expect: []byte{0x01, 0x0b, 0x41, 0x82, 0x06, 0x56, 0x52, 0x49, 0x53, 0x4b, 0x41, 0x01, 0x08},
+		},
+		{
+			name:   "empty values",
+			input:  testBinary{},
+			expect: []byte{0x01, 0x02, 0x00, 0x00},
 		},
 	}
 
@@ -947,7 +952,10 @@ func Test_encBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual, _ := encBinary(tc.input)
+			actual, err := encBinary(tc.input)
+			if !assert.NoError(err) {
+				return
+			}
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -993,7 +1001,7 @@ func Test_decBinary(t *testing.T) {
 
 			var actual testBinary
 			if tc.expectError {
-				actual.decErr = "error"
+				actual.decErr = errors.New("error")
 			}
 
 			actualRead, err := decBinary(tc.input, &actual)
@@ -1885,6 +1893,8 @@ func Test_Enc_Bool(t *testing.T) {
 }
 
 func Test_Enc_Binary(t *testing.T) {
+	var nilSlice []byte
+
 	testURL, err := url.Parse("https://github.com/")
 	if err != nil {
 		panic(fmt.Sprintf("cannot parse test url: %v", err))
@@ -1897,24 +1907,24 @@ func Test_Enc_Binary(t *testing.T) {
 		expect []byte
 	}{
 		{
-			name:   "encode to nil bytes",
-			input:  valueThatMarshalsWith(func() []byte { return nil }),
+			name:   "nil bytes",
+			input:  testBinary{encOverride: &nilSlice},
 			expect: []byte{0x00},
 		},
 		{
-			name:   "encode to empty bytes",
-			input:  valueThatMarshalsWith(func() []byte { return []byte{} }),
+			name:   "empty bytes",
+			input:  testBinary{encOverride: ref([]byte{})},
 			expect: []byte{0x00},
 		},
 		{
-			name:   "encode to one byte",
-			input:  valueThatMarshalsWith(func() []byte { return []byte{0x03} }),
-			expect: []byte{0x01, 0x01, 0x03},
+			name:   "1 byte",
+			input:  testBinary{encOverride: ref([]byte{0xff})},
+			expect: []byte{0x01, 0x01, 0xff},
 		},
 		{
-			name:   "encode to several bytes",
-			input:  valueThatMarshalsWith(func() []byte { return []byte{0x03, 0x44, 0x15} }),
-			expect: []byte{0x01, 0x03, 0x03, 0x44, 0x15},
+			name:   "several bytes",
+			input:  testBinary{encOverride: ref([]byte{0xff, 0x0a, 0x0b, 0x0c, 0x0e})},
+			expect: []byte{0x01, 0x05, 0xff, 0x0a, 0x0b, 0x0c, 0x0e},
 		},
 		{
 			name:   "actual object",

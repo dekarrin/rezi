@@ -657,11 +657,11 @@ func MustDec(data []byte, v interface{}) int {
 // the data itself (including there being fewer bytes than necessary to decode
 // the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		err = errorf("%v", r)
-	// 	}
-	// }()
+	defer func() {
+		if r := recover(); r != nil {
+			err = errorf("%v", r)
+		}
+	}()
 
 	info, err := canDecode(v)
 	if err != nil {
