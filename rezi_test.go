@@ -336,12 +336,20 @@ func (ttv *testText) UnmarshalText(data []byte) error {
 // MarshalBinary instead of normal encoding. encOverride is therefore encoded,
 // in a sense, but not directly. If both encOverride and encErr are set, encErr
 // takes precedence.
+//
+// encPanic and decPanic are the same thing but for panics. They take precedence
+// over all others.
 type testBinary struct {
-	number      int32
-	data        string
+	// encoded fields:
+	number int32
+	data   string
+
+	// non-encoded fields:
 	decErr      error
 	encErr      error
 	encOverride *[]byte
+	decPanic    interface{}
+	encPanic    interface{}
 }
 
 func (tbv testBinary) MarshalBinary() ([]byte, error) {
