@@ -561,8 +561,8 @@ type (
 // analyzedValue is used to pass around a value along with its type info and
 // reflect.Value to different subroutines. it's mostly just used for argument
 // grouping.
-type analyzedValue struct {
-	native interface{}
+type analyzedValue[E any] struct {
+	native E
 	ref    reflect.Value
 	ti     typeInfo
 }
@@ -612,7 +612,7 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
-	value := analyzedValue{native: v, ref: reflect.ValueOf(v), ti: info}
+	value := analyzedValue[any]{native: v, ref: reflect.ValueOf(v), ti: info}
 
 	if info.Primitive() {
 		return encCheckedPrim(value)
@@ -692,7 +692,7 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 	}
 }
 
-func encWithNilCheck[E any](v analyzedValue, encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
+func encWithNilCheck[E any](v analyzedValue[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
 	if v.ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
 		encodeTarget := v.ref

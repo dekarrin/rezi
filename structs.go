@@ -6,7 +6,7 @@ import (
 )
 
 // encCheckedStruct encodes a compatible struct as a REZI .
-func encCheckedStruct(value analyzedValue) ([]byte, error) {
+func encCheckedStruct(value analyzedValue[any]) ([]byte, error) {
 	if value.ti.Main != mtStruct {
 		panic("not a struct type")
 	}

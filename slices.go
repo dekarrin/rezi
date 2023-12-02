@@ -9,7 +9,7 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encCheckedSlice(value analyzedValue) ([]byte, error) {
+func encCheckedSlice(value analyzedValue[any]) ([]byte, error) {
 	if value.ti.Main != mtSlice && value.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}

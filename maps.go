@@ -72,7 +72,7 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 }
 
 // encCheckedMap encodes a compatible map as a REZI map.
-func encCheckedMap(value analyzedValue) ([]byte, error) {
+func encCheckedMap(value analyzedValue[any]) ([]byte, error) {
 	if value.ti.Main != mtMap {
 		panic("not a map type")
 	}

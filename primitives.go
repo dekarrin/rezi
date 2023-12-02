@@ -71,7 +71,7 @@ type anyComplex interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value analyzedValue) ([]byte, error) {
+func encCheckedPrim(value analyzedValue[any]) ([]byte, error) {
 	switch value.ti.Main {
 	case mtString:
 		return encWithNilCheck(value, nilErrEncoder(encString), reflect.Value.String)
