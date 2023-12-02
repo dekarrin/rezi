@@ -348,8 +348,6 @@ type testBinary struct {
 	decErr      error
 	encErr      error
 	encOverride *[]byte
-	decPanic    interface{}
-	encPanic    interface{}
 }
 
 func (tbv testBinary) MarshalBinary() ([]byte, error) {
