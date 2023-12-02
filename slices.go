@@ -9,12 +9,12 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encCheckedSlice(v interface{}, ti typeInfo) ([]byte, error) {
-	if ti.Main != mtSlice && ti.Main != mtArray {
+func encCheckedSlice(value analyzedValue) ([]byte, error) {
+	if value.ti.Main != mtSlice && value.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
 
-	return encWithNilCheck(v, ti, encSlice, reflect.Value.Interface)
+	return encWithNilCheck(value, encSlice, reflect.Value.Interface)
 }
 
 func encSlice(v interface{}) ([]byte, error) {

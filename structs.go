@@ -6,13 +6,13 @@ import (
 )
 
 // encCheckedStruct encodes a compatible struct as a REZI .
-func encCheckedStruct(v interface{}, ti typeInfo) ([]byte, error) {
-	if ti.Main != mtStruct {
+func encCheckedStruct(value analyzedValue) ([]byte, error) {
+	if value.ti.Main != mtStruct {
 		panic("not a struct type")
 	}
 
-	return encWithNilCheck(v, ti, func(val interface{}) ([]byte, error) {
-		return encStruct(val, ti)
+	return encWithNilCheck(value, func(val interface{}) ([]byte, error) {
+		return encStruct(val, value.ti)
 	}, reflect.Value.Interface)
 }
 

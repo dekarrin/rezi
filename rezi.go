@@ -558,6 +558,15 @@ type (
 	encFunc[E any] func(E) ([]byte, error)
 )
 
+// analyzedValue is used to pass around a value along with its type info and
+// reflect.Value to different subroutines. it's mostly just used for argument
+// grouping.
+type analyzedValue struct {
+	native interface{}
+	ref    reflect.Value
+	ti     typeInfo
+}
+
 func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
 	return func(e E) ([]byte, error) {
 		return fn(e), nil
@@ -603,16 +612,18 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
+	value := analyzedValue{native: v, ref: reflect.ValueOf(v), ti: info}
+
 	if info.Primitive() {
-		return encCheckedPrim(v, info)
+		return encCheckedPrim(value)
 	} else if info.Main == mtNil {
 		return encNilHeader(0), nil
 	} else if info.Main == mtMap {
-		return encCheckedMap(v, info)
+		return encCheckedMap(value)
 	} else if info.Main == mtSlice || info.Main == mtArray {
-		return encCheckedSlice(v, info)
+		return encCheckedSlice(value)
 	} else if info.Main == mtStruct {
-		return encCheckedStruct(v, info)
+		return encCheckedStruct(value)
 	} else {
 		panic("no possible encoding")
 	}
@@ -681,14 +692,14 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 	}
 }
 
-func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
-	if ti.Indir > 0 {
+func encWithNilCheck[E any](v analyzedValue, encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
+	if v.ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
-		encodeTarget := reflect.ValueOf(value)
+		encodeTarget := v.ref
 		// encodeTarget is a *THING but we want a THING
 
 		nilLevel := -1
-		for i := 0; i < ti.Indir; i++ {
+		for i := 0; i < v.ti.Indir; i++ {
 			if encodeTarget.IsNil() {
 				// so if it were a *string we deal w, nil level can only be 0.
 				// if it were a **string we deal w, nil level can be 0 or 1.
@@ -702,14 +713,18 @@ func encWithNilCheck[E any](value interface{}, ti typeInfo, encFn encFunc[E], co
 		if nilLevel > -1 {
 			return encNilHeader(nilLevel), nil
 		}
+
 		return encFn(convFn(encodeTarget))
 	} else {
 		// if the type we have is actually a new UDT with some underlying basic
 		// Go type, then in fact we want to encode it as the actual kind type.
-		if ti.Underlying {
-			value = convFn(reflect.ValueOf(value))
+		if v.ti.Underlying {
+			v.native = convFn(v.ref)
+
+			// TODO: remove ref reassignment and see if thins still work
+			v.ref = reflect.ValueOf(v.native)
 		}
-		return encFn(value.(E))
+		return encFn(v.native.(E))
 	}
 }
 

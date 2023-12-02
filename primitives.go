@@ -71,84 +71,84 @@ type anyComplex interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
-	switch ti.Main {
+func encCheckedPrim(value analyzedValue) ([]byte, error) {
+	switch value.ti.Main {
 	case mtString:
-		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
+		return encWithNilCheck(value, nilErrEncoder(encString), reflect.Value.String)
 	case mtBool:
-		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
+		return encWithNilCheck(value, nilErrEncoder(encBool), reflect.Value.Bool)
 	case mtIntegral:
-		if ti.Signed {
-			switch ti.Bits {
+		if value.ti.Signed {
+			switch value.ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
 					return int8(r.Int())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
 					return int16(r.Int())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), reflect.Value.Int)
+				return encWithNilCheck(value, nilErrEncoder(encInt[int64]), reflect.Value.Int)
 			default:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
 				})
 			}
 		} else {
-			switch ti.Bits {
+			switch value.ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
 					return uint8(r.Uint())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
 					return uint16(r.Uint())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
 			default:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
 				})
 			}
 		}
 	case mtFloat:
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 32:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
+			return encWithNilCheck(value, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
 				return float32(r.Float())
 			})
 		default:
 			fallthrough
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
+			return encWithNilCheck(value, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
 		}
 	case mtComplex:
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
+			return encWithNilCheck(value, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
 				return complex64(r.Complex())
 			})
 		default:
 			fallthrough
 		case 128:
-			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
+			return encWithNilCheck(value, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
 		}
 	case mtBinary:
-		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
+		return encWithNilCheck(value, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
 	case mtText:
-		return encWithNilCheck(value, ti, encText, func(r reflect.Value) encoding.TextMarshaler {
+		return encWithNilCheck(value, encText, func(r reflect.Value) encoding.TextMarshaler {
 			return r.Interface().(encoding.TextMarshaler)
 		})
 	default:
@@ -379,6 +379,9 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			// we do now have a T (as an interface{}). We must use reflection to
 			// assign it.
 
+			// do NOT use zeroIndirAssign; that is only for underlying type
+			// detection which we do not need if operating on an mtBinary
+
 			refReceiver := reflect.ValueOf(v)
 			refReceiver.Elem().Set(reflect.ValueOf(bu))
 		}
@@ -405,6 +408,9 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 			// due to complicated forcing of decText into the decFunc API,
 			// we do now have a T (as an interface{}). We must use reflection to
 			// assign it.
+
+			// do NOT use zeroIndirAssign; that is only for underlying type
+			// detection which we do not need if operating on an metText
 
 			refReceiver := reflect.ValueOf(v)
 			refReceiver.Elem().Set(reflect.ValueOf(tu))
