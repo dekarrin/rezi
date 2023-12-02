@@ -657,11 +657,11 @@ func MustDec(data []byte, v interface{}) int {
 // the data itself (including there being fewer bytes than necessary to decode
 // the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		err = errorf("%v", r)
-	// 	}
-	// }()
+	defer func() {
+		if r := recover(); r != nil {
+			err = errorf("%v", r)
+		}
+	}()
 
 	info, err := canDecode(v)
 	if err != nil {
@@ -733,11 +733,11 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	var extraInfo interface{}
 
 	if !hdr.IsNil() {
+		effectiveExtraIndirs = ti.Indir
 		decoded, extraInfo, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
-		effectiveExtraIndirs = ti.Indir
 	}
 
 	if ti.Indir > 0 {
@@ -788,13 +788,22 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
 	return func(data []byte) (interface{}, interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
-		receiverType := reflect.TypeOf(wrapped)
+		refWrapped := reflect.ValueOf(wrapped)
+		receiverType := refWrapped.Type()
+		refUnwrapped := refWrapped
 
 		if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
 			// for every * in the (...*) part of *(...*)T up until the
 			// implementor/slice-ptr, do a deref.
 			for i := 0; i < ti.Indir; i++ {
 				receiverType = receiverType.Elem()
+				if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() {
+					if !refUnwrapped.IsNil() {
+						refUnwrapped = refUnwrapped.Elem()
+					} else {
+						refUnwrapped = reflect.Value{}
+					}
+				}
 			}
 		}
 
@@ -813,10 +822,25 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 				return nil, nil, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
-			receiverValue = reflect.New(receiverType.Elem())
+
+			// Make shore we are actually using the populated struct for
+			// interface implementors, in case unmarshaling is dependant on any
+			// prior-set properties. No need to do this for mtStruct bc that is
+			// automatic and we have full control; we don't (and can't) rely on
+			// already set things and use reflect after actual decoding to copy
+			// the decoded values into the passed-in pointer.
+			if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() && !refUnwrapped.IsNil() {
+				receiverValue = refUnwrapped
+			} else {
+				receiverValue = reflect.New(receiverType.Elem())
+			}
 		} else {
 			// receiverType is itself T (future-proofing)
-			receiverValue = reflect.Zero(receiverType)
+			if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() {
+				receiverValue = refUnwrapped
+			} else {
+				receiverValue = reflect.Zero(receiverType)
+			}
 		}
 
 		var decoded interface{}

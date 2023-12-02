@@ -1,7 +1,6 @@
 package rezi
 
 import (
-	"encoding"
 	"errors"
 	"fmt"
 	"io"
@@ -69,17 +68,17 @@ func Test_Enc_Errors(t *testing.T) {
 		},
 		{
 			name:      "marshal failure - Error",
-			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			input:     testBinary{encErr: ErrFakeMarshal},
 			expectErr: Error,
 		},
 		{
 			name:      "marshal failure - ErrMarshalBinary",
-			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			input:     testBinary{encErr: ErrFakeMarshal},
 			expectErr: ErrMarshalBinary,
 		},
 		{
 			name:      "marshal failure - wrapped error",
-			input:     marshaler(func() ([]byte, error) { return nil, ErrFakeMarshal }),
+			input:     testBinary{encErr: ErrFakeMarshal},
 			expectErr: ErrFakeMarshal,
 		},
 	}
@@ -97,6 +96,8 @@ func Test_Enc_Errors(t *testing.T) {
 
 func Test_Dec_Errors(t *testing.T) {
 	dummyTyped := make(chan struct{})
+
+	ErrTestError := errors.New("test error")
 
 	testCases := []struct {
 		name      string
@@ -137,20 +138,20 @@ func Test_Dec_Errors(t *testing.T) {
 		{
 			name:      "unmarshal failure - Error",
 			data:      []byte{0x01, 0x01, 0x00},
-			recv:      &errUnmarshaler{},
+			recv:      &testBinary{decErr: ErrTestError},
 			expectErr: Error,
 		},
 		{
 			name:      "unmarshal failure - ErrUnmarshalBinary",
 			data:      []byte{0x01, 0x01, 0x00},
-			recv:      &errUnmarshaler{},
+			recv:      &testBinary{decErr: ErrTestError},
 			expectErr: ErrUnmarshalBinary,
 		},
 		{
 			name:      "unmarshal failure - wrapped error",
 			data:      []byte{0x01, 0x01, 0x00},
-			recv:      &errUnmarshaler{},
-			expectErr: errTestError,
+			recv:      &testBinary{decErr: ErrTestError},
+			expectErr: ErrTestError,
 		},
 		{
 			name:      "not enough bytes - Error",
@@ -279,31 +280,6 @@ func ref[E any](v E) *E {
 	return &v
 }
 
-var errTestError = errors.New("test error")
-
-type errUnmarshaler struct{}
-
-func (eu *errUnmarshaler) UnmarshalBinary([]byte) error {
-	return errTestError
-}
-
-type testMarshaler func() ([]byte, error)
-
-func marshaler(fn testMarshaler) encoding.BinaryMarshaler {
-	return fn
-}
-func (m testMarshaler) MarshalBinary() ([]byte, error) {
-	return m()
-}
-
-func valueThatUnmarshalsWith(byteConsumer func([]byte) error) encoding.BinaryUnmarshaler {
-	return marshaledBytesConsumer{fn: byteConsumer}
-}
-
-func valueThatMarshalsWith(byteProducer func() []byte) encoding.BinaryMarshaler {
-	return marshaledBytesProducer{fn: byteProducer}
-}
-
 // testText is a small struct that implements TextMarshaler and TextUnmarshaler.
 // It has three fields, that it lays out as such in encoding: "value", a uint16,
 // followed by "enabled", a bool, followed by "name", a string. Each field is
@@ -352,14 +328,35 @@ func (ttv *testText) UnmarshalText(data []byte) error {
 }
 
 // testBinary is a small struct that implements BinaryMarshaler and
-// BinaryUnmarshaler. It has two fields, that it lays out as such in encoding:
-// "data", a string, followed by "number", an int32.
+// BinaryUnmarshaler. It has two fields that it lays out as such in encoding:
+// "data", a string, followed by "number", an int32. decErr is an error string
+// to return from UnmarshalBinary instead of decoding, if left nil no error is
+// returned; same with encErr but for encoding. Neither err field is encoded. If
+// encOverride is set, the byte slice pointed to will be returned from
+// MarshalBinary instead of normal encoding. encOverride is therefore encoded,
+// in a sense, but not directly. If both encOverride and encErr are set, encErr
+// takes precedence.
+//
+// encPanic and decPanic are the same thing but for panics. They take precedence
+// over all others.
 type testBinary struct {
+	// encoded fields:
 	number int32
 	data   string
+
+	// non-encoded fields:
+	decErr      error
+	encErr      error
+	encOverride *[]byte
 }
 
 func (tbv testBinary) MarshalBinary() ([]byte, error) {
+	if tbv.encErr != nil {
+		return nil, tbv.encErr
+	}
+	if tbv.encOverride != nil {
+		return *tbv.encOverride, nil
+	}
 	var b []byte
 	b = append(b, MustEnc(tbv.data)...)
 	b = append(b, MustEnc(tbv.number)...)
@@ -367,6 +364,9 @@ func (tbv testBinary) MarshalBinary() ([]byte, error) {
 }
 
 func (tbv *testBinary) UnmarshalBinary(data []byte) error {
+	if tbv.decErr != nil {
+		return tbv.decErr
+	}
 	var n int
 	var err error
 
@@ -383,26 +383,6 @@ func (tbv *testBinary) UnmarshalBinary(data []byte) error {
 	}
 
 	return nil
-}
-
-// TODO: see if we can't eliminate marshaledBytesConsumer and marsaledBytesProducer in tests
-// at some point; feels like there's a lot of duplication in these fixtures.
-type marshaledBytesConsumer struct {
-	fn func([]byte) error
-}
-
-func (mv marshaledBytesConsumer) UnmarshalBinary(b []byte) error {
-	return mv.fn(b)
-}
-
-type marshaledBytesProducer struct {
-	fn func() []byte
-}
-
-// MarshalBinary converts mv into a slice of bytes that can be decoded with
-// UnmarshalBinary.
-func (mv marshaledBytesProducer) MarshalBinary() ([]byte, error) {
-	return mv.fn(), nil
 }
 
 type testNontrivial struct {
