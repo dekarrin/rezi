@@ -720,9 +720,6 @@ func encWithNilCheck[E any](v analyzedValue, encFn encFunc[E], convFn func(refle
 		// Go type, then in fact we want to encode it as the actual kind type.
 		if v.ti.Underlying {
 			v.native = convFn(v.ref)
-
-			// TODO: remove ref reassignment and see if thins still work
-			v.ref = reflect.ValueOf(v.native)
 		}
 		return encFn(v.native.(E))
 	}
