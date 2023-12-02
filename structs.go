@@ -6,23 +6,19 @@ import (
 )
 
 // encCheckedStruct encodes a compatible struct as a REZI .
-func encCheckedStruct(value analyzedValue[any]) ([]byte, error) {
+func encCheckedStruct(value analyzed[any]) ([]byte, error) {
 	if value.ti.Main != mtStruct {
 		panic("not a struct type")
 	}
 
-	return encWithNilCheck(value, func(val interface{}) ([]byte, error) {
-		return encStruct(val, value.ti)
-	}, reflect.Value.Interface)
+	return encWithNilCheck(value, encStruct, reflect.Value.Interface)
 }
 
-func encStruct(v interface{}, ti typeInfo) ([]byte, error) {
-	refVal := reflect.ValueOf(v)
-
+func encStruct(val analyzed[any]) ([]byte, error) {
 	enc := make([]byte, 0)
 
-	for _, fi := range ti.Fields.ByOrder {
-		v := refVal.Field(fi.Index)
+	for _, fi := range val.ti.Fields.ByOrder {
+		v := val.ref.Field(fi.Index)
 
 		fNameData, err := Enc(fi.Name)
 		if err != nil {
@@ -45,7 +41,7 @@ func encStruct(v interface{}, ti typeInfo) ([]byte, error) {
 		enc = append(enc, fValData...)
 	}
 
-	enc = append(encInt(tLen(len(enc))), enc...)
+	enc = append(encCount(len(enc), nil), enc...)
 	return enc, nil
 }
 

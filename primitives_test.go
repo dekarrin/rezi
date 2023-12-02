@@ -36,7 +36,7 @@ func Test_encBool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encBool(tc.input)
+			actual := encBool(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -157,7 +157,7 @@ func Test_encInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encInt(tc.input)
+			actual := encInt(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -293,7 +293,7 @@ func Test_encFloat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encFloat(tc.input)
+			actual := encFloat(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -508,7 +508,7 @@ func Test_encComplex(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encComplex(tc.input)
+			actual := encComplex(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -670,7 +670,7 @@ func Test_encString(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual := encString(tc.input)
+			actual := encString(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -823,7 +823,7 @@ func Test_encText(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual, _ := encText(tc.input)
+			actual, _ := encText(withNoAnalysis(tc.input))
 
 			assert.Equal(tc.expect, actual)
 		})
@@ -952,7 +952,7 @@ func Test_encBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actual, err := encBinary(tc.input)
+			actual, err := encBinary(withNoAnalysis(tc.input))
 			if !assert.NoError(err) {
 				return
 			}

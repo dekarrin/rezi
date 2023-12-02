@@ -71,7 +71,7 @@ type anyComplex interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value analyzedValue[any]) ([]byte, error) {
+func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 	switch value.ti.Main {
 	case mtString:
 		return encWithNilCheck(value, nilErrEncoder(encString), reflect.Value.String)
@@ -423,7 +423,7 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 
 // Negative, NilAt, and Length from extra are all ignored.
 func encCount(count tLen, extra *countHeader) []byte {
-	intBytes := encInt(count)
+	intBytes := encInt(analyzed[tLen]{native: count})
 
 	if extra == nil {
 		// normal int enc
@@ -502,7 +502,10 @@ func decCountHeader(data []byte) (countHeader, int, error) {
 	return hdr, hdr.DecodedCount, err
 }
 
-func encBool(b bool) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[bool] only to conform to encFunc.
+func encBool(val analyzed[bool]) []byte {
+	b := val.native
 	enc := make([]byte, 1)
 
 	if b {
@@ -530,7 +533,11 @@ func decBool(data []byte) (bool, interface{}, int, error) {
 	}
 }
 
-func encComplex[E anyComplex](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[anyComplex] only to conform to encFunc.
+func encComplex[E anyComplex](val analyzed[E]) []byte {
+	v := val.native
+
 	// go 1.18 compat, real() and imag() cannot be done to our E type
 	//
 	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
@@ -550,8 +557,8 @@ func encComplex[E anyComplex](v E) []byte {
 	}
 
 	// encode the parts
-	realEnc := encFloat(rv)
-	imagEnc := encFloat(iv)
+	realEnc := encFloat(analyzed[float64]{native: rv})
+	imagEnc := encFloat(analyzed[float64]{native: iv})
 
 	hdrEnc := encCount(len(realEnc)+len(imagEnc), &countHeader{ByteLength: true})
 
@@ -629,7 +636,11 @@ func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
 	return E(v128), nil, offset, nil
 }
 
-func encFloat[E anyFloat](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[anyFloat] only to conform to encFunc.
+func encFloat[E anyFloat](val analyzed[E]) []byte {
+	v := val.native
+
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
 		if math.Signbit(float64(v)) {
@@ -862,7 +873,10 @@ func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 	return E(fVal), nil, int(byteCount) + numHeaderBytes, nil
 }
 
-func encInt[E integral](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[integral] only to conform to encFunc.
+func encInt[E integral](val analyzed[E]) []byte {
+	v := val.native
 	if v == 0 {
 		return []byte{0x00}
 	}
@@ -991,7 +1005,11 @@ func decInt[E integral](data []byte) (E, interface{}, int, error) {
 	return E(iVal), nil, int(byteCount) + numHeaderBytes, nil
 }
 
-func encString(s string) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[string] only to conform to encFunc.
+func encString(val analyzed[string]) []byte {
+	s := val.native
+
 	if s == "" {
 		return []byte{0x00}
 	}
@@ -1131,7 +1149,11 @@ func decUTF8Codepoint(data []byte) (rune, int, error) {
 	return ch, charBytesRead, nil
 }
 
-func encText(t encoding.TextMarshaler) ([]byte, error) {
+// does not actually use analysis data, only native value. accepts
+// analyzed[encoding.TextMarshaler] only to conform to encFunc.
+func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
+	t := val.native
+
 	if t == nil {
 		return encNilHeader(0), nil
 	}
@@ -1142,7 +1164,7 @@ func encText(t encoding.TextMarshaler) ([]byte, error) {
 	}
 	tText := string(tTextSlice)
 
-	return encString(tText), nil
+	return encString(analyzed[string]{native: tText}), nil
 }
 
 func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
@@ -1163,7 +1185,11 @@ func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
 	return readBytes, nil
 }
 
-func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
+// does not actually use analysis data, only native value. accepts
+// analyzed[encoding.BinaryMarshaler] only to conform to encFunc.
+func encBinary(val analyzed[encoding.BinaryMarshaler]) ([]byte, error) {
+	b := val.native
+
 	if b == nil {
 		return encNilHeader(0), nil
 	}
@@ -1173,7 +1199,7 @@ func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 		return nil, errorf("%s: %s", ErrMarshalBinary, marshalErr)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encCount(len(enc), nil), enc...)
 
 	return enc, nil
 }

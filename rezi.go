@@ -555,21 +555,25 @@ type (
 	// the interface{} in decFunc is any additional info needed for further
 	// stages of decode, nil in all cases except for struct decoding.
 	decFunc[E any] func([]byte) (E, interface{}, int, error)
-	encFunc[E any] func(E) ([]byte, error)
+	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
-// analyzedValue is used to pass around a value along with its type info and
+// analyzed is used to pass around a value along with its type info and
 // reflect.Value to different subroutines. it's mostly just used for argument
 // grouping.
-type analyzedValue[E any] struct {
+type analyzed[E any] struct {
 	native E
 	ref    reflect.Value
 	ti     typeInfo
 }
 
-func nilErrEncoder[E any](fn func(E) []byte) encFunc[E] {
-	return func(e E) ([]byte, error) {
-		return fn(e), nil
+func preAnalyzed[E any](oldAnalysis analyzed[any], newVal E) analyzed[E] {
+	return analyzed[E]{native: newVal, ref: oldAnalysis.ref, ti: oldAnalysis.ti}
+}
+
+func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
+	return func(val analyzed[E]) ([]byte, error) {
+		return fn(val), nil
 	}
 }
 
@@ -612,7 +616,7 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
-	value := analyzedValue[any]{native: v, ref: reflect.ValueOf(v), ti: info}
+	value := analyzed[any]{native: v, ref: reflect.ValueOf(v), ti: info}
 
 	if info.Primitive() {
 		return encCheckedPrim(value)
@@ -692,7 +696,7 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 	}
 }
 
-func encWithNilCheck[E any](v analyzedValue[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
+func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
 	if v.ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
 		encodeTarget := v.ref
@@ -713,15 +717,19 @@ func encWithNilCheck[E any](v analyzedValue[any], encFn encFunc[E], convFn func(
 		if nilLevel > -1 {
 			return encNilHeader(nilLevel), nil
 		}
-
-		return encFn(convFn(encodeTarget))
+		reAnalyzed := analyzed[E]{
+			native: convFn(encodeTarget),
+			ti:     v.ti,
+		}
+		reAnalyzed.ref = reflect.ValueOf(reAnalyzed.native)
+		return encFn(reAnalyzed)
 	} else {
 		// if the type we have is actually a new UDT with some underlying basic
 		// Go type, then in fact we want to encode it as the actual kind type.
 		if v.ti.Underlying {
 			v.native = convFn(v.ref)
 		}
-		return encFn(v.native.(E))
+		return encFn(preAnalyzed(v, v.native.(E)))
 	}
 }
 
@@ -1001,7 +1009,7 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 	// okay, if nilAt is > 1 then we need to additionally encode an int of that
 	// value
 	if hdr.NilAt > 1 {
-		encoded = append(encoded, encInt(hdr.NilAt-1)...)
+		encoded = append(encoded, encInt(analyzed[int]{native: hdr.NilAt - 1})...)
 	}
 
 	return encoded, nil

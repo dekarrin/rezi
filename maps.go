@@ -72,27 +72,25 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 }
 
 // encCheckedMap encodes a compatible map as a REZI map.
-func encCheckedMap(value analyzedValue[any]) ([]byte, error) {
+func encCheckedMap(value analyzed[any]) ([]byte, error) {
 	if value.ti.Main != mtMap {
 		panic("not a map type")
 	}
 
-	return encWithNilCheck(value, func(val interface{}) ([]byte, error) {
-		return encMap(val, *value.ti.KeyType)
-	}, reflect.Value.Interface)
+	return encWithNilCheck(value, encMap, reflect.Value.Interface)
 }
 
-func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
-	refVal := reflect.ValueOf(v)
-
-	if v == nil || refVal.IsNil() {
+// requires keyType type info to be avail under *mapVal.ti.KeyType and ref to be
+// set.
+func encMap(val analyzed[any]) ([]byte, error) {
+	if val.native == nil || val.ref.IsNil() {
 		return encNilHeader(0), nil
 	}
 
-	mapKeys := refVal.MapKeys()
+	mapKeys := val.ref.MapKeys()
 	keysToSort := sortableMapKeys{
 		keys: mapKeys,
-		ti:   keyType,
+		ti:   *val.ti.KeyType,
 	}
 	sort.Sort(keysToSort)
 	mapKeys = keysToSort.keys
@@ -101,7 +99,7 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 
 	for i := range mapKeys {
 		k := mapKeys[i]
-		v := refVal.MapIndex(k)
+		v := val.ref.MapIndex(k)
 
 		keyData, err := Enc(k.Interface())
 		if err != nil {
@@ -116,7 +114,7 @@ func encMap(v interface{}, keyType typeInfo) ([]byte, error) {
 		enc = append(enc, valData...)
 	}
 
-	enc = append(encInt(tLen(len(enc))), enc...)
+	enc = append(encCount(len(enc), nil), enc...)
 	return enc, nil
 }
 

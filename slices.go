@@ -9,7 +9,7 @@ import (
 )
 
 // encMap encodes a compatible slice as a REZI map.
-func encCheckedSlice(value analyzedValue[any]) ([]byte, error) {
+func encCheckedSlice(value analyzed[any]) ([]byte, error) {
 	if value.ti.Main != mtSlice && value.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
@@ -17,18 +17,17 @@ func encCheckedSlice(value analyzedValue[any]) ([]byte, error) {
 	return encWithNilCheck(value, encSlice, reflect.Value.Interface)
 }
 
-func encSlice(v interface{}) ([]byte, error) {
-	refVal := reflect.ValueOf(v)
-	isArray := reflect.TypeOf(v).Kind() == reflect.Array
+func encSlice(val analyzed[any]) ([]byte, error) {
+	isArray := val.ref.Type().Kind() == reflect.Array
 
-	if v == nil || (!isArray && refVal.IsNil()) {
+	if val.native == nil || (!isArray && val.ref.IsNil()) {
 		return encNilHeader(0), nil
 	}
 
 	enc := make([]byte, 0)
 
-	for i := 0; i < refVal.Len(); i++ {
-		v := refVal.Index(i)
+	for i := 0; i < val.ref.Len(); i++ {
+		v := val.ref.Index(i)
 		encData, err := Enc(v.Interface())
 		if err != nil {
 			if isArray {
@@ -40,7 +39,7 @@ func encSlice(v interface{}) ([]byte, error) {
 		enc = append(enc, encData...)
 	}
 
-	enc = append(encInt(tLen(len(enc))), enc...)
+	enc = append(encCount(len(enc), nil), enc...)
 	return enc, nil
 }
 
