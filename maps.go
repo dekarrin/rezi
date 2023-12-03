@@ -128,10 +128,7 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},
-		func(b []byte, v analyzed[any]) (decInfo, int, error) {
-			decN, err := decMap(b, v)
-			return decInfo{}, decN, err
-		},
+		decMap,
 	))
 	if err != nil {
 		return n, err
@@ -143,12 +140,13 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decMap(data []byte, v analyzed[any]) (int, error) {
+func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
+	var di decInfo
 	var totalConsumed int
 
 	toConsume, _, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorDecf(0, "decode byte count: %s", err)
+		return di, 0, errorDecf(0, "decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -162,14 +160,16 @@ func decMap(data []byte, v analyzed[any]) (int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
-		return totalConsumed, nil
+		di.Ref = emptyMap
+		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		// initialize to the nil map
 		nilMap := reflect.Zero(refMapType)
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
-		return totalConsumed, nil
+		di.Ref = nilMap
+		return di, totalConsumed, nil
 	}
 
 	if len(data) < toConsume {
@@ -181,7 +181,7 @@ func decMap(data []byte, v analyzed[any]) (int, error) {
 		}
 		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data at offset"
 		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return totalConsumed, err
+		return di, totalConsumed, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -198,7 +198,7 @@ func decMap(data []byte, v analyzed[any]) (int, error) {
 		refKey := reflect.New(refKType)
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "map key: %v", err)
+			return di, totalConsumed, errorDecf(totalConsumed, "map key: %v", err)
 		}
 		totalConsumed += n
 		i += n
@@ -207,7 +207,7 @@ func decMap(data []byte, v analyzed[any]) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "map value[%v]: %v", refKey.Elem().Interface(), err)
+			return di, totalConsumed, errorDecf(totalConsumed, "map value[%v]: %v", refKey.Elem().Interface(), err)
 		}
 		totalConsumed += n
 		i += n
@@ -217,6 +217,6 @@ func decMap(data []byte, v analyzed[any]) (int, error) {
 	}
 
 	refVal.Elem().Set(m)
-
-	return totalConsumed, nil
+	di.Ref = m
+	return di, totalConsumed, nil
 }

@@ -52,10 +52,7 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
-		func(b []byte, v analyzed[any]) (decInfo, int, error) {
-			decN, err := decSlice(b, v)
-			return decInfo{}, decN, err
-		},
+		decSlice,
 	))
 	if err != nil {
 		return n, err
@@ -67,12 +64,14 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decSlice(data []byte, v analyzed[any]) (int, error) {
+func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
+	var di decInfo
+
 	var totalConsumed int
 
 	toConsume, _, n, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorDecf(0, "decode byte count: %s", err)
+		return di, 0, errorDecf(0, "decode byte count: %s", err)
 	}
 	data = data[n:]
 	totalConsumed += n
@@ -96,7 +95,8 @@ func decSlice(data []byte, v analyzed[any]) (int, error) {
 			empty = reflect.MakeSlice(refSliceType, 0, 0)
 		}
 		refSliceVal.Elem().Set(empty)
-		return totalConsumed, nil
+		di.Ref = refSliceVal
+		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		var nilVal reflect.Value
 		if isArray {
@@ -105,7 +105,8 @@ func decSlice(data []byte, v analyzed[any]) (int, error) {
 			nilVal = reflect.Zero(refSliceType)
 		}
 		refSliceVal.Elem().Set(nilVal)
-		return totalConsumed, nil
+		di.Ref = nilVal
+		return di, totalConsumed, nil
 	}
 
 	if len(data) < toConsume {
@@ -117,7 +118,7 @@ func decSlice(data []byte, v analyzed[any]) (int, error) {
 		}
 		const errFmt = "decoded %s byte count is %d but only %d byte%s remain%s in data at offset"
 		err := errorDecf(totalConsumed, errFmt, sliceOrArrStr, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return totalConsumed, err
+		return di, totalConsumed, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
@@ -138,7 +139,7 @@ func decSlice(data []byte, v analyzed[any]) (int, error) {
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return totalConsumed, errorDecf(totalConsumed, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
+			return di, totalConsumed, errorDecf(totalConsumed, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
 		}
 		totalConsumed += n
 		i += n
@@ -152,6 +153,7 @@ func decSlice(data []byte, v analyzed[any]) (int, error) {
 		itemIdx++
 	}
 
+	di.Ref = sl
 	refSliceVal.Elem().Set(sl)
-	return totalConsumed, nil
+	return di, totalConsumed, nil
 }
