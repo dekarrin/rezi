@@ -128,8 +128,8 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},
-		func(b []byte, i interface{}) (interface{}, int, error) {
-			decN, err := decMap(b, i)
+		func(b []byte, v analyzed[any]) (interface{}, int, error) {
+			decN, err := decMap(b, v.native)
 			return nil, decN, err
 		},
 	))

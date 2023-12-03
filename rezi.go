@@ -807,7 +807,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 
 // decToUnwrappedFn takes the encoded bytes and an interface to decode to and
 // returns any extra data (may be nil), bytes consumed, and error status.
-func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
+func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (interface{}, int, error)) decFunc[interface{}] {
 	return func(data []byte) (interface{}, interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		refWrapped := wrapped.ref
@@ -868,7 +868,8 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		var decoded interface{}
 
 		receiver := receiverValue.Interface()
-		extraInfo, decConsumed, decErr := decToUnwrappedFn(data, receiver)
+		recvAnalyzed := analyzed[any]{native: receiver, ref: receiverValue, ti: wrapped.ti}
+		extraInfo, decConsumed, decErr := decToUnwrappedFn(data, recvAnalyzed)
 
 		if decErr != nil {
 			return nil, extraInfo, decConsumed, decErr

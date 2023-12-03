@@ -52,8 +52,8 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
-		func(b []byte, i interface{}) (interface{}, int, error) {
-			decN, err := decSlice(b, i)
+		func(b []byte, v analyzed[any]) (interface{}, int, error) {
+			decN, err := decSlice(b, v.native)
 			return nil, decN, err
 		},
 	))

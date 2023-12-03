@@ -363,8 +363,8 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
-				recv := unwrapped.(encoding.BinaryUnmarshaler)
+			func(b []byte, unwrapped analyzed[any]) (interface{}, int, error) {
+				recv := unwrapped.native.(encoding.BinaryUnmarshaler)
 				decN, err := decBinary(b, recv)
 				return nil, decN, err
 			},
@@ -393,8 +393,8 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
-				recv := unwrapped.(encoding.TextUnmarshaler)
+			func(b []byte, unwrapped analyzed[any]) (interface{}, int, error) {
+				recv := unwrapped.native.(encoding.TextUnmarshaler)
 				decN, err := decText(b, recv)
 				return nil, decN, err
 			},

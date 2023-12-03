@@ -57,8 +57,8 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
-		func(data []byte, otherV interface{}) (interface{}, int, error) {
-			fi, n, err := decStruct(data, otherV, v.ti)
+		func(data []byte, v analyzed[any]) (interface{}, int, error) {
+			fi, n, err := decStruct(data, v.native, v.ti)
 			extraInfo = fi
 			return fi, n, err
 		},
