@@ -43,14 +43,14 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 	return enc, nil
 }
 
-func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
-	if ti.Main != mtSlice && ti.Main != mtArray {
+func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
+	if v.ti.Main != mtSlice && v.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
 
-	sl, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+	sl, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
-			return t.Kind() == reflect.Pointer && ((ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
+			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
 		func(b []byte, i interface{}) (interface{}, int, error) {
 			decN, err := decSlice(b, i)
@@ -60,8 +60,8 @@ func decCheckedSlice(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	if ti.Indir == 0 {
-		refReceiver := reflect.ValueOf(v)
+	if v.ti.Indir == 0 {
+		refReceiver := v.ref
 		refReceiver.Elem().Set(reflect.ValueOf(sl))
 	}
 	return n, err

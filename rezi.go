@@ -683,14 +683,16 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return 0, err
 	}
 
+	value := analyzed[any]{native: v, ref: reflect.ValueOf(v), ti: info}
+
 	if info.Primitive() {
-		return decCheckedPrim(data, v, info)
+		return decCheckedPrim(data, value)
 	} else if info.Main == mtMap {
-		return decCheckedMap(data, v, info)
+		return decCheckedMap(data, value)
 	} else if info.Main == mtSlice || info.Main == mtArray {
-		return decCheckedSlice(data, v, info)
+		return decCheckedSlice(data, value)
 	} else if info.Main == mtStruct {
-		return decCheckedStruct(data, v, info)
+		return decCheckedStruct(data, value)
 	} else {
 		panic("no possible decoding")
 	}
@@ -737,10 +739,10 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
-func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFunc[E]) (decoded E, n int, err error) {
+func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, n int, err error) {
 	var hdr countHeader
 
-	if ti.Indir > 0 {
+	if v.ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
 			return decoded, n, errorDecf(0, "check count header: %s", err)
@@ -753,26 +755,26 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 	var extraInfo interface{}
 
 	if !hdr.IsNil() {
-		effectiveExtraIndirs = ti.Indir
+		effectiveExtraIndirs = v.ti.Indir
 		decoded, extraInfo, n, err = decFn(data)
 		if err != nil {
 			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
 		}
 	}
 
-	if ti.Indir > 0 {
+	if v.ti.Indir > 0 {
 		// the user has passed in a ptr-ptr-to. We cannot directly assign.
-		assignTarget := reflect.ValueOf(v)
+		assignTarget := v.ref
 		// assignTarget is a **string but we want a *string
 
 		// if it's a struct, we must get the original value, if one exists, in order
 		// to preserve the original member values
 		var origStructVal reflect.Value
-		if ti.Main == mtStruct {
+		if v.ti.Main == mtStruct {
 			origStructVal = unwrapOriginalStructValue(assignTarget)
 		}
 
-		for i := 0; i < ti.Indir && i < effectiveExtraIndirs; i++ {
+		for i := 0; i < v.ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
 			// *what does it mean*
@@ -785,11 +787,11 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 
 		if !hdr.IsNil() {
 			refDecoded := reflect.ValueOf(decoded)
-			if ti.Underlying {
+			if v.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
 
-			if ti.Main == mtStruct && origStructVal.IsValid() {
+			if v.ti.Main == mtStruct && origStructVal.IsValid() {
 				refDecoded = setStructMembers(origStructVal, refDecoded, extraInfo.([]fieldInfo))
 			}
 
@@ -805,19 +807,19 @@ func decWithNilCheck[E any](data []byte, v interface{}, ti typeInfo, decFn decFu
 
 // decToUnwrappedFn takes the encoded bytes and an interface to decode to and
 // returns any extra data (may be nil), bytes consumed, and error status.
-func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
+func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, interface{}) (interface{}, int, error)) decFunc[interface{}] {
 	return func(data []byte) (interface{}, interface{}, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
-		refWrapped := reflect.ValueOf(wrapped)
+		refWrapped := wrapped.ref
 		receiverType := refWrapped.Type()
 		refUnwrapped := refWrapped
 
 		if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
 			// for every * in the (...*) part of *(...*)T up until the
 			// implementor/slice-ptr, do a deref.
-			for i := 0; i < ti.Indir; i++ {
+			for i := 0; i < wrapped.ti.Indir; i++ {
 				receiverType = receiverType.Elem()
-				if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() {
+				if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() {
 					if !refUnwrapped.IsNil() {
 						refUnwrapped = refUnwrapped.Elem()
 					} else {
@@ -849,14 +851,14 @@ func fn_DecToWrappedReceiver(wrapped interface{}, ti typeInfo, assertFn func(ref
 			// automatic and we have full control; we don't (and can't) rely on
 			// already set things and use reflect after actual decoding to copy
 			// the decoded values into the passed-in pointer.
-			if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() && !refUnwrapped.IsNil() {
+			if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() && !refUnwrapped.IsNil() {
 				receiverValue = refUnwrapped
 			} else {
 				receiverValue = reflect.New(receiverType.Elem())
 			}
 		} else {
 			// receiverType is itself T (future-proofing)
-			if (ti.Main == mtText || ti.Main == mtBinary) && refUnwrapped.IsValid() {
+			if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() {
 				receiverValue = refUnwrapped
 			} else {
 				receiverValue = reflect.Zero(receiverType)

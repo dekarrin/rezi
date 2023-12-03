@@ -47,18 +47,18 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 
 // decCheckedStruct decodes a REZI bytes representation of a struct into a
 // compatible struct type.
-func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
-	if ti.Main != mtStruct {
+func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
+	if v.ti.Main != mtStruct {
 		panic("not a struct type")
 	}
 
 	var extraInfo []fieldInfo
-	st, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+	st, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
-		func(data []byte, v interface{}) (interface{}, int, error) {
-			fi, n, err := decStruct(data, v, ti)
+		func(data []byte, otherV interface{}) (interface{}, int, error) {
+			fi, n, err := decStruct(data, otherV, v.ti)
 			extraInfo = fi
 			return fi, n, err
 		},
@@ -66,19 +66,19 @@ func decCheckedStruct(data []byte, v interface{}, ti typeInfo) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	if ti.Indir == 0 {
-		refReceiver := reflect.ValueOf(v)
+	if v.ti.Indir == 0 {
+		refReceiver := v.ref
 
 		// if it's a struct, we must get the original value, if one exists, in order
 		// to preserve the original member values
 		var origStructVal reflect.Value
-		if ti.Main == mtStruct {
+		if v.ti.Main == mtStruct {
 			origStructVal = unwrapOriginalStructValue(refReceiver)
 		}
 
 		refSt := reflect.ValueOf(st)
 
-		if ti.Main == mtStruct && origStructVal.IsValid() {
+		if v.ti.Main == mtStruct && origStructVal.IsValid() {
 			refSt = setStructMembers(origStructVal, refSt, extraInfo)
 		}
 
