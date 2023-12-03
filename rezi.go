@@ -561,10 +561,6 @@ type decInfo struct {
 	// creating it more than once can be avoided. Not always set by every decode
 	// function; check with IsValid() before using.
 	Ref reflect.Value
-
-	// N is the number of bytes consumed by the decode. May be valid even when
-	// the decode returned an error.
-	N int
 }
 
 type (
