@@ -48,7 +48,7 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 		panic("not a slice or array type")
 	}
 
-	sl, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	sl, _, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},

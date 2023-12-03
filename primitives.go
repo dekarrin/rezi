@@ -180,7 +180,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 
 	switch value.ti.Main {
 	case mtString:
-		s, n, err := decWithNilCheck(data, value, decString)
+		s, _, n, err := decWithNilCheck(data, value, decString)
 		if err != nil {
 			return n, err
 		}
@@ -189,7 +189,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 		}
 		return n, nil
 	case mtBool:
-		b, n, err := decWithNilCheck(data, value, decBool)
+		b, _, n, err := decWithNilCheck(data, value, decBool)
 		if err != nil {
 			return n, err
 		}
@@ -205,7 +205,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			switch value.ti.Bits {
 			case 64:
 				var i int64
-				i, n, err = decWithNilCheck(data, value, decInt[int64])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int64])
 				if err != nil {
 					return n, err
 				}
@@ -214,7 +214,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 32:
 				var i int32
-				i, n, err = decWithNilCheck(data, value, decInt[int32])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int32])
 				if err != nil {
 					return n, err
 				}
@@ -223,7 +223,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 16:
 				var i int16
-				i, n, err = decWithNilCheck(data, value, decInt[int16])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int16])
 				if err != nil {
 					return n, err
 				}
@@ -232,7 +232,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 8:
 				var i int8
-				i, n, err = decWithNilCheck(data, value, decInt[int8])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int8])
 				if err != nil {
 					return n, err
 				}
@@ -241,7 +241,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			default:
 				var i int
-				i, n, err = decWithNilCheck(data, value, decInt[int])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int])
 				if err != nil {
 					return n, err
 				}
@@ -253,7 +253,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			switch value.ti.Bits {
 			case 64:
 				var i uint64
-				i, n, err = decWithNilCheck(data, value, decInt[uint64])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
@@ -262,7 +262,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 32:
 				var i uint32
-				i, n, err = decWithNilCheck(data, value, decInt[uint32])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
@@ -271,7 +271,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 16:
 				var i uint16
-				i, n, err = decWithNilCheck(data, value, decInt[uint16])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
@@ -280,7 +280,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			case 8:
 				var i uint8
-				i, n, err = decWithNilCheck(data, value, decInt[uint8])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
@@ -289,7 +289,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 				}
 			default:
 				var i uint
-				i, n, err = decWithNilCheck(data, value, decInt[uint])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint])
 				if err != nil {
 					return n, err
 				}
@@ -307,7 +307,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 		switch value.ti.Bits {
 		case 32:
 			var f float32
-			f, n, err = decWithNilCheck(data, value, decFloat[float32])
+			f, _, n, err = decWithNilCheck(data, value, decFloat[float32])
 			if err != nil {
 				return n, err
 			}
@@ -318,7 +318,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			fallthrough
 		case 64:
 			var f float64
-			f, n, err = decWithNilCheck(data, value, decFloat[float64])
+			f, _, n, err = decWithNilCheck(data, value, decFloat[float64])
 			if err != nil {
 				return n, err
 			}
@@ -335,7 +335,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 		switch value.ti.Bits {
 		case 64:
 			var c complex64
-			c, n, err = decWithNilCheck(data, value, decComplex[complex64])
+			c, _, n, err = decWithNilCheck(data, value, decComplex[complex64])
 			if err != nil {
 				return n, err
 			}
@@ -346,7 +346,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			fallthrough
 		case 128:
 			var c complex128
-			c, n, err = decWithNilCheck(data, value, decComplex[complex128])
+			c, _, n, err = decWithNilCheck(data, value, decComplex[complex128])
 			if err != nil {
 				return n, err
 			}
@@ -359,7 +359,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		bu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
@@ -389,7 +389,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 	case mtText:
 		// if we just got handed a pointer-to TextUnmarshaler, we need to undo
 		// that
-		tu, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		tu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},

@@ -53,7 +53,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 	}
 
 	var extraInfo decInfo
-	st, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	st, _, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},

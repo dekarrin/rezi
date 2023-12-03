@@ -561,6 +561,10 @@ type decInfo struct {
 	// creating it more than once can be avoided. Not always set by every decode
 	// function; check with IsValid() before using.
 	Ref reflect.Value
+
+	// N is the number of bytes consumed by the decode. May be valid even when
+	// the decode returned an error.
+	N int
 }
 
 type (
@@ -763,26 +767,24 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
-func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, n int, err error) {
+func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, di decInfo, n int, err error) {
 	var hdr countHeader
 
 	if v.ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
-			return decoded, n, errorDecf(0, "check count header: %s", err)
+			return decoded, di, n, errorDecf(0, "check count header: %s", err)
 		}
 	}
 
 	countHeaderBytes := n
 	effectiveExtraIndirs := hdr.ExtraNilIndirections()
 
-	var extraInfo decInfo
-
 	if !hdr.IsNil() {
 		effectiveExtraIndirs = v.ti.Indir
-		decoded, extraInfo, n, err = decFn(data)
+		decoded, di, n, err = decFn(data)
 		if err != nil {
-			return decoded, n, errorDecf(countHeaderBytes, "%s", err)
+			return decoded, di, n, errorDecf(countHeaderBytes, "%s", err)
 		}
 	}
 
@@ -816,7 +818,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 			}
 
 			if v.ti.Main == mtStruct && origStructVal.IsValid() {
-				refDecoded = setStructMembers(origStructVal, refDecoded, extraInfo)
+				refDecoded = setStructMembers(origStructVal, refDecoded, di)
 			}
 
 			assignTarget.Elem().Set(refDecoded)
@@ -826,7 +828,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		}
 	}
 
-	return decoded, n, nil
+	return decoded, di, n, nil
 }
 
 // decToUnwrappedFn takes the encoded bytes and an interface to decode to and
