@@ -548,6 +548,20 @@ import (
 	"reflect"
 )
 
+// decInfo holds information gained during decoding to be used in further
+// processing of the decoded data.
+type decInfo struct {
+	// Fields is only included in decInfo when a struct has been decoded and
+	// gives a slice of all valid fields that were detected (and read) during
+	// the decode. This is used to inform which fields to overwrite in the
+	// receiver pointer.
+	Fields []fieldInfo
+
+	// Ref is the value that was decoded but as a reflect.Value. This is so that
+	// creating it more than once can be avoided.
+	Ref reflect.Value
+}
+
 type (
 	tLen      = int
 	tNilLevel = int
@@ -616,7 +630,11 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
-	value := analyzed[any]{native: v, ref: reflect.ValueOf(v), ti: info}
+	value := analyzed[any]{
+		native: v,
+		ref:    reflect.ValueOf(v),
+		ti:     info,
+	}
 
 	if info.Primitive() {
 		return encCheckedPrim(value)
@@ -683,7 +701,11 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return 0, err
 	}
 
-	value := analyzed[any]{native: v, ref: reflect.ValueOf(v), ti: info}
+	value := analyzed[any]{
+		native: v,
+		ref:    reflect.ValueOf(v),
+		ti:     info,
+	}
 
 	if info.Primitive() {
 		return decCheckedPrim(data, value)
@@ -719,11 +741,12 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 		if nilLevel > -1 {
 			return encNilHeader(nilLevel), nil
 		}
+		convTarget := convFn(encodeTarget)
 		reAnalyzed := analyzed[E]{
-			native: convFn(encodeTarget),
+			native: convTarget,
+			ref:    reflect.ValueOf(convTarget),
 			ti:     v.ti,
 		}
-		reAnalyzed.ref = reflect.ValueOf(reAnalyzed.native)
 		return encFn(reAnalyzed)
 	} else {
 		// if the type we have is actually a new UDT with some underlying basic

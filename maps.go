@@ -129,7 +129,7 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},
 		func(b []byte, v analyzed[any]) (interface{}, int, error) {
-			decN, err := decMap(b, v.native)
+			decN, err := decMap(b, v)
 			return nil, decN, err
 		},
 	))
@@ -143,7 +143,7 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decMap(data []byte, v interface{}) (int, error) {
+func decMap(data []byte, v analyzed[any]) (int, error) {
 	var totalConsumed int
 
 	toConsume, _, n, err := decInt[tLen](data)
@@ -153,7 +153,7 @@ func decMap(data []byte, v interface{}) (int, error) {
 	data = data[n:]
 	totalConsumed += n
 
-	refVal := reflect.ValueOf(v)
+	refVal := v.ref
 	refMapType := refVal.Type().Elem()
 
 	if toConsume == 0 {

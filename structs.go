@@ -22,7 +22,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 
 		fNameData, err := Enc(fi.Name)
 		if err != nil {
-			msgTypeName := reflect.ValueOf(v).Type().Name()
+			msgTypeName := val.ref.Type().Name()
 			if msgTypeName == "" {
 				msgTypeName = "(anonymous type)"
 			}
@@ -30,7 +30,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 		}
 		fValData, err := Enc(v.Interface())
 		if err != nil {
-			msgTypeName := reflect.ValueOf(v).Type().Name()
+			msgTypeName := val.ref.Type().Name()
 			if msgTypeName == "" {
 				msgTypeName = "(anonymous type)"
 			}
@@ -58,7 +58,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
 		func(data []byte, v analyzed[any]) (interface{}, int, error) {
-			fi, n, err := decStruct(data, v.native, v.ti)
+			fi, n, err := decStruct(data, v)
 			extraInfo = fi
 			return fi, n, err
 		},
@@ -88,11 +88,11 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 }
 
 // the fieldInfo is the successfully decoded fields.
-func decStruct(data []byte, v interface{}, ti typeInfo) ([]fieldInfo, int, error) {
+func decStruct(data []byte, v analyzed[any]) ([]fieldInfo, int, error) {
 	var decFields []fieldInfo
 	var totalConsumed int
 
-	refVal := reflect.ValueOf(v)
+	refVal := v.ref
 	refStructType := refVal.Type().Elem()
 	msgTypeName := refStructType.Name()
 	if msgTypeName == "" {
@@ -144,7 +144,7 @@ func decStruct(data []byte, v interface{}, ti typeInfo) ([]fieldInfo, int, error
 		data = data[n:]
 
 		// get field info from name
-		fi, ok := ti.Fields.ByName[fNameVal]
+		fi, ok := v.ti.Fields.ByName[fNameVal]
 		if !ok {
 			return decFields, totalConsumed, errorDecf(totalConsumed, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
 		}

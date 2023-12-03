@@ -53,7 +53,7 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
 		func(b []byte, v analyzed[any]) (interface{}, int, error) {
-			decN, err := decSlice(b, v.native)
+			decN, err := decSlice(b, v)
 			return nil, decN, err
 		},
 	))
@@ -67,7 +67,7 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decSlice(data []byte, v interface{}) (int, error) {
+func decSlice(data []byte, v analyzed[any]) (int, error) {
 	var totalConsumed int
 
 	toConsume, _, n, err := decInt[tLen](data)
@@ -77,7 +77,7 @@ func decSlice(data []byte, v interface{}) (int, error) {
 	data = data[n:]
 	totalConsumed += n
 
-	refSliceVal := reflect.ValueOf(v)
+	refSliceVal := v.ref
 	refSliceType := refSliceVal.Type().Elem()
 	isArray := refSliceType.Kind() == reflect.Array
 	sliceOrArrStr := "slice"
