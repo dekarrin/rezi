@@ -108,7 +108,7 @@ func decStruct(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyStruct.Elem())
-		di.Ref = emptyStruct
+		di.Ref = emptyStruct.Elem()
 		return di, totalConsumed, nil
 	}
 

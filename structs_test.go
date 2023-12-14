@@ -251,7 +251,129 @@ func Test_Dec_Struct(t *testing.T) {
 		Value float64
 	}
 
-	runDecTests(t, "no-member struct", nil, []byte{0x00}, testStructEmpty{}, nil, 1)
+	t.Run("no-member struct", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         testStructEmpty
+			input          = []byte{0x00}
+			expect         = testStructEmpty{}
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run("no-member struct, no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         testStructEmpty
+			input          = []byte{0x00}
+			expect         testStructEmpty
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*(no-member struct)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *testStructEmpty
+			input          = []byte{0x00}
+			expectVal      = testStructEmpty{}
+			expect         = &expectVal
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*(no-member struct), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &testStructEmpty{} // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *testStructEmpty
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**(no-member struct)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **testStructEmpty
+			input          = []byte{0x00}
+			expectVal      = testStructEmpty{}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**(no-member struct), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &testStructEmpty{}
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *testStructEmpty
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "one-member struct", nil,
 		[]byte{
