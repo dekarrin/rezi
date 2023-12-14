@@ -95,7 +95,7 @@ func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
 			empty = reflect.MakeSlice(refSliceType, 0, 0)
 		}
 		refSliceVal.Elem().Set(empty)
-		di.Ref = refSliceVal
+		di.Ref = refSliceVal.Elem()
 		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		var nilVal reflect.Value
