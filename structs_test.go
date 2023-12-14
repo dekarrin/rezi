@@ -382,6 +382,153 @@ func Test_Dec_Struct(t *testing.T) {
 			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
 			0x01, 0x04, // 4
 		}, testStructOneMember{Value: 4}, nil, 12)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "multi-member struct", nil,
 		[]byte{
@@ -393,6 +540,153 @@ func Test_Dec_Struct(t *testing.T) {
 			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
 			0x01, 0x04, // 4
 		}, testStructMultiMember{Value: 4, Name: "NEPETA"}, nil, 28)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "with unexported", nil,
 		[]byte{
@@ -401,6 +695,153 @@ func Test_Dec_Struct(t *testing.T) {
 			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
 			0x01, 0x04, // 4
 		}, testStructWithUnexported{Value: 4, unexported: 0}, nil, 12)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "with unexported values set", &testStructWithUnexported{unexported: 12},
 		[]byte{
@@ -409,6 +850,153 @@ func Test_Dec_Struct(t *testing.T) {
 			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
 			0x01, 0x04, // 4
 		}, testStructWithUnexported{Value: 4, unexported: 12}, &testStructWithUnexported{unexported: 12}, 12)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "with unexported case distinguished", nil,
 		[]byte{
@@ -417,8 +1005,302 @@ func Test_Dec_Struct(t *testing.T) {
 			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
 			0x01, 0x04, // 4
 		}, testStructWithUnexportedCaseDistinguished{Value: 4, value: 0}, nil, 12)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "only unexported", nil, []byte{0x00}, testStructOnlyUnexported{value: 0, name: ""}, nil, 1)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "many fields", nil,
 		[]byte{
@@ -445,6 +1327,153 @@ func Test_Dec_Struct(t *testing.T) {
 			inc:     0,
 			enabled: nil,
 		}, nil, 59)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "with embedded", nil,
 		[]byte{
@@ -463,6 +1492,153 @@ func Test_Dec_Struct(t *testing.T) {
 			},
 			Name: "NEPETA",
 		}, nil, 50)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
 
 	runDecTests(t, "with embedded overlap", nil,
 		[]byte{
@@ -485,8 +1661,154 @@ func Test_Dec_Struct(t *testing.T) {
 			Value: 8.25,
 			Name:  "NEPETA",
 		}, nil, 62)
+	// normal value test
+	t.Run(name, func(t *testing.T) {
+		assert := assert.New(t)
 
-	// // specialized test we cannot abstract easily
+		var (
+			actual         E
+			input          = filledInput
+			expect         = filledExpect
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run(name+", no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         E
+			input          = []byte{0x00}
+			expect         E
+			expectConsumed = 1
+		)
+
+		if initVal != nil {
+			actual = *initVal
+		}
+
+		if emptyExpect != nil {
+			expect = *emptyExpect
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         *E
+			input          = filledInput
+			expectVal      = filledExpect
+			expect         = &expectVal
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(E)
+			*actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*("+name+"), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         = &filledExpect // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *E
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**("+name+")", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         **E
+			input          = filledInput
+			expectVal      = filledExpect
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = filledExpectConsumed
+		)
+
+		if initVal != nil {
+			actual = new(*E)
+			*actual = new(E)
+			**actual = (*initVal)
+		}
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &filledExpect
+			actual           = &actualInitialPtr // initially set to enshore it's cleared
+			input            = []byte{0xb0, 0x01, 0x01}
+			expectPtr        *E
+			expect           = &expectPtr
+			expectConsumed   = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
 	t.Run("missing values in encoded are left alone", func(t *testing.T) {
 		assert := assert.New(t)
 
