@@ -375,27 +375,21 @@ func Test_Dec_Struct(t *testing.T) {
 		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
 	})
 
-	runDecTests(t, "one-member struct", nil,
-		[]byte{
-			0x01, 0x0a, // len=10
-
-			0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-			0x01, 0x04, // 4
-		}, testStructOneMember{Value: 4}, nil, 12)
 	// normal value test
-	t.Run(name, func(t *testing.T) {
+	t.Run("one-member struct", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actual         E
-			input          = filledInput
-			expect         = filledExpect
-			expectConsumed = filledExpectConsumed
-		)
+			actual testStructOneMember
+			input  = []byte{
+				0x01, 0x0a, // len=10
 
-		if initVal != nil {
-			actual = *initVal
-		}
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+			}
+			expect         = testStructOneMember{Value: 4}
+			expectConsumed = 12
+		)
 
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
@@ -407,23 +401,15 @@ func Test_Dec_Struct(t *testing.T) {
 	})
 
 	// 0-len struct
-	t.Run(name+", no values encoded", func(t *testing.T) {
+	t.Run("one-member struct, no values encoded", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actual         E
+			actual         testStructOneMember
 			input          = []byte{0x00}
-			expect         E
+			expect         testStructOneMember
 			expectConsumed = 1
 		)
-
-		if initVal != nil {
-			actual = *initVal
-		}
-
-		if emptyExpect != nil {
-			expect = *emptyExpect
-		}
 
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
@@ -435,21 +421,21 @@ func Test_Dec_Struct(t *testing.T) {
 	})
 
 	// single pointer, filled
-	t.Run("*("+name+")", func(t *testing.T) {
+	t.Run("*(one-member struct)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actual         *E
-			input          = filledInput
-			expectVal      = filledExpect
-			expect         = &expectVal
-			expectConsumed = filledExpectConsumed
-		)
+			actual *testStructOneMember
+			input  = []byte{
+				0x01, 0x0a, // len=10
 
-		if initVal != nil {
-			actual = new(E)
-			*actual = (*initVal)
-		}
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+			}
+			expectVal      = testStructOneMember{Value: 4}
+			expect         = &expectVal
+			expectConsumed = 12
+		)
 
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
@@ -461,13 +447,13 @@ func Test_Dec_Struct(t *testing.T) {
 	})
 
 	// single pointer, nil
-	t.Run("*("+name+"), nil", func(t *testing.T) {
+	t.Run("*(one-member struct), nil", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actual         = &filledExpect // initially set to enshore it's cleared
+			actual         = &testStructOneMember{Value: 4} // initially set to enshore it's cleared
 			input          = []byte{0xa0}
-			expect         *E
+			expect         *testStructOneMember
 			expectConsumed = 1
 		)
 
@@ -481,23 +467,22 @@ func Test_Dec_Struct(t *testing.T) {
 	})
 
 	// double pointer, filled
-	t.Run("**("+name+")", func(t *testing.T) {
+	t.Run("**(one-member struct)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actual         **E
-			input          = filledInput
-			expectVal      = filledExpect
+			actual **testStructOneMember
+			input  = []byte{
+				0x01, 0x0a, // len=10
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+			}
+			expectVal      = testStructOneMember{Value: 4}
 			expectPtr      = &expectVal
 			expect         = &expectPtr
-			expectConsumed = filledExpectConsumed
+			expectConsumed = 12
 		)
-
-		if initVal != nil {
-			actual = new(*E)
-			*actual = new(E)
-			**actual = (*initVal)
-		}
 
 		consumed, err := Dec(input, &actual)
 		if !assert.NoError(err) {
@@ -509,14 +494,14 @@ func Test_Dec_Struct(t *testing.T) {
 	})
 
 	// double pointer, nil at first level
-	t.Run("**("+name+"), nil at first level", func(t *testing.T) {
+	t.Run("**(one-member struct), nil at first level", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			actualInitialPtr = &filledExpect
+			actualInitialPtr = &testStructOneMember{Value: 4}
 			actual           = &actualInitialPtr // initially set to enshore it's cleared
 			input            = []byte{0xb0, 0x01, 0x01}
-			expectPtr        *E
+			expectPtr        *testStructOneMember
 			expect           = &expectPtr
 			expectConsumed   = 3
 		)
