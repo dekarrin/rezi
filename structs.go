@@ -52,7 +52,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 		panic("not a struct type")
 	}
 
-	st, di, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	_, di, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
@@ -71,7 +71,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 			origStructVal = unwrapOriginalStructValue(refReceiver)
 		}
 
-		refSt := reflect.ValueOf(st)
+		refSt := di.Ref
 
 		if v.ti.Main == mtStruct && origStructVal.IsValid() {
 			refSt = setStructMembers(origStructVal, refSt, di)

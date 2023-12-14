@@ -691,11 +691,11 @@ func MustDec(data []byte, v interface{}) int {
 // the data itself (including there being fewer bytes than necessary to decode
 // the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errorf("%v", r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		err = errorf("%v", r)
+	// 	}
+	// }()
 
 	info, err := canDecode(v)
 	if err != nil {
@@ -808,7 +808,10 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		}
 
 		if !hdr.IsNil() {
-			refDecoded := reflect.ValueOf(decoded)
+			refDecoded := di.Ref
+			if !di.Ref.IsValid() {
+				refDecoded = reflect.ValueOf(decoded)
+			}
 			if v.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
