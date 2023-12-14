@@ -393,7 +393,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			// TODO: make most of the decCollection funcs be usable directly here.
+			// TODO: make most of the decCollection funcs be usable directly here, and see if we can do same for ALL decX funcs
 			func(b []byte, unwrapped analyzed[any]) (decInfo, int, error) {
 				recv := unwrapped.native.(encoding.TextUnmarshaler)
 				decN, err := decText(b, recv)
