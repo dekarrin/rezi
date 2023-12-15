@@ -20,7 +20,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 	for _, fi := range val.ti.Fields.ByOrder {
 		v := val.ref.Field(fi.Index)
 
-		fNameData, err := Enc(fi.Name)
+		fNameData, err := encWithTypeInfo(fi.Name, typeInfo{Indir: 0, Underlying: false, Main: mtString})
 		if err != nil {
 			msgTypeName := val.ref.Type().Name()
 			if msgTypeName == "" {
@@ -28,7 +28,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 			}
 			return nil, errorf("%s.%s field name: %s", msgTypeName, fi.Name, err)
 		}
-		fValData, err := Enc(v.Interface())
+		fValData, err := encWithTypeInfo(v.Interface(), fi.Type)
 		if err != nil {
 			msgTypeName := val.ref.Type().Name()
 			if msgTypeName == "" {

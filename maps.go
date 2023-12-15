@@ -101,11 +101,11 @@ func encMap(val analyzed[any]) ([]byte, error) {
 		k := mapKeys[i]
 		v := val.ref.MapIndex(k)
 
-		keyData, err := Enc(k.Interface())
+		keyData, err := encWithTypeInfo(k.Interface(), *val.ti.KeyType)
 		if err != nil {
 			return nil, errorf("map key %v: %v", k.Interface(), err)
 		}
-		valData, err := Enc(v.Interface())
+		valData, err := encWithTypeInfo(v.Interface(), *val.ti.ValType)
 		if err != nil {
 			return nil, errorf("map value[%v]: %v", k.Interface(), err)
 		}

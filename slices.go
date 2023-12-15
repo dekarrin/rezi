@@ -28,7 +28,7 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 
 	for i := 0; i < val.ref.Len(); i++ {
 		v := val.ref.Index(i)
-		encData, err := Enc(v.Interface())
+		encData, err := encWithTypeInfo(v.Interface(), *val.ti.ValType)
 		if err != nil {
 			if isArray {
 				return nil, errorf("array item[%d]: %s", i, err)

@@ -631,6 +631,12 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
+	return encWithTypeInfo(v, info)
+}
+
+// encWithTypeInfo has type analysis already performed, and it is not panic
+// safe.
+func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
 	value := analyzed[any]{
 		native: v,
 		ref:    reflect.ValueOf(v),
@@ -702,6 +708,12 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return 0, err
 	}
 
+	return decWithTypeInfo(data, v, info)
+}
+
+// decWithTypeInfo has type analysis already performed, and it is not panic
+// safe.
+func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err error) {
 	value := analyzed[any]{
 		native: v,
 		ref:    reflect.ValueOf(v),
