@@ -280,6 +280,10 @@ func ref[E any](v E) *E {
 	return &v
 }
 
+func withNoAnalysis[E any](newVal E) analyzed[E] {
+	return analyzed[E]{native: newVal}
+}
+
 // testText is a small struct that implements TextMarshaler and TextUnmarshaler.
 // It has three fields, that it lays out as such in encoding: "value", a uint16,
 // followed by "enabled", a bool, followed by "name", a string. Each field is

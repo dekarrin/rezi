@@ -32,6 +32,26 @@ func Test_Enc_Slice_NoIndirection(t *testing.T) {
 		assert.Equal(expect, actual)
 	})
 
+	t.Run("empty []int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input  = []int{}
+			expect = []byte{
+				0x00,
+			}
+		)
+
+		// execute
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		// assert
+		assert.Equal(expect, actual)
+	})
+
 	t.Run("[]int", func(t *testing.T) {
 		// setup
 		assert := assert.New(t)
@@ -1555,6 +1575,30 @@ func Test_Dec_Slice_NoIndirection(t *testing.T) {
 
 		assert.Equal(expectConsumed, consumed)
 		assert.Nil(actual)
+	})
+
+	t.Run("empty []int", func(t *testing.T) {
+		// setup
+		assert := assert.New(t)
+		var (
+			input = []byte{
+				0x00,
+			}
+			expectConsumed = 1
+		)
+
+		// execute
+		actual := []int{1, 2} // start with a value so we can check it is set to empty
+		consumed, err := Dec(input, &actual)
+
+		// assert
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.NotNil(actual)
+		assert.Empty(actual)
+		assert.Equal(expectConsumed, consumed)
 	})
 
 	t.Run("[]int", func(t *testing.T) {

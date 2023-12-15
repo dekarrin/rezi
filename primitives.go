@@ -71,84 +71,84 @@ type anyComplex interface {
 // correct level of indirection of pointer that the passed-in pointer was nil
 // at, which is retrieved by a call to decCheckedPrim with a pointer to *that*
 // type.
-func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
-	switch ti.Main {
+func encCheckedPrim(value analyzed[any]) ([]byte, error) {
+	switch value.ti.Main {
 	case mtString:
-		return encWithNilCheck(value, ti, nilErrEncoder(encString), reflect.Value.String)
+		return encWithNilCheck(value, nilErrEncoder(encString), reflect.Value.String)
 	case mtBool:
-		return encWithNilCheck(value, ti, nilErrEncoder(encBool), reflect.Value.Bool)
+		return encWithNilCheck(value, nilErrEncoder(encBool), reflect.Value.Bool)
 	case mtIntegral:
-		if ti.Signed {
-			switch ti.Bits {
+		if value.ti.Signed {
+			switch value.ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int8]), func(r reflect.Value) int8 {
 					return int8(r.Int())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int16]), func(r reflect.Value) int16 {
 					return int16(r.Int())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int32]), func(r reflect.Value) int32 {
 					return int32(r.Int())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int64]), reflect.Value.Int)
+				return encWithNilCheck(value, nilErrEncoder(encInt[int64]), reflect.Value.Int)
 			default:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
+				return encWithNilCheck(value, nilErrEncoder(encInt[int]), func(r reflect.Value) int {
 					return int(r.Int())
 				})
 			}
 		} else {
-			switch ti.Bits {
+			switch value.ti.Bits {
 			case 8:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint8]), func(r reflect.Value) uint8 {
 					return uint8(r.Uint())
 				})
 			case 16:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint16]), func(r reflect.Value) uint16 {
 					return uint16(r.Uint())
 				})
 			case 32:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint32]), func(r reflect.Value) uint32 {
 					return uint32(r.Uint())
 				})
 			case 64:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint64]), reflect.Value.Uint)
 			default:
-				return encWithNilCheck(value, ti, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
+				return encWithNilCheck(value, nilErrEncoder(encInt[uint]), func(r reflect.Value) uint {
 					return uint(r.Uint())
 				})
 			}
 		}
 	case mtFloat:
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 32:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
+			return encWithNilCheck(value, nilErrEncoder(encFloat[float32]), func(r reflect.Value) float32 {
 				return float32(r.Float())
 			})
 		default:
 			fallthrough
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
+			return encWithNilCheck(value, nilErrEncoder(encFloat[float64]), reflect.Value.Float)
 		}
 	case mtComplex:
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 64:
-			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
+			return encWithNilCheck(value, nilErrEncoder(encComplex[complex64]), func(r reflect.Value) complex64 {
 				return complex64(r.Complex())
 			})
 		default:
 			fallthrough
 		case 128:
-			return encWithNilCheck(value, ti, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
+			return encWithNilCheck(value, nilErrEncoder(encComplex[complex128]), reflect.Value.Complex)
 		}
 	case mtBinary:
-		return encWithNilCheck(value, ti, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
+		return encWithNilCheck(value, encBinary, func(r reflect.Value) encoding.BinaryMarshaler {
 			return r.Interface().(encoding.BinaryMarshaler)
 		})
 	case mtText:
-		return encWithNilCheck(value, ti, encText, func(r reflect.Value) encoding.TextMarshaler {
+		return encWithNilCheck(value, encText, func(r reflect.Value) encoding.TextMarshaler {
 			return r.Interface().(encoding.TextMarshaler)
 		})
 	default:
@@ -158,13 +158,13 @@ func encCheckedPrim(value interface{}, ti typeInfo) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](decoded E, v interface{}, ti typeInfo) {
-	if ti.Underlying {
+func zeroIndirAssign[E any](decoded E, val analyzed[any]) {
+	if val.ti.Underlying {
 		// need to get fancier
-		refVal := reflect.ValueOf(v)
+		refVal := val.ref
 		refVal.Elem().Set(reflect.ValueOf(decoded).Convert(refVal.Type().Elem()))
 	} else {
-		tVal := v.(*E)
+		tVal := val.native.(*E)
 		*tVal = decoded
 	}
 }
@@ -174,127 +174,127 @@ func zeroIndirAssign[E any](decoded E, v interface{}, ti typeInfo) {
 // string, float, complex), or implement encoding.BinaryUnmarshaler, or
 // implement encoding.TextUnmarshaler, or be a pointer to one of those types
 // with any level of indirection.
-func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
+func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
 
-	switch ti.Main {
+	switch value.ti.Main {
 	case mtString:
-		s, n, err := decWithNilCheck(data, v, ti, decString)
+		s, _, n, err := decWithNilCheck(data, value, decString)
 		if err != nil {
 			return n, err
 		}
-		if ti.Indir == 0 {
-			zeroIndirAssign(s, v, ti)
+		if value.ti.Indir == 0 {
+			zeroIndirAssign(s, value)
 		}
 		return n, nil
 	case mtBool:
-		b, n, err := decWithNilCheck(data, v, ti, decBool)
+		b, _, n, err := decWithNilCheck(data, value, decBool)
 		if err != nil {
 			return n, err
 		}
-		if ti.Indir == 0 {
-			zeroIndirAssign(b, v, ti)
+		if value.ti.Indir == 0 {
+			zeroIndirAssign(b, value)
 		}
 		return n, nil
 	case mtIntegral:
 		var n int
 		var err error
 
-		if ti.Signed {
-			switch ti.Bits {
+		if value.ti.Signed {
+			switch value.ti.Bits {
 			case 64:
 				var i int64
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int64])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int64])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 32:
 				var i int32
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int32])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int32])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 16:
 				var i int16
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int16])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int16])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 8:
 				var i int8
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int8])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int8])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			default:
 				var i int
-				i, n, err = decWithNilCheck(data, v, ti, decInt[int])
+				i, _, n, err = decWithNilCheck(data, value, decInt[int])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			}
 		} else {
-			switch ti.Bits {
+			switch value.ti.Bits {
 			case 64:
 				var i uint64
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint64])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 32:
 				var i uint32
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint32])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 16:
 				var i uint16
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint16])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			case 8:
 				var i uint8
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint8])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			default:
 				var i uint
-				i, n, err = decWithNilCheck(data, v, ti, decInt[uint])
+				i, _, n, err = decWithNilCheck(data, value, decInt[uint])
 				if err != nil {
 					return n, err
 				}
-				if ti.Indir == 0 {
-					zeroIndirAssign(i, v, ti)
+				if value.ti.Indir == 0 {
+					zeroIndirAssign(i, value)
 				}
 			}
 		}
@@ -304,26 +304,26 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		var n int
 		var err error
 
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 32:
 			var f float32
-			f, n, err = decWithNilCheck(data, v, ti, decFloat[float32])
+			f, _, n, err = decWithNilCheck(data, value, decFloat[float32])
 			if err != nil {
 				return n, err
 			}
-			if ti.Indir == 0 {
-				zeroIndirAssign(f, v, ti)
+			if value.ti.Indir == 0 {
+				zeroIndirAssign(f, value)
 			}
 		default:
 			fallthrough
 		case 64:
 			var f float64
-			f, n, err = decWithNilCheck(data, v, ti, decFloat[float64])
+			f, _, n, err = decWithNilCheck(data, value, decFloat[float64])
 			if err != nil {
 				return n, err
 			}
-			if ti.Indir == 0 {
-				zeroIndirAssign(f, v, ti)
+			if value.ti.Indir == 0 {
+				zeroIndirAssign(f, value)
 			}
 		}
 
@@ -332,26 +332,26 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 		var n int
 		var err error
 
-		switch ti.Bits {
+		switch value.ti.Bits {
 		case 64:
 			var c complex64
-			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex64])
+			c, _, n, err = decWithNilCheck(data, value, decComplex[complex64])
 			if err != nil {
 				return n, err
 			}
-			if ti.Indir == 0 {
-				zeroIndirAssign(c, v, ti)
+			if value.ti.Indir == 0 {
+				zeroIndirAssign(c, value)
 			}
 		default:
 			fallthrough
 		case 128:
 			var c complex128
-			c, n, err = decWithNilCheck(data, v, ti, decComplex[complex128])
+			c, _, n, err = decWithNilCheck(data, value, decComplex[complex128])
 			if err != nil {
 				return n, err
 			}
-			if ti.Indir == 0 {
-				zeroIndirAssign(c, v, ti)
+			if value.ti.Indir == 0 {
+				zeroIndirAssign(c, value)
 			}
 		}
 
@@ -359,65 +359,72 @@ func decCheckedPrim(data []byte, v interface{}, ti typeInfo) (int, error) {
 	case mtBinary:
 		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
 		// that
-		bu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		bu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
-				recv := unwrapped.(encoding.BinaryUnmarshaler)
+			func(b []byte, unwrapped analyzed[any]) (decInfo, int, error) {
+				recv := unwrapped.native.(encoding.BinaryUnmarshaler)
 				decN, err := decBinary(b, recv)
-				return nil, decN, err
+				return decInfo{}, decN, err
 			},
 		))
 		if err != nil {
 			return n, err
 		}
-		if ti.Indir == 0 {
+		if value.ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 
 			// due to complicated forcing of decBinary into the decFunc API,
 			// we do now have a T (as an interface{}). We must use reflection to
 			// assign it.
 
-			refReceiver := reflect.ValueOf(v)
+			// do NOT use zeroIndirAssign; that is only for underlying type
+			// detection which we do not need if operating on an mtBinary
+
+			refReceiver := value.ref
 			refReceiver.Elem().Set(reflect.ValueOf(bu))
 		}
 		return n, nil
 	case mtText:
 		// if we just got handed a pointer-to TextUnmarshaler, we need to undo
 		// that
-		tu, n, err := decWithNilCheck(data, v, ti, fn_DecToWrappedReceiver(v, ti,
+		tu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped interface{}) (interface{}, int, error) {
-				recv := unwrapped.(encoding.TextUnmarshaler)
+			// TODO: make most of the decCollection funcs be usable directly here, and see if we can do same for ALL decX funcs
+			func(b []byte, unwrapped analyzed[any]) (decInfo, int, error) {
+				recv := unwrapped.native.(encoding.TextUnmarshaler)
 				decN, err := decText(b, recv)
-				return nil, decN, err
+				return decInfo{}, decN, err
 			},
 		))
 		if err != nil {
 			return n, err
 		}
-		if ti.Indir == 0 {
+		if value.ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
 
 			// due to complicated forcing of decText into the decFunc API,
 			// we do now have a T (as an interface{}). We must use reflection to
 			// assign it.
 
-			refReceiver := reflect.ValueOf(v)
+			// do NOT use zeroIndirAssign; that is only for underlying type
+			// detection which we do not need if operating on an metText
+
+			refReceiver := value.ref
 			refReceiver.Elem().Set(reflect.ValueOf(tu))
 		}
 		return n, nil
 	default:
-		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", v))
+		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", value.native))
 	}
 }
 
 // Negative, NilAt, and Length from extra are all ignored.
 func encCount(count tLen, extra *countHeader) []byte {
-	intBytes := encInt(count)
+	intBytes := encInt(analyzed[tLen]{native: count})
 
 	if extra == nil {
 		// normal int enc
@@ -496,7 +503,10 @@ func decCountHeader(data []byte) (countHeader, int, error) {
 	return hdr, hdr.DecodedCount, err
 }
 
-func encBool(b bool) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[bool] only to conform to encFunc.
+func encBool(val analyzed[bool]) []byte {
+	b := val.native
 	enc := make([]byte, 1)
 
 	if b {
@@ -508,23 +518,28 @@ func encBool(b bool) []byte {
 	return enc
 }
 
-// returned interface{} is only there to implement decFunc and will always be
-// nil
-func decBool(data []byte) (bool, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decBool(data []byte) (bool, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return false, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return false, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	if data[0] == 0 {
-		return false, nil, 1, nil
+		return false, di, 1, nil
 	} else if data[0] == 1 {
-		return true, nil, 1, nil
+		return true, di, 1, nil
 	} else {
-		return false, nil, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
+		return false, di, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
 	}
 }
 
-func encComplex[E anyComplex](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[anyComplex] only to conform to encFunc.
+func encComplex[E anyComplex](val analyzed[E]) []byte {
+	v := val.native
+
 	// go 1.18 compat, real() and imag() cannot be done to our E type
 	//
 	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
@@ -544,8 +559,8 @@ func encComplex[E anyComplex](v E) []byte {
 	}
 
 	// encode the parts
-	realEnc := encFloat(rv)
-	imagEnc := encFloat(iv)
+	realEnc := encFloat(analyzed[float64]{native: rv})
+	imagEnc := encFloat(analyzed[float64]{native: iv})
 
 	hdrEnc := encCount(len(realEnc)+len(imagEnc), &countHeader{ByteLength: true})
 
@@ -556,21 +571,23 @@ func encComplex[E anyComplex](v E) []byte {
 	return enc
 }
 
-// return interface is just to implement decFunc and will always be nils
-func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decComplex[E anyComplex](data []byte) (E, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return 0.0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case single-byte 0's check
 	if data[0] == 0x00 {
-		return E(0.0 + 0.0i), nil, 1, nil
+		return E(0.0 + 0.0i), di, 1, nil
 	} else if data[0] == 0x80 {
 		// only way to reliably get a -0.0 value is by direct calculation on var
 		// (cannot be result of consts, I tried, at least as of Go 1.19.4)
 		var val float64
 		val *= -1.0
-		return E(complex(val, val)), nil, 1, nil
+		return E(complex(val, val)), di, 1, nil
 	}
 
 	// do normal decoding of full-form
@@ -584,7 +601,7 @@ func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
 	// get the byte count as an int
 	byteCount, _, n, err = decInt[tLen](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), nil, 0, err
+		return E(0.0 + 0.0i), di, 0, err
 	}
 	offset += n
 
@@ -598,7 +615,7 @@ func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
 		}
 		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0 + 0.0i), nil, 0, err
+		return E(0.0 + 0.0i), di, 0, err
 	}
 
 	// clamp data to len
@@ -607,23 +624,27 @@ func decComplex[E anyComplex](data []byte) (E, interface{}, int, error) {
 	// real part
 	rPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), nil, 0, errorDecf(offset, "%s", err)
+		return E(0.0 + 0.0i), di, 0, errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	// imaginary part
 	iPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), nil, 0, errorDecf(offset, "%s", err)
+		return E(0.0 + 0.0i), di, 0, errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	var v128 complex128 = complex(rPart, iPart)
 
-	return E(v128), nil, offset, nil
+	return E(v128), di, offset, nil
 }
 
-func encFloat[E anyFloat](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[anyFloat] only to conform to encFunc.
+func encFloat[E anyFloat](val analyzed[E]) []byte {
+	v := val.native
+
 	// first off, if it is 0, than we can return special 0-value
 	if v == 0.0 {
 		if math.Signbit(float64(v)) {
@@ -734,21 +755,23 @@ func encFloat[E anyFloat](v E) []byte {
 	return enc
 }
 
-// returned interface{} is just to implement decFunc; will always be nil
-func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decFloat[E anyFloat](data []byte) (E, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return 0.0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	// special case single-byte 0's check
 	if byteCount == 0 {
-		return E(0.0), nil, 1, nil
+		return E(0.0), di, 1, nil
 	} else if byteCount == 0x80 {
 		var val float64
 		val *= -1.0
-		return E(val), nil, 1, nil
+		return E(val), di, 1, nil
 	}
 
 	// pull count and sign out of byteCount
@@ -762,7 +785,7 @@ func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return E(0.0), nil, 0, err
+			return E(0.0), di, 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -779,14 +802,14 @@ func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 		if negative {
 			val *= -1.0
 		}
-		return E(val), nil, numHeaderBytes, nil
+		return E(val), di, numHeaderBytes, nil
 	}
 
 	if int(byteCount) < 2 {
 		// the absolute minimum is 2 if not 0
 		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
 		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
-		return E(0.0), nil, 0, err
+		return E(0.0), di, 0, err
 	}
 
 	if len(data) < int(byteCount) {
@@ -798,7 +821,7 @@ func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 		}
 		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0), nil, 0, err
+		return E(0.0), di, 0, err
 	}
 
 	floatData := data[:byteCount]
@@ -853,10 +876,13 @@ func decFloat[E anyFloat](data []byte) (E, interface{}, int, error) {
 
 	fVal := math.Float64frombits(iVal)
 
-	return E(fVal), nil, int(byteCount) + numHeaderBytes, nil
+	return E(fVal), di, int(byteCount) + numHeaderBytes, nil
 }
 
-func encInt[E integral](v E) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[integral] only to conform to encFunc.
+func encInt[E integral](val analyzed[E]) []byte {
+	v := val.native
 	if v == 0 {
 		return []byte{0x00}
 	}
@@ -907,17 +933,18 @@ func encInt[E integral](v E) []byte {
 // number of bytes to decode after all count header bytes and interprets it as
 // such. does not do further checks on count header.
 //
-// returned interface{} is included only to implement decFunc and will always be
-// nil
-func decInt[E integral](data []byte) (E, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decInt[E integral](data []byte) (E, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return 0, nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return 0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	if byteCount == 0 {
-		return 0, nil, 1, nil
+		return 0, di, 1, nil
 	}
 
 	// pull count and sign out of byteCount
@@ -931,7 +958,7 @@ func decInt[E integral](data []byte) (E, interface{}, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return 0, nil, 0, err
+			return 0, di, 0, err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -951,7 +978,7 @@ func decInt[E integral](data []byte) (E, interface{}, int, error) {
 		}
 		const errFmt = "decoded int byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return 0, nil, 0, err
+		return 0, di, 0, err
 	}
 
 	intData := data[:byteCount]
@@ -982,10 +1009,14 @@ func decInt[E integral](data []byte) (E, interface{}, int, error) {
 	iVal |= (uint64(intData[6]) << 8)
 	iVal |= (uint64(intData[7]))
 
-	return E(iVal), nil, int(byteCount) + numHeaderBytes, nil
+	return E(iVal), di, int(byteCount) + numHeaderBytes, nil
 }
 
-func encString(s string) []byte {
+// does not actually use analysis data, only native value. accepts
+// analyzed[string] only to conform to encFunc.
+func encString(val analyzed[string]) []byte {
+	s := val.native
+
 	if s == "" {
 		return []byte{0x00}
 	}
@@ -1008,20 +1039,22 @@ func encString(s string) []byte {
 
 // decString decodes a string of any version. Assumes header is not nil.
 //
-// returned interface{} is only to implement decFunc and will always be nil
-func decString(data []byte) (string, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decString(data []byte) (string, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case; 0x00 is the empty string in all variants
 	if data[0] == 0 {
-		return "", nil, 1, nil
+		return "", di, 1, nil
 	}
 
 	hdr, _, err := decCountHeader(data)
 	if err != nil {
-		return "", nil, 0, err
+		return "", di, 0, err
 	}
 
 	// compatibility with older format
@@ -1032,19 +1065,21 @@ func decString(data []byte) (string, interface{}, int, error) {
 	return decStringV1(data)
 }
 
-// returned interface{} is only to implement decFunc and will always be nil
-func decStringV1(data []byte) (string, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decStringV1(data []byte) (string, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 	strLength, _, countLen, err := decInt[tLen](data)
 	if err != nil {
-		return "", nil, 0, errorDecf(0, "decode string byte count: %s", err)
+		return "", di, 0, errorDecf(0, "decode string byte count: %s", err)
 	}
 	data = data[countLen:]
 
 	if strLength < 0 {
-		return "", nil, 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
+		return "", di, 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
 	}
 
 	if len(data) < strLength {
@@ -1056,7 +1091,7 @@ func decStringV1(data []byte) (string, interface{}, int, error) {
 		}
 		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(countLen, errFmt, strLength, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return "", nil, 0, err
+		return "", di, 0, err
 	}
 	// clamp it
 	data = data[:strLength]
@@ -1067,7 +1102,7 @@ func decStringV1(data []byte) (string, interface{}, int, error) {
 	for readBytes-countLen < strLength {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", nil, 0, errorDecf(readBytes, "%s", err)
+			return "", di, 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1075,22 +1110,24 @@ func decStringV1(data []byte) (string, interface{}, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), nil, readBytes, nil
+	return sb.String(), di, readBytes, nil
 }
 
-// returned interface{} is only to implement decFunc and will always be nil
-func decStringV0(data []byte) (string, interface{}, int, error) {
+// returned decInfo is only to implement decFunc and will always be empty.
+func decStringV0(data []byte) (string, decInfo, int, error) {
+	var di decInfo
+
 	if len(data) < 1 {
-		return "", nil, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 	runeCount, _, n, err := decInt[int](data)
 	if err != nil {
-		return "", nil, 0, errorDecf(0, "decode string rune count: %s", err)
+		return "", di, 0, errorDecf(0, "decode string rune count: %s", err)
 	}
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", nil, 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
+		return "", di, 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
 	}
 
 	readBytes := n
@@ -1100,7 +1137,7 @@ func decStringV0(data []byte) (string, interface{}, int, error) {
 	for i := 0; i < runeCount; i++ {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", nil, 0, errorDecf(readBytes, "%s", err)
+			return "", di, 0, errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1108,7 +1145,7 @@ func decStringV0(data []byte) (string, interface{}, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), nil, readBytes, nil
+	return sb.String(), di, readBytes, nil
 }
 
 func decUTF8Codepoint(data []byte) (rune, int, error) {
@@ -1125,7 +1162,11 @@ func decUTF8Codepoint(data []byte) (rune, int, error) {
 	return ch, charBytesRead, nil
 }
 
-func encText(t encoding.TextMarshaler) ([]byte, error) {
+// does not actually use analysis data, only native value. accepts
+// analyzed[encoding.TextMarshaler] only to conform to encFunc.
+func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
+	t := val.native
+
 	if t == nil {
 		return encNilHeader(0), nil
 	}
@@ -1136,7 +1177,7 @@ func encText(t encoding.TextMarshaler) ([]byte, error) {
 	}
 	tText := string(tTextSlice)
 
-	return encString(tText), nil
+	return encString(analyzed[string]{native: tText}), nil
 }
 
 func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
@@ -1157,7 +1198,11 @@ func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
 	return readBytes, nil
 }
 
-func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
+// does not actually use analysis data, only native value. accepts
+// analyzed[encoding.BinaryMarshaler] only to conform to encFunc.
+func encBinary(val analyzed[encoding.BinaryMarshaler]) ([]byte, error) {
+	b := val.native
+
 	if b == nil {
 		return encNilHeader(0), nil
 	}
@@ -1167,7 +1212,7 @@ func encBinary(b encoding.BinaryMarshaler) ([]byte, error) {
 		return nil, errorf("%s: %s", ErrMarshalBinary, marshalErr)
 	}
 
-	enc = append(encInt(len(enc)), enc...)
+	enc = append(encCount(len(enc), nil), enc...)
 
 	return enc, nil
 }
