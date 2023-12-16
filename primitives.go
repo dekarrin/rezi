@@ -535,8 +535,6 @@ func encComplex[E anyComplex](val analyzed[E]) []byte {
 	v := val.native
 
 	// go 1.18 compat, real() and imag() cannot be done to our E type
-	//
-	// TODO: if we want 1.18 compat then our go.mod should be set to that too.
 	v128 := complex128(v)
 
 	rv := real(v128)
