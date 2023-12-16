@@ -339,9 +339,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 		var under bool
 		if pkt, ok := refPrimitiveKindTypes[t.Kind()]; ok {
-			// TODO: second check probs not needed; if t.Kind() == X, X(t(val)) should always be valid i think.
-			// Verify. Check in Laws of Reflection?
-			under = t != pkt && t.ConvertibleTo(pkt)
+			under = t != pkt
 		}
 
 		switch t.Kind() {
@@ -490,9 +488,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 
 		var under bool
 		if pkt, ok := refPrimitiveKindTypes[t.Kind()]; ok {
-			// TODO: second check probs not needed; if t.Kind() == X, X(t(val)) should always be valid i think.
-			// Verify. Check in Laws of Reflection?
-			under = t != pkt && t.ConvertibleTo(pkt)
+			under = t != pkt
 		}
 
 		switch t.Kind() {
