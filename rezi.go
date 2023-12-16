@@ -830,9 +830,6 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 
 		if !hdr.IsNil() {
 			refDecoded := di.ref
-			if !di.ref.IsValid() { // TODO: this check should never be false; we already set it if invalid in decode. check this.
-				refDecoded = reflect.ValueOf(decoded)
-			}
 			if v.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
