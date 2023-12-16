@@ -176,8 +176,6 @@ func setStructMembers(initial, decoded reflect.Value, info decInfo) reflect.Valu
 // this will return nil if v does not end up in a struct value after
 // dereferences are made
 func unwrapOriginalStructValue(refVal reflect.Value) reflect.Value {
-	// TODO: move all this to type analysis
-
 	// the user may have passed in a ptr-ptr-to, make shore we get actual
 	// target
 	for refVal.Kind() == reflect.Pointer && !refVal.IsNil() {
