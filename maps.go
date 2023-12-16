@@ -101,11 +101,11 @@ func encMap(val analyzed[any]) ([]byte, error) {
 		k := mapKeys[i]
 		v := val.ref.MapIndex(k)
 
-		keyData, err := Enc(k.Interface())
+		keyData, err := encWithTypeInfo(k.Interface(), *val.ti.KeyType)
 		if err != nil {
 			return nil, errorf("map key %v: %v", k.Interface(), err)
 		}
-		valData, err := Enc(v.Interface())
+		valData, err := encWithTypeInfo(v.Interface(), *val.ti.ValType)
 		if err != nil {
 			return nil, errorf("map value[%v]: %v", k.Interface(), err)
 		}
@@ -135,7 +135,7 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 	}
 	if v.ti.Indir == 0 {
 		refReceiver := v.ref
-		refReceiver.Elem().Set(di.Ref)
+		refReceiver.Elem().Set(di.ref)
 	}
 	return n, err
 }
@@ -160,7 +160,7 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
-		di.Ref = emptyMap
+		di.ref = emptyMap
 		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		// initialize to the nil map
@@ -168,7 +168,7 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
-		di.Ref = nilMap
+		di.ref = nilMap
 		return di, totalConsumed, nil
 	}
 
@@ -217,6 +217,6 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 	}
 
 	refVal.Elem().Set(m)
-	di.Ref = m
+	di.ref = m
 	return di, totalConsumed, nil
 }

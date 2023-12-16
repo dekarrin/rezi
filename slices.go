@@ -28,7 +28,7 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 
 	for i := 0; i < val.ref.Len(); i++ {
 		v := val.ref.Index(i)
-		encData, err := Enc(v.Interface())
+		encData, err := encWithTypeInfo(v.Interface(), *val.ti.ValType)
 		if err != nil {
 			if isArray {
 				return nil, errorf("array item[%d]: %s", i, err)
@@ -59,7 +59,7 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 	}
 	if v.ti.Indir == 0 {
 		refReceiver := v.ref
-		refReceiver.Elem().Set(di.Ref)
+		refReceiver.Elem().Set(di.ref)
 	}
 	return n, err
 }
@@ -95,7 +95,7 @@ func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
 			empty = reflect.MakeSlice(refSliceType, 0, 0)
 		}
 		refSliceVal.Elem().Set(empty)
-		di.Ref = refSliceVal.Elem()
+		di.ref = refSliceVal.Elem()
 		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		var nilVal reflect.Value
@@ -105,7 +105,7 @@ func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
 			nilVal = reflect.Zero(refSliceType)
 		}
 		refSliceVal.Elem().Set(nilVal)
-		di.Ref = nilVal
+		di.ref = nilVal
 		return di, totalConsumed, nil
 	}
 
@@ -153,7 +153,7 @@ func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
 		itemIdx++
 	}
 
-	di.Ref = sl
+	di.ref = sl
 	refSliceVal.Elem().Set(sl)
 	return di, totalConsumed, nil
 }

@@ -550,17 +550,20 @@ import (
 
 // decInfo holds information gained during decoding to be used in further
 // processing of the decoded data.
+//
+// TODO: combine this into 'decValue[E]' type and make it hold n and the value
+// itself.
 type decInfo struct {
-	// Fields is only included in decInfo when a struct has been decoded and
+	// fields is only included in decInfo when a struct has been decoded and
 	// gives a slice of all valid fields that were detected (and read) during
 	// the decode. This is used to inform which fields to overwrite in the
 	// receiver pointer.
-	Fields []fieldInfo
+	fields []fieldInfo
 
-	// Ref is the value that was decoded but as a reflect.Value. This is so that
+	// ref is the value that was decoded but as a reflect.Value. This is so that
 	// creating it more than once can be avoided. Not always set by every decode
 	// function; check with IsValid() before using.
-	Ref reflect.Value
+	ref reflect.Value
 }
 
 type (
@@ -631,6 +634,12 @@ func Enc(v interface{}) (data []byte, err error) {
 		return nil, err
 	}
 
+	return encWithTypeInfo(v, info)
+}
+
+// encWithTypeInfo has type analysis already performed, and it is not panic
+// safe.
+func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
 	value := analyzed[any]{
 		native: v,
 		ref:    reflect.ValueOf(v),
@@ -702,6 +711,12 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 		return 0, err
 	}
 
+	return decWithTypeInfo(data, v, info)
+}
+
+// decWithTypeInfo has type analysis already performed, and it is not panic
+// safe.
+func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err error) {
 	value := analyzed[any]{
 		native: v,
 		ref:    reflect.ValueOf(v),
@@ -763,6 +778,8 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // indirection level. If ti.Indir == 0, this will not assign. Callers should use
 // that check to determine if it is safe to do their own assignment of the
 // decoded value this function returns.
+//
+// This function guarantees that decInfo.Ref will always be set.
 func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, di decInfo, n int, err error) {
 	var hdr countHeader
 
@@ -781,6 +798,10 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		decoded, di, n, err = decFn(data)
 		if err != nil {
 			return decoded, di, n, errorDecf(countHeaderBytes, "%s", err)
+		}
+		// if we got no Ref in decInfo for decoded, we should fix that here
+		if !di.ref.IsValid() {
+			di.ref = reflect.ValueOf(decoded)
 		}
 	}
 
@@ -808,8 +829,8 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		}
 
 		if !hdr.IsNil() {
-			refDecoded := di.Ref
-			if !di.Ref.IsValid() {
+			refDecoded := di.ref
+			if !di.ref.IsValid() { // TODO: this check should never be false; we already set it if invalid in decode. check this.
 				refDecoded = reflect.ValueOf(decoded)
 			}
 			if v.ti.Underlying {
@@ -824,6 +845,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)
+			di.ref = zeroVal
 		}
 	}
 
@@ -901,7 +923,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
-			decoded = reflect.ValueOf(receiver).Elem().Interface()
+			decoded = receiverValue.Elem().Interface()
 		} else {
 			decoded = receiver
 		}
