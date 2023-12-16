@@ -550,6 +550,9 @@ import (
 
 // decInfo holds information gained during decoding to be used in further
 // processing of the decoded data.
+//
+// TODO: combine this into 'decValue[E]' type and make it hold n and the value
+// itself.
 type decInfo struct {
 	// fields is only included in decInfo when a struct has been decoded and
 	// gives a slice of all valid fields that were detected (and read) during
@@ -920,7 +923,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
-			decoded = reflect.ValueOf(receiver).Elem().Interface()
+			decoded = receiverValue.Elem().Interface()
 		} else {
 			decoded = receiver
 		}

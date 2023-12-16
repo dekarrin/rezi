@@ -159,11 +159,11 @@ func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](decoded E, val analyzed[any]) {
+func zeroIndirAssign[E any](decoded E, di decInfo, val analyzed[any]) {
 	if val.ti.Underlying {
 		// need to get fancier
 		refVal := val.ref
-		refVal.Elem().Set(reflect.ValueOf(decoded).Convert(refVal.Type().Elem()))
+		refVal.Elem().Set(di.ref.Convert(refVal.Type().Elem()))
 	} else {
 		tVal := val.native.(*E)
 		*tVal = decoded
@@ -178,190 +178,184 @@ func zeroIndirAssign[E any](decoded E, val analyzed[any]) {
 func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
+	var di decInfo
+	var n int
+	var err error
 
 	switch value.ti.Main {
 	case mtString:
-		s, _, n, err := decWithNilCheck(data, value, decString)
+		var s string
+		s, di, n, err = decWithNilCheck(data, value, decString)
 		if err != nil {
 			return n, err
 		}
 		if value.ti.Indir == 0 {
-			zeroIndirAssign(s, value)
+			zeroIndirAssign(s, di, value)
 		}
 		return n, nil
 	case mtBool:
-		b, di, n, err := decWithNilCheck(data, value, decBool)
+		var b bool
+		b, di, n, err = decWithNilCheck(data, value, decBool)
 		if err != nil {
 			return n, err
 		}
 		log.Printf("%v\n", di)
 		if value.ti.Indir == 0 {
-			zeroIndirAssign(b, value)
+			zeroIndirAssign(b, di, value)
 		}
 		return n, nil
 	case mtIntegral:
-		var n int
-		var err error
-
 		if value.ti.Signed {
 			switch value.ti.Bits {
 			case 64:
 				var i int64
-				i, _, n, err = decWithNilCheck(data, value, decInt[int64])
+				i, di, n, err = decWithNilCheck(data, value, decInt[int64])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 32:
 				var i int32
-				i, _, n, err = decWithNilCheck(data, value, decInt[int32])
+				i, di, n, err = decWithNilCheck(data, value, decInt[int32])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 16:
 				var i int16
-				i, _, n, err = decWithNilCheck(data, value, decInt[int16])
+				i, di, n, err = decWithNilCheck(data, value, decInt[int16])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 8:
 				var i int8
-				i, _, n, err = decWithNilCheck(data, value, decInt[int8])
+				i, di, n, err = decWithNilCheck(data, value, decInt[int8])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			default:
 				var i int
-				i, _, n, err = decWithNilCheck(data, value, decInt[int])
+				i, di, n, err = decWithNilCheck(data, value, decInt[int])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			}
 		} else {
 			switch value.ti.Bits {
 			case 64:
 				var i uint64
-				i, _, n, err = decWithNilCheck(data, value, decInt[uint64])
+				i, di, n, err = decWithNilCheck(data, value, decInt[uint64])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 32:
 				var i uint32
-				i, _, n, err = decWithNilCheck(data, value, decInt[uint32])
+				i, di, n, err = decWithNilCheck(data, value, decInt[uint32])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 16:
 				var i uint16
-				i, _, n, err = decWithNilCheck(data, value, decInt[uint16])
+				i, di, n, err = decWithNilCheck(data, value, decInt[uint16])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			case 8:
 				var i uint8
-				i, _, n, err = decWithNilCheck(data, value, decInt[uint8])
+				i, di, n, err = decWithNilCheck(data, value, decInt[uint8])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			default:
 				var i uint
-				i, _, n, err = decWithNilCheck(data, value, decInt[uint])
+				i, di, n, err = decWithNilCheck(data, value, decInt[uint])
 				if err != nil {
 					return n, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, value)
+					zeroIndirAssign(i, di, value)
 				}
 			}
 		}
 
 		return n, nil
 	case mtFloat:
-		var n int
-		var err error
-
 		switch value.ti.Bits {
 		case 32:
 			var f float32
-			f, _, n, err = decWithNilCheck(data, value, decFloat[float32])
+			f, di, n, err = decWithNilCheck(data, value, decFloat[float32])
 			if err != nil {
 				return n, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(f, value)
+				zeroIndirAssign(f, di, value)
 			}
 		default:
 			fallthrough
 		case 64:
 			var f float64
-			f, _, n, err = decWithNilCheck(data, value, decFloat[float64])
+			f, di, n, err = decWithNilCheck(data, value, decFloat[float64])
 			if err != nil {
 				return n, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(f, value)
+				zeroIndirAssign(f, di, value)
 			}
 		}
 
 		return n, nil
 	case mtComplex:
-		var n int
-		var err error
-
 		switch value.ti.Bits {
 		case 64:
 			var c complex64
-			c, _, n, err = decWithNilCheck(data, value, decComplex[complex64])
+			c, di, n, err = decWithNilCheck(data, value, decComplex[complex64])
 			if err != nil {
 				return n, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(c, value)
+				zeroIndirAssign(c, di, value)
 			}
 		default:
 			fallthrough
 		case 128:
 			var c complex128
-			c, _, n, err = decWithNilCheck(data, value, decComplex[complex128])
+			c, di, n, err = decWithNilCheck(data, value, decComplex[complex128])
 			if err != nil {
 				return n, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(c, value)
+				zeroIndirAssign(c, di, value)
 			}
 		}
 
 		return n, nil
 	case mtBinary:
-		// if we just got handed a pointer-to binaryUnmarshaler, we need to undo
-		// that
-		bu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		_, di, n, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
@@ -385,13 +379,11 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			// detection which we do not need if operating on an mtBinary
 
 			refReceiver := value.ref
-			refReceiver.Elem().Set(reflect.ValueOf(bu))
+			refReceiver.Elem().Set(di.ref)
 		}
 		return n, nil
 	case mtText:
-		// if we just got handed a pointer-to TextUnmarshaler, we need to undo
-		// that
-		tu, _, n, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		_, di, n, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
@@ -416,7 +408,7 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			// detection which we do not need if operating on an metText
 
 			refReceiver := value.ref
-			refReceiver.Elem().Set(reflect.ValueOf(tu))
+			refReceiver.Elem().Set(di.ref)
 		}
 		return n, nil
 	default:
