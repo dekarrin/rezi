@@ -71,7 +71,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 			origStructVal = unwrapOriginalStructValue(refReceiver)
 		}
 
-		refSt := di.Ref
+		refSt := di.ref
 
 		if v.ti.Main == mtStruct && origStructVal.IsValid() {
 			refSt = setStructMembers(origStructVal, refSt, di)
@@ -108,7 +108,7 @@ func decStruct(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyStruct.Elem())
-		di.Ref = emptyStruct.Elem()
+		di.ref = emptyStruct.Elem()
 		return di, totalConsumed, nil
 	}
 
@@ -153,10 +153,10 @@ func decStruct(data []byte, v analyzed[any]) (decInfo, int, error) {
 		totalConsumed += n
 		i += n
 		data = data[n:]
-		di.Fields = append(di.Fields, fi)
+		di.fields = append(di.fields, fi)
 	}
 
-	di.Ref = target
+	di.ref = target
 	return di, totalConsumed, nil
 }
 
@@ -164,7 +164,7 @@ func setStructMembers(initial, decoded reflect.Value, info decInfo) reflect.Valu
 	newVal := reflect.New(initial.Type())
 	newVal.Elem().Set(initial)
 
-	for _, fi := range info.Fields {
+	for _, fi := range info.fields {
 		destPtr := newVal.Elem().Field(fi.Index).Addr()
 		fieldVal := decoded.Field(fi.Index)
 		destPtr.Elem().Set(fieldVal)

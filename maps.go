@@ -135,7 +135,7 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 	}
 	if v.ti.Indir == 0 {
 		refReceiver := v.ref
-		refReceiver.Elem().Set(di.Ref)
+		refReceiver.Elem().Set(di.ref)
 	}
 	return n, err
 }
@@ -160,7 +160,7 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
-		di.Ref = emptyMap
+		di.ref = emptyMap
 		return di, totalConsumed, nil
 	} else if toConsume == -1 {
 		// initialize to the nil map
@@ -168,7 +168,7 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
-		di.Ref = nilMap
+		di.ref = nilMap
 		return di, totalConsumed, nil
 	}
 
@@ -217,6 +217,6 @@ func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
 	}
 
 	refVal.Elem().Set(m)
-	di.Ref = m
+	di.ref = m
 	return di, totalConsumed, nil
 }

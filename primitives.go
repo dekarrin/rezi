@@ -8,6 +8,7 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"reflect"
 	"strings"
@@ -189,10 +190,11 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 		}
 		return n, nil
 	case mtBool:
-		b, _, n, err := decWithNilCheck(data, value, decBool)
+		b, di, n, err := decWithNilCheck(data, value, decBool)
 		if err != nil {
 			return n, err
 		}
+		log.Printf("%v\n", di)
 		if value.ti.Indir == 0 {
 			zeroIndirAssign(b, value)
 		}
