@@ -47,6 +47,13 @@ type testStructManyFields struct {
 	enabled *sync.Mutex
 }
 
+type testStructWithAnonymousTypedMember struct {
+	Name struct {
+		First string
+		Last  string
+	}
+}
+
 func Test_Enc_Struct(t *testing.T) {
 	// we require an exported struct in order to test embedded struct fields.
 	// we will declare it and other struct types it is embedded in here in this
@@ -955,6 +962,152 @@ func Test_Enc_Struct(t *testing.T) {
 				},
 				Value: 8.25,
 				Name:  "NEPETA",
+			}
+			expect = []byte{
+				0x01, 0x3c, // len=60
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+
+				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
+				0x01, 0x0a, // len=10
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x03, 0xc0, 0x20, 0x80, // 8.25
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	// single pointer, filled
+	t.Run("*(with embedded overlap)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = &testStructWithEmbeddedOverlap{
+				TestStructToEmbed: TestStructToEmbed{
+					Value: 4,
+				},
+				Value: 8.25,
+				Name:  "NEPETA",
+			}
+			expect = []byte{
+				0x01, 0x3c, // len=60
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+
+				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
+				0x01, 0x0a, // len=10
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x03, 0xc0, 0x20, 0x80, // 8.25
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	// single pointer, nil
+	t.Run("*(with embedded overlap), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input  *testStructWithEmbeddedOverlap
+			expect = []byte{0xa0}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	// double pointer, filled
+	t.Run("**(with embedded overlap)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputPtr = &testStructWithEmbeddedOverlap{
+				TestStructToEmbed: TestStructToEmbed{
+					Value: 4,
+				},
+				Value: 8.25,
+				Name:  "NEPETA",
+			}
+			input  = &inputPtr
+			expect = []byte{
+				0x01, 0x3c, // len=60
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+
+				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
+				0x01, 0x0a, // len=10
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x01, 0x04, // 4
+
+				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
+				0x03, 0xc0, 0x20, 0x80, // 8.25
+			}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	// double pointer, nil at first level
+	t.Run("**(with embedded overlap), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			inputPtr *testStructWithEmbeddedOverlap
+			input    = &inputPtr
+			expect   = []byte{0xb0, 0x01, 0x01}
+		)
+
+		actual, err := Enc(input)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual)
+	})
+
+	// normal value test
+	t.Run("anonymous-typed member", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			input = testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
 			}
 			expect = []byte{
 				0x01, 0x3c, // len=60
