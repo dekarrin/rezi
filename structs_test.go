@@ -1110,18 +1110,15 @@ func Test_Enc_Struct(t *testing.T) {
 				},
 			}
 			expect = []byte{
-				0x01, 0x3c, // len=60
+				0x01, 0x2a, // len=42
 
 				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
 				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
-
-				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
-				0x01, 0x0a, // len=10
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x01, 0x04, // 4
-
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x03, 0xc0, 0x20, 0x80, // 8.25
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
 			}
 		)
 
@@ -1134,30 +1131,29 @@ func Test_Enc_Struct(t *testing.T) {
 	})
 
 	// single pointer, filled
-	t.Run("*(with embedded overlap)", func(t *testing.T) {
+	t.Run("*(anonymous-typed member)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			input = &testStructWithEmbeddedOverlap{
-				TestStructToEmbed: TestStructToEmbed{
-					Value: 4,
+			input = &testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
 				},
-				Value: 8.25,
-				Name:  "NEPETA",
 			}
 			expect = []byte{
-				0x01, 0x3c, // len=60
+				0x01, 0x2a, // len=42
 
 				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
 				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
-
-				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
-				0x01, 0x0a, // len=10
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x01, 0x04, // 4
-
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x03, 0xc0, 0x20, 0x80, // 8.25
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
 			}
 		)
 
@@ -1170,11 +1166,11 @@ func Test_Enc_Struct(t *testing.T) {
 	})
 
 	// single pointer, nil
-	t.Run("*(with embedded overlap), nil", func(t *testing.T) {
+	t.Run("*(anonymous-typed member), nil", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			input  *testStructWithEmbeddedOverlap
+			input  *testStructWithAnonymousTypedMember
 			expect = []byte{0xa0}
 		)
 
@@ -1187,31 +1183,30 @@ func Test_Enc_Struct(t *testing.T) {
 	})
 
 	// double pointer, filled
-	t.Run("**(with embedded overlap)", func(t *testing.T) {
+	t.Run("**(anonymous-typed member)", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputPtr = &testStructWithEmbeddedOverlap{
-				TestStructToEmbed: TestStructToEmbed{
-					Value: 4,
+			inputPtr = &testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
 				},
-				Value: 8.25,
-				Name:  "NEPETA",
 			}
 			input  = &inputPtr
 			expect = []byte{
-				0x01, 0x3c, // len=60
+				0x01, 0x2a, // len=42
 
 				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
 				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
-
-				0x41, 0x82, 0x11, 0x54, 0x65, 0x73, 0x74, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x54, 0x6f, 0x45, 0x6d, 0x62, 0x65, 0x64, // "TestStructToEmbed"
-				0x01, 0x0a, // len=10
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x01, 0x04, // 4
-
-				0x41, 0x82, 0x05, 0x56, 0x61, 0x6c, 0x75, 0x65, // "Value"
-				0x03, 0xc0, 0x20, 0x80, // 8.25
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
 			}
 		)
 
@@ -1224,11 +1219,11 @@ func Test_Enc_Struct(t *testing.T) {
 	})
 
 	// double pointer, nil at first level
-	t.Run("**(with embedded overlap), nil at first level", func(t *testing.T) {
+	t.Run("**(anonymous-typed member), nil at first level", func(t *testing.T) {
 		assert := assert.New(t)
 
 		var (
-			inputPtr *testStructWithEmbeddedOverlap
+			inputPtr *testStructWithAnonymousTypedMember
 			input    = &inputPtr
 			expect   = []byte{0xb0, 0x01, 0x01}
 		)
@@ -2791,6 +2786,201 @@ func Test_Dec_Struct(t *testing.T) {
 			actual         = &actualInitialPtr // initially set to enshore it's cleared
 			input          = []byte{0xb0, 0x01, 0x01}
 			expectPtr      *testStructWithEmbeddedOverlap
+			expect         = &expectPtr
+			expectConsumed = 3
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// normal value test
+	t.Run("anonymous-typed member", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual testStructWithAnonymousTypedMember
+			input  = []byte{
+				0x01, 0x2a, // len=42
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
+			}
+			expect = testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
+			}
+			expectConsumed = 44
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// 0-len struct
+	t.Run("anonymous-typed member, no values encoded", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual         testStructWithAnonymousTypedMember
+			input          = []byte{0x00}
+			expect         testStructWithAnonymousTypedMember
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, filled
+	t.Run("*(anonymous-typed member)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual *testStructWithAnonymousTypedMember
+			input  = []byte{
+				0x01, 0x2a, // len=42
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
+			}
+			expectVal = testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
+			}
+			expect         = &expectVal
+			expectConsumed = 44
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// single pointer, nil
+	t.Run("*(anonymous-typed member), nil", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual = &testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
+			} // initially set to enshore it's cleared
+			input          = []byte{0xa0}
+			expect         *testStructWithAnonymousTypedMember
+			expectConsumed = 1
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, filled
+	t.Run("**(anonymous-typed member)", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actual **testStructWithAnonymousTypedMember
+			input  = []byte{
+				0x01, 0x2a, // len=42
+
+				0x41, 0x82, 0x04, 0x4e, 0x61, 0x6d, 0x65, // "Name"
+
+				0x01, 0x21, // len=33
+				0x41, 0x82, 0x05, 0x46, 0x69, 0x72, 0x73, 0x74, // "First"
+				0x41, 0x82, 0x06, 0x4e, 0x45, 0x50, 0x45, 0x54, 0x41, // "NEPETA"
+				0x41, 0x82, 0x04, 0x4c, 0x61, 0x73, 0x74, // "Last"
+				0x41, 0x82, 0x06, 0x4c, 0x45, 0x49, 0x4a, 0x4f, 0x4e, // "LEIJON"
+			}
+			expectVal = testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
+			}
+			expectPtr      = &expectVal
+			expect         = &expectPtr
+			expectConsumed = 44
+		)
+
+		consumed, err := Dec(input, &actual)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Equal(expect, actual, "value mismatch")
+		assert.Equal(expectConsumed, consumed, "consumed bytes mismatch")
+	})
+
+	// double pointer, nil at first level
+	t.Run("**(anonymous-typed member), nil at first level", func(t *testing.T) {
+		assert := assert.New(t)
+
+		var (
+			actualInitialPtr = &testStructWithAnonymousTypedMember{
+				Name: struct {
+					First string
+					Last  string
+				}{
+					First: "NEPETA",
+					Last:  "LEIJON",
+				},
+			}
+			actual         = &actualInitialPtr // initially set to enshore it's cleared
+			input          = []byte{0xb0, 0x01, 0x01}
+			expectPtr      *testStructWithAnonymousTypedMember
 			expect         = &expectPtr
 			expectConsumed = 3
 		)
