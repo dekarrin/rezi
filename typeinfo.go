@@ -86,10 +86,9 @@ func (mt mainType) String() string {
 
 // fieldInfo holds REZI-specific type info on fieldds of a struct
 type fieldInfo struct {
-	Name      string
-	Index     int // position in fields by index
-	Type      typeInfo
-	Anonymous bool // TODO: check if this actually needed on completion of #61
+	Name  string
+	Index int // position in fields by index
+	Type  typeInfo
 }
 
 type fields struct {
@@ -137,14 +136,6 @@ func sortFieldsByName(fields []fieldInfo) []fieldInfo {
 	return sorting.fields
 }
 
-// does not sort in place; makes complete copy
-func sortFieldsByIndex(fields []fieldInfo) []fieldInfo {
-	sorting := &sortableFields{fields: make([]fieldInfo, len(fields)), alpha: false}
-	copy(sorting.fields, fields)
-	sort.Sort(sorting)
-	return sorting.fields
-}
-
 // typeInfo holds REZI-specific type info on types that can be encoded and
 // decoded.
 type typeInfo struct {
@@ -158,119 +149,6 @@ type typeInfo struct {
 	Len        int       // only valid for array
 	Dec        bool      // whether the info is for a decoded value. if false, it's for an encoded one.
 	Fields     fields    // valid for struct only
-}
-
-// MainReflectType returns the reflect.Type that represents the main type of the
-// value that this typeInfo is created from. It will be nil when Main is a
-// mainType which does not have a strictly associated kind (mtUnknown, mtNil),
-// or if the typeInfo represents an invalid type (such as mtIntegral with bit
-// size of 3).
-//
-// The returned type will be entirely based off of the typeInfo, As a result,
-// typeInfos created from implementors of marshaler classes will return the
-// interface implemented in the result as opposed to the actual implementor, as
-// that info is not available in the typeInfo. In addition, those with
-// underlying types that are basic Go types will return the underlying type as
-// opposed to the actual type.
-//
-// If indirected is set to false, the returned type strictly refers to the main
-// type with no indirection; a typeInfo created from a *uint8 will return the
-// Type of uint8, even though it was made from a pointer. This does not affect
-// the value and/or key types when the returned Type is a container type (map,
-// array, slice); these will always be properly indirected.
-func (ti typeInfo) MainReflectType(indirected bool) reflect.Type {
-	var t reflect.Type
-	switch ti.Main {
-	case mtArray:
-		vrt := ti.ValType.MainReflectType(true)
-		t = reflect.ArrayOf(ti.Len, vrt)
-	case mtBool:
-		t = refPrimitiveKindTypes[reflect.Bool]
-	case mtComplex:
-		switch ti.Bits {
-		case 128:
-			t = refPrimitiveKindTypes[reflect.Complex128]
-		case 64:
-			t = refPrimitiveKindTypes[reflect.Complex64]
-		}
-	case mtFloat:
-		switch ti.Bits {
-		case 64:
-			t = refPrimitiveKindTypes[reflect.Float64]
-		case 32:
-			t = refPrimitiveKindTypes[reflect.Float32]
-		}
-	case mtIntegral:
-		if ti.Signed {
-			switch ti.Bits {
-			case 0:
-				t = refPrimitiveKindTypes[reflect.Int]
-			case 8:
-				t = refPrimitiveKindTypes[reflect.Int8]
-			case 16:
-				t = refPrimitiveKindTypes[reflect.Int16]
-			case 32:
-				t = refPrimitiveKindTypes[reflect.Int32]
-			case 64:
-				t = refPrimitiveKindTypes[reflect.Int64]
-			}
-		} else {
-			switch ti.Bits {
-			case 0:
-				t = refPrimitiveKindTypes[reflect.Uint]
-			case 8:
-				t = refPrimitiveKindTypes[reflect.Uint8]
-			case 16:
-				t = refPrimitiveKindTypes[reflect.Uint16]
-			case 32:
-				t = refPrimitiveKindTypes[reflect.Uint32]
-			case 64:
-				t = refPrimitiveKindTypes[reflect.Uint64]
-			}
-		}
-	case mtBinary:
-		if ti.Dec {
-			t = refBinaryUnmarshalerType
-		} else {
-			t = refBinaryMarshalerType
-		}
-	case mtText:
-		if ti.Dec {
-			t = refTextUnmarshalerType
-		} else {
-			t = refTextMarshalerType
-		}
-	case mtMap:
-		krt := ti.KeyType.MainReflectType(true)
-		vrt := ti.ValType.MainReflectType(true)
-		t = reflect.MapOf(krt, vrt)
-	case mtSlice:
-		vrt := ti.ValType.MainReflectType(true)
-		t = reflect.SliceOf(vrt)
-	case mtString:
-		t = refPrimitiveKindTypes[reflect.String]
-	case mtStruct:
-		sorted := sortFieldsByIndex(ti.Fields.ByOrder)
-		refFields := []reflect.StructField{}
-		for _, fi := range sorted {
-			structRefType := fi.Type.MainReflectType(true)
-			sf := reflect.StructField{
-				Name:      fi.Name,
-				Anonymous: fi.Anonymous,
-				Type:      structRefType,
-			}
-			refFields = append(refFields, sf)
-		}
-		t = reflect.StructOf(refFields)
-	}
-
-	if t != nil && indirected {
-		for i := 0; i < ti.Indir; i++ {
-			t = reflect.PointerTo(t)
-		}
-	}
-
-	return t
 }
 
 func (ti typeInfo) Primitive() bool {
@@ -428,7 +306,7 @@ func encTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				if err != nil {
 					return typeInfo{}, errorf("field .%s is not encodeable: %s", sf.Name, err)
 				}
-				fi := fieldInfo{Index: i, Name: sf.Name, Anonymous: sf.Anonymous, Type: fieldValInfo}
+				fi := fieldInfo{Index: i, Name: sf.Name, Type: fieldValInfo}
 				fieldsData.ByName[fi.Name] = fi
 				fieldsData.ByOrder = append(fieldsData.ByOrder, fi)
 			}
@@ -577,7 +455,7 @@ func decTypeInfo(t reflect.Type) (info typeInfo, err error) {
 				if err != nil {
 					return typeInfo{}, errorf("field .%s is not decodeable: %s", sf.Name, err)
 				}
-				fi := fieldInfo{Index: i, Name: sf.Name, Anonymous: sf.Anonymous, Type: fieldValInfo}
+				fi := fieldInfo{Index: i, Name: sf.Name, Type: fieldValInfo}
 				fieldsData.ByName[fi.Name] = fi
 				fieldsData.ByOrder = append(fieldsData.ByOrder, fi)
 			}
