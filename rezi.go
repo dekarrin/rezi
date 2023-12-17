@@ -577,13 +577,20 @@ type decValue[E any] struct {
 	fields []fieldInfo
 }
 
+// d is a shorthand function for creating decValues with only a valid n and
+// native. No other fields in the returned decValue are set. It's mostly used
+// for improving readability of directly returned decValues.
+func d[E any](value E, n int) decValue[E] {
+	return decValue[E]{native: value, n: n}
+}
+
 type (
 	tLen      = int
 	tNilLevel = int
 
 	// the decInfo in decFunc is any additional info needed for further
 	// stages of decode. It can be empty if no further info is required.
-	decFunc[E any] func([]byte) (E, decValue, int, error)
+	decFunc[E any] func([]byte) (decValue[E], error)
 	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
@@ -791,13 +798,14 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // decoded value this function returns.
 //
 // This function guarantees that decInfo.Ref will always be set.
-func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, di decValue, n int, err error) {
+func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec decValue[E], err error) {
 	var hdr countHeader
+	var n int
 
 	if v.ti.Indir > 0 {
 		hdr, n, err = decCountHeader(data)
 		if err != nil {
-			return decoded, di, n, errorDecf(0, "check count header: %s", err)
+			return dec, errorDecf(0, "check count header: %s", err)
 		}
 	}
 
@@ -806,13 +814,13 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 
 	if !hdr.IsNil() {
 		effectiveExtraIndirs = v.ti.Indir
-		decoded, di, n, err = decFn(data)
+		dec, err = decFn(data)
 		if err != nil {
-			return decoded, di, n, errorDecf(countHeaderBytes, "%s", err)
+			return dec, errorDecf(countHeaderBytes, "%s", err)
 		}
-		// if we got no Ref in decInfo for decoded, we should fix that here
-		if !di.ref.IsValid() {
-			di.ref = reflect.ValueOf(decoded)
+		// if we got no Ref in the decValue, we should fix that here
+		if !dec.ref.IsValid() {
+			dec.ref = reflect.ValueOf(dec.native)
 		}
 	}
 
@@ -840,30 +848,32 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		}
 
 		if !hdr.IsNil() {
-			refDecoded := di.ref
+			refDecoded := dec.ref
 			if v.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
 
 			if v.ti.Main == mtStruct && origStructVal.IsValid() {
-				refDecoded = setStructMembers(origStructVal, refDecoded, di)
+				refDecoded = setStructMembers(origStructVal, refDecoded, dec)
 			}
 
 			assignTarget.Elem().Set(refDecoded)
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)
-			di.ref = zeroVal
+			dec.ref = zeroVal
 		}
 	}
 
-	return decoded, di, n, nil
+	return dec, nil
 }
 
 // decToUnwrappedFn takes the encoded bytes and an interface to decode to and
-// returns any extra data (may be nil), bytes consumed, and error status.
-func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decValue, int, error)) decFunc[interface{}] {
-	return func(data []byte) (interface{}, decValue, int, error) {
+// returns any extra data (may be nil), bytes consumed, and error status. it
+// need not return a valid value in decValue.native, as that will be set
+// automatically and any existing value is overwritten.
+func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decValue[any], error)) decFunc[interface{}] {
+	return func(data []byte) (decValue[interface{}], error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		refWrapped := wrapped.ref
 		receiverType := refWrapped.Type()
@@ -896,7 +906,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, decValue{}, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return decValue[any]{}, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 
@@ -924,10 +934,10 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 
 		receiver := receiverValue.Interface()
 		recvAnalyzed := analyzed[any]{native: receiver, ref: receiverValue, ti: wrapped.ti}
-		extraInfo, decConsumed, decErr := decToUnwrappedFn(data, recvAnalyzed)
+		dec, decErr := decToUnwrappedFn(data, recvAnalyzed)
 
 		if decErr != nil {
-			return nil, extraInfo, decConsumed, decErr
+			return dec, decErr
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
@@ -935,8 +945,9 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		} else {
 			decoded = receiver
 		}
+		dec.native = decoded
 
-		return decoded, extraInfo, decConsumed, decErr
+		return dec, decErr
 	}
 }
 

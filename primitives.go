@@ -485,15 +485,18 @@ func encNilHeader(indirLevels int) []byte {
 
 // decCountHeader decodes a count header. It could represent a nil value. It
 // will *not* decode the actual count, if in fact the count is present.
-func decCountHeader(data []byte) (countHeader, int, error) {
-	var hdr countHeader
+//
+// ref in the returned decValue will not be set.
+func decCountHeader(data []byte) (decValue[countHeader], error) {
+	var hdr decValue[countHeader]
 
 	if len(data) < 1 {
-		return hdr, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return hdr, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
-	err := hdr.UnmarshalBinary(data)
-	return hdr, hdr.DecodedCount, err
+	err := hdr.native.UnmarshalBinary(data)
+	hdr.n = hdr.native.DecodedCount
+	return hdr, err
 }
 
 // does not actually use analysis data, only native value. accepts
@@ -511,20 +514,18 @@ func encBool(val analyzed[bool]) []byte {
 	return enc
 }
 
-// returned decInfo is only to implement decFunc and will always be empty.
-func decBool(data []byte) (bool, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decBool(data []byte) (decValue[bool], error) {
 	if len(data) < 1 {
-		return false, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d(false, 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	if data[0] == 0 {
-		return false, di, 1, nil
+		return d(false, 1), nil
 	} else if data[0] == 1 {
-		return true, di, 1, nil
+		return d(true, 1), nil
 	} else {
-		return false, di, 0, errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
+		return d(false, 0), errorDecf(0, "not a bool value 0x00 or 0x01: %#02x", data[0]).wrap(ErrMalformedData)
 	}
 }
 
@@ -562,23 +563,21 @@ func encComplex[E anyComplex](val analyzed[E]) []byte {
 	return enc
 }
 
-// returned decInfo is only to implement decFunc and will always be empty.
-func decComplex[E anyComplex](data []byte) (E, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decComplex[E anyComplex](data []byte) (decValue[E], error) {
 	if len(data) < 1 {
-		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d(E(0.0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case single-byte 0's check
 	if data[0] == 0x00 {
-		return E(0.0 + 0.0i), di, 1, nil
+		return d(E(0.0+0.0i), 1), nil
 	} else if data[0] == 0x80 {
 		// only way to reliably get a -0.0 value is by direct calculation on var
 		// (cannot be result of consts, I tried, at least as of Go 1.19.4)
 		var val float64
 		val *= -1.0
-		return E(complex(val, val)), di, 1, nil
+		return d(E(complex(val, val)), 1), nil
 	}
 
 	// do normal decoding of full-form
@@ -592,7 +591,7 @@ func decComplex[E anyComplex](data []byte) (E, decValue, int, error) {
 	// get the byte count as an int
 	byteCount, _, n, err = decInt[tLen](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), di, 0, err
+		return d(E(0.0+0.0i), 0), err
 	}
 	offset += n
 
@@ -606,7 +605,7 @@ func decComplex[E anyComplex](data []byte) (E, decValue, int, error) {
 		}
 		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0 + 0.0i), di, 0, err
+		return d(E(0.0+0.0i), 0), err
 	}
 
 	// clamp data to len
@@ -615,20 +614,20 @@ func decComplex[E anyComplex](data []byte) (E, decValue, int, error) {
 	// real part
 	rPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), di, 0, errorDecf(offset, "%s", err)
+		return d(E(0.0+0.0i), 0), errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	// imaginary part
 	iPart, _, n, err = decFloat[float64](data[offset:])
 	if err != nil {
-		return E(0.0 + 0.0i), di, 0, errorDecf(offset, "%s", err)
+		return d(E(0.0+0.0i), 0), errorDecf(offset, "%s", err)
 	}
 	offset += n
 
 	var v128 complex128 = complex(rPart, iPart)
 
-	return E(v128), di, offset, nil
+	return d(E(v128), offset), nil
 }
 
 // does not actually use analysis data, only native value. accepts
@@ -746,23 +745,21 @@ func encFloat[E anyFloat](val analyzed[E]) []byte {
 	return enc
 }
 
-// returned decInfo is only to implement decFunc and will always be empty.
-func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decFloat[E anyFloat](data []byte) (decValue[E], error) {
 	if len(data) < 1 {
-		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d(E(0.0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	// special case single-byte 0's check
 	if byteCount == 0 {
-		return E(0.0), di, 1, nil
+		return d(E(0.0), 1), nil
 	} else if byteCount == 0x80 {
 		var val float64
 		val *= -1.0
-		return E(val), di, 1, nil
+		return d(E(val), 1), nil
 	}
 
 	// pull count and sign out of byteCount
@@ -776,7 +773,7 @@ func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return E(0.0), di, 0, err
+			return d(E(0.0), 0), err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -793,14 +790,14 @@ func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
 		if negative {
 			val *= -1.0
 		}
-		return E(val), di, numHeaderBytes, nil
+		return d(E(val), numHeaderBytes), nil
 	}
 
 	if int(byteCount) < 2 {
 		// the absolute minimum is 2 if not 0
 		const errFmt = "min data len for non-zero float is 2, but count from header specifies len of %d starting at offset"
 		err := errorDecf(numHeaderBytes, errFmt, int(byteCount)).wrap(ErrMalformedData)
-		return E(0.0), di, 0, err
+		return d(E(0.0), 0), err
 	}
 
 	if len(data) < int(byteCount) {
@@ -812,7 +809,7 @@ func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
 		}
 		const errFmt = "decoded float byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return E(0.0), di, 0, err
+		return d(E(0.0), 0), err
 	}
 
 	floatData := data[:byteCount]
@@ -867,7 +864,7 @@ func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
 
 	fVal := math.Float64frombits(iVal)
 
-	return E(fVal), di, int(byteCount) + numHeaderBytes, nil
+	return d(E(fVal), int(byteCount)+numHeaderBytes), nil
 }
 
 // does not actually use analysis data, only native value. accepts
@@ -924,18 +921,16 @@ func encInt[E integral](val analyzed[E]) []byte {
 // number of bytes to decode after all count header bytes and interprets it as
 // such. does not do further checks on count header.
 //
-// returned decInfo is only to implement decFunc and will always be empty.
-func decInt[E integral](data []byte) (E, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decInt[E integral](data []byte) (decValue[E], error) {
 	if len(data) < 1 {
-		return 0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d(E(0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	byteCount := data[0]
 
 	if byteCount == 0 {
-		return 0, di, 1, nil
+		return d(E(0), 1), nil
 	}
 
 	// pull count and sign out of byteCount
@@ -949,7 +944,7 @@ func decInt[E integral](data []byte) (E, decValue, int, error) {
 		if len(data[1:]) < 1 {
 			const errFmt = "count header indicates extension byte follows, but at end of data"
 			err := errorDecf(numHeaderBytes, errFmt).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-			return 0, di, 0, err
+			return d(E(0), 0), err
 		}
 		data = data[1:]
 		numHeaderBytes++
@@ -969,7 +964,7 @@ func decInt[E integral](data []byte) (E, decValue, int, error) {
 		}
 		const errFmt = "decoded int byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(numHeaderBytes, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return 0, di, 0, err
+		return d(E(0), 0), err
 	}
 
 	intData := data[:byteCount]
@@ -1000,7 +995,7 @@ func decInt[E integral](data []byte) (E, decValue, int, error) {
 	iVal |= (uint64(intData[6]) << 8)
 	iVal |= (uint64(intData[7]))
 
-	return E(iVal), di, int(byteCount) + numHeaderBytes, nil
+	return d(E(iVal), int(byteCount)+numHeaderBytes), nil
 }
 
 // does not actually use analysis data, only native value. accepts
@@ -1030,47 +1025,45 @@ func encString(val analyzed[string]) []byte {
 
 // decString decodes a string of any version. Assumes header is not nil.
 //
-// returned decInfo is only to implement decFunc and will always be empty.
-func decString(data []byte) (string, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decString(data []byte) (decValue[string], error) {
 	if len(data) < 1 {
-		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
 
 	// special case; 0x00 is the empty string in all variants
 	if data[0] == 0 {
-		return "", di, 1, nil
+		return d("", 1), nil
 	}
 
-	hdr, _, err := decCountHeader(data)
+	hdr, err := decCountHeader(data)
 	if err != nil {
-		return "", di, 0, err
+		return d("", 0), err
 	}
 
 	// compatibility with older format
-	if !hdr.ByteLength {
+	if !hdr.native.ByteLength {
 		return decStringV0(data)
 	}
 
 	return decStringV1(data)
 }
 
-// returned decInfo is only to implement decFunc and will always be empty.
-func decStringV1(data []byte) (string, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decStringV1(data []byte) (decValue[string], error) {
 	if len(data) < 1 {
-		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	strLength, _, countLen, err := decInt[tLen](data)
+	strLengthDec, err := decInt[tLen](data)
 	if err != nil {
-		return "", di, 0, errorDecf(0, "decode string byte count: %s", err)
+		return d("", 0), errorDecf(0, "decode string byte count: %s", err)
 	}
+	strLength := strLengthDec.native
+	countLen := strLengthDec.n
 	data = data[countLen:]
 
 	if strLength < 0 {
-		return "", di, 0, errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
+		return d("", 0), errorDecf(countLen, "string byte count < 0").wrap(ErrMalformedData)
 	}
 
 	if len(data) < strLength {
@@ -1082,7 +1075,7 @@ func decStringV1(data []byte) (string, decValue, int, error) {
 		}
 		const errFmt = "decoded string byte count is %d but only %d byte%s remain%s at offset"
 		err := errorDecf(countLen, errFmt, strLength, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return "", di, 0, err
+		return d("", 0), err
 	}
 	// clamp it
 	data = data[:strLength]
@@ -1093,7 +1086,7 @@ func decStringV1(data []byte) (string, decValue, int, error) {
 	for readBytes-countLen < strLength {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", di, 0, errorDecf(readBytes, "%s", err)
+			return d("", 0), errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1101,24 +1094,24 @@ func decStringV1(data []byte) (string, decValue, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), di, readBytes, nil
+	return d(sb.String(), readBytes), nil
 }
 
-// returned decInfo is only to implement decFunc and will always be empty.
-func decStringV0(data []byte) (string, decValue, int, error) {
-	var di decValue
-
+// returned decValue does not set ref automatically.
+func decStringV0(data []byte) (decValue[string], error) {
 	if len(data) < 1 {
-		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
+		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
-	runeCount, _, n, err := decInt[int](data)
+	runeCountDec, err := decInt[int](data)
 	if err != nil {
-		return "", di, 0, errorDecf(0, "decode string rune count: %s", err)
+		return d("", 0), errorDecf(0, "decode string rune count: %s", err)
 	}
+	n := runeCountDec.n
+	runeCount := runeCountDec.native
 	data = data[n:]
 
 	if runeCount < 0 {
-		return "", di, 0, errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
+		return d("", 0), errorDecf(0, "string rune count < 0").wrap(ErrMalformedData)
 	}
 
 	readBytes := n
@@ -1128,7 +1121,7 @@ func decStringV0(data []byte) (string, decValue, int, error) {
 	for i := 0; i < runeCount; i++ {
 		ch, charBytesRead, err := decUTF8Codepoint(data)
 		if err != nil {
-			return "", di, 0, errorDecf(readBytes, "%s", err)
+			return d("", 0), errorDecf(readBytes, "%s", err)
 		}
 
 		sb.WriteRune(ch)
@@ -1136,7 +1129,7 @@ func decStringV0(data []byte) (string, decValue, int, error) {
 		data = data[charBytesRead:]
 	}
 
-	return sb.String(), di, readBytes, nil
+	return d(sb.String(), readBytes), nil
 }
 
 func decUTF8Codepoint(data []byte) (rune, int, error) {
@@ -1171,17 +1164,18 @@ func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
 	return encString(analyzed[string]{native: tText}), nil
 }
 
-func decText(data []byte, t encoding.TextUnmarshaler) (int, error) {
-	var readBytes int
-	var textData string
+func decText(data []byte, t encoding.TextUnmarshaler) (decValue[encoding.TextMarshaler], error) {
+	var textData decValue[string]
+	var dec decValue[encoding.TextMarshaler]
 	var err error
 
-	textData, _, readBytes, err = decString(data)
+	textData, err = decString(data)
 	if err != nil {
-		return readBytes, errorDecf(0, "decode text: %s", err).wrap(ErrMalformedData)
+		return dec, errorDecf(0, "decode text: %s", err).wrap(ErrMalformedData)
 	}
+	dec.n = textData.n
 
-	err = t.UnmarshalText([]byte(textData))
+	err = t.UnmarshalText([]byte(textData.native))
 	if err != nil {
 		return readBytes, errorDecf(0, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
 	}
