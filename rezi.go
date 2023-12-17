@@ -554,17 +554,27 @@ import (
 //
 // TODO: combine this into 'decValue[E]' type and make it hold n and the value
 // itself.
-type decValue struct {
-	// fields is only included in decInfo when a struct has been decoded and
-	// gives a slice of all valid fields that were detected (and read) during
-	// the decode. This is used to inform which fields to overwrite in the
-	// receiver pointer.
-	fields []fieldInfo
+// TODO: after above todo is done, turn it into just decoded[E].
+type decValue[E any] struct {
+	// native is the actual value that was decoded
+	native E
+
+	// n is the number of bytes that were consumed in order to decode the value.
+	n int
 
 	// ref is the value that was decoded but as a reflect.Value. This is so that
 	// creating it more than once can be avoided. Not always set by every decode
 	// function; check with IsValid() before using.
 	ref reflect.Value
+
+	// fields is a slice of all valid fields that were detected (and read)
+	// during the decode of an automatically-supported struct. This is used to
+	// inform which fields to overwrite in the receiver pointer. It will only be
+	// valid when the decode it's returned from decoded a struct that doesn't
+	// implement one of the unmarshaling methods; structs that do delegate the
+	// responsibility to the unmarshaling method and thus have no need for
+	// supplementary field info.
+	fields []fieldInfo
 }
 
 type (
