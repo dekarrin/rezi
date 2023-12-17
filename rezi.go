@@ -548,12 +548,13 @@ import (
 	"reflect"
 )
 
-// decInfo holds information gained during decoding to be used in further
-// processing of the decoded data.
+// decValue holds a decoded value as well as information gained during
+// decoding to be used in further processing of the decoded data. It's mostly
+// used for gathering the return values from decFn.
 //
 // TODO: combine this into 'decValue[E]' type and make it hold n and the value
 // itself.
-type decInfo struct {
+type decValue struct {
 	// fields is only included in decInfo when a struct has been decoded and
 	// gives a slice of all valid fields that were detected (and read) during
 	// the decode. This is used to inform which fields to overwrite in the
@@ -572,7 +573,7 @@ type (
 
 	// the decInfo in decFunc is any additional info needed for further
 	// stages of decode. It can be empty if no further info is required.
-	decFunc[E any] func([]byte) (E, decInfo, int, error)
+	decFunc[E any] func([]byte) (E, decValue, int, error)
 	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
@@ -780,7 +781,7 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // decoded value this function returns.
 //
 // This function guarantees that decInfo.Ref will always be set.
-func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, di decInfo, n int, err error) {
+func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (decoded E, di decValue, n int, err error) {
 	var hdr countHeader
 
 	if v.ti.Indir > 0 {
@@ -851,8 +852,8 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 
 // decToUnwrappedFn takes the encoded bytes and an interface to decode to and
 // returns any extra data (may be nil), bytes consumed, and error status.
-func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decInfo, int, error)) decFunc[interface{}] {
-	return func(data []byte) (interface{}, decInfo, int, error) {
+func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decValue, int, error)) decFunc[interface{}] {
+	return func(data []byte) (interface{}, decValue, int, error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		refWrapped := wrapped.ref
 		receiverType := refWrapped.Type()
@@ -885,7 +886,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return nil, decInfo{}, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return nil, decValue{}, 0, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 

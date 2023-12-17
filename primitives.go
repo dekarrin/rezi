@@ -159,7 +159,7 @@ func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](decoded E, di decInfo, val analyzed[any]) {
+func zeroIndirAssign[E any](decoded E, di decValue, val analyzed[any]) {
 	if val.ti.Underlying {
 		// need to get fancier
 		refVal := val.ref
@@ -178,7 +178,7 @@ func zeroIndirAssign[E any](decoded E, di decInfo, val analyzed[any]) {
 func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
-	var di decInfo
+	var di decValue
 	var n int
 	var err error
 
@@ -359,10 +359,10 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped analyzed[any]) (decInfo, int, error) {
+			func(b []byte, unwrapped analyzed[any]) (decValue, int, error) {
 				recv := unwrapped.native.(encoding.BinaryUnmarshaler)
 				decN, err := decBinary(b, recv)
-				return decInfo{}, decN, err
+				return decValue{}, decN, err
 			},
 		))
 		if err != nil {
@@ -387,10 +387,10 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped analyzed[any]) (decInfo, int, error) {
+			func(b []byte, unwrapped analyzed[any]) (decValue, int, error) {
 				recv := unwrapped.native.(encoding.TextUnmarshaler)
 				decN, err := decText(b, recv)
-				return decInfo{}, decN, err
+				return decValue{}, decN, err
 			},
 		))
 		if err != nil {
@@ -512,8 +512,8 @@ func encBool(val analyzed[bool]) []byte {
 }
 
 // returned decInfo is only to implement decFunc and will always be empty.
-func decBool(data []byte) (bool, decInfo, int, error) {
-	var di decInfo
+func decBool(data []byte) (bool, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return false, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -563,8 +563,8 @@ func encComplex[E anyComplex](val analyzed[E]) []byte {
 }
 
 // returned decInfo is only to implement decFunc and will always be empty.
-func decComplex[E anyComplex](data []byte) (E, decInfo, int, error) {
-	var di decInfo
+func decComplex[E anyComplex](data []byte) (E, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -747,8 +747,8 @@ func encFloat[E anyFloat](val analyzed[E]) []byte {
 }
 
 // returned decInfo is only to implement decFunc and will always be empty.
-func decFloat[E anyFloat](data []byte) (E, decInfo, int, error) {
-	var di decInfo
+func decFloat[E anyFloat](data []byte) (E, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return 0.0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -925,8 +925,8 @@ func encInt[E integral](val analyzed[E]) []byte {
 // such. does not do further checks on count header.
 //
 // returned decInfo is only to implement decFunc and will always be empty.
-func decInt[E integral](data []byte) (E, decInfo, int, error) {
-	var di decInfo
+func decInt[E integral](data []byte) (E, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return 0, di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -1031,8 +1031,8 @@ func encString(val analyzed[string]) []byte {
 // decString decodes a string of any version. Assumes header is not nil.
 //
 // returned decInfo is only to implement decFunc and will always be empty.
-func decString(data []byte) (string, decInfo, int, error) {
-	var di decInfo
+func decString(data []byte) (string, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -1057,8 +1057,8 @@ func decString(data []byte) (string, decInfo, int, error) {
 }
 
 // returned decInfo is only to implement decFunc and will always be empty.
-func decStringV1(data []byte) (string, decInfo, int, error) {
-	var di decInfo
+func decStringV1(data []byte) (string, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -1105,8 +1105,8 @@ func decStringV1(data []byte) (string, decInfo, int, error) {
 }
 
 // returned decInfo is only to implement decFunc and will always be empty.
-func decStringV0(data []byte) (string, decInfo, int, error) {
-	var di decInfo
+func decStringV0(data []byte) (string, decValue, int, error) {
+	var di decValue
 
 	if len(data) < 1 {
 		return "", di, 0, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)

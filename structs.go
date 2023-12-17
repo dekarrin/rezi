@@ -83,8 +83,8 @@ func decCheckedStruct(data []byte, v analyzed[any]) (int, error) {
 }
 
 // decInfo will have Fields set to the successfully decoded fields.
-func decStruct(data []byte, v analyzed[any]) (decInfo, int, error) {
-	di := decInfo{}
+func decStruct(data []byte, v analyzed[any]) (decValue, int, error) {
+	di := decValue{}
 
 	var totalConsumed int
 
@@ -160,7 +160,7 @@ func decStruct(data []byte, v analyzed[any]) (decInfo, int, error) {
 	return di, totalConsumed, nil
 }
 
-func setStructMembers(initial, decoded reflect.Value, info decInfo) reflect.Value {
+func setStructMembers(initial, decoded reflect.Value, info decValue) reflect.Value {
 	newVal := reflect.New(initial.Type())
 	newVal.Elem().Set(initial)
 

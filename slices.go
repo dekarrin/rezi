@@ -64,8 +64,8 @@ func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decSlice(data []byte, v analyzed[any]) (decInfo, int, error) {
-	var di decInfo
+func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
+	var di decValue
 
 	var totalConsumed int
 

@@ -140,8 +140,8 @@ func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
 	return n, err
 }
 
-func decMap(data []byte, v analyzed[any]) (decInfo, int, error) {
-	var di decInfo
+func decMap(data []byte, v analyzed[any]) (decValue, int, error) {
+	var di decValue
 	var totalConsumed int
 
 	toConsume, _, n, err := decInt[tLen](data)
