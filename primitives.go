@@ -159,7 +159,7 @@ func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](decoded E, di decValue, val analyzed[any]) {
+func zeroIndirAssign[E any](decoded E, di decValue[E], val analyzed[any]) {
 	if val.ti.Underlying {
 		// need to get fancier
 		refVal := val.ref
@@ -383,14 +383,14 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 		}
 		return n, nil
 	case mtText:
-		_, di, n, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		var t decValue[any]
+		t, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped analyzed[any]) (decValue, int, error) {
+			func(b []byte, unwrapped analyzed[any]) (decValue[any], error) {
 				recv := unwrapped.native.(encoding.TextUnmarshaler)
-				decN, err := decText(b, recv)
-				return decValue{}, decN, err
+				return decText(b, recv)
 			},
 		))
 		if err != nil {
@@ -581,22 +581,18 @@ func decComplex[E anyComplex](data []byte) (decValue[E], error) {
 	}
 
 	// do normal decoding of full-form
-	var n int
 	var err error
 	var offset int
-	var byteCount tLen
-	var rPart float64
-	var iPart float64
 
 	// get the byte count as an int
-	byteCount, _, n, err = decInt[tLen](data[offset:])
+	byteCount, err := decInt[tLen](data[offset:])
 	if err != nil {
 		return d(E(0.0+0.0i), 0), err
 	}
-	offset += n
+	offset += byteCount.n
 
 	// count check
-	if len(data[offset:]) < byteCount {
+	if len(data[offset:]) < byteCount.native {
 		s := "s"
 		verbS := ""
 		if len(data) == 1 {
@@ -609,23 +605,23 @@ func decComplex[E anyComplex](data []byte) (decValue[E], error) {
 	}
 
 	// clamp data to len
-	data = data[:offset+byteCount]
+	data = data[:offset+byteCount.native]
 
 	// real part
-	rPart, _, n, err = decFloat[float64](data[offset:])
+	rPart, err := decFloat[float64](data[offset:])
 	if err != nil {
-		return d(E(0.0+0.0i), 0), errorDecf(offset, "%s", err)
+		return d(E(0.0+0.0i), offset), errorDecf(offset, "%s", err)
 	}
-	offset += n
+	offset += rPart.n
 
 	// imaginary part
-	iPart, _, n, err = decFloat[float64](data[offset:])
+	iPart, err := decFloat[float64](data[offset:])
 	if err != nil {
-		return d(E(0.0+0.0i), 0), errorDecf(offset, "%s", err)
+		return d(E(0.0+0.0i), offset), errorDecf(offset, "%s", err)
 	}
-	offset += n
+	offset += iPart.n
 
-	var v128 complex128 = complex(rPart, iPart)
+	var v128 complex128 = complex(rPart.native, iPart.native)
 
 	return d(E(v128), offset), nil
 }
@@ -1164,9 +1160,9 @@ func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
 	return encString(analyzed[string]{native: tText}), nil
 }
 
-func decText(data []byte, t encoding.TextUnmarshaler) (decValue[encoding.TextMarshaler], error) {
+func decText(data []byte, t encoding.TextUnmarshaler) (decValue[any], error) {
 	var textData decValue[string]
-	var dec decValue[encoding.TextMarshaler]
+	var dec decValue[any]
 	var err error
 
 	textData, err = decString(data)
@@ -1177,10 +1173,11 @@ func decText(data []byte, t encoding.TextUnmarshaler) (decValue[encoding.TextMar
 
 	err = t.UnmarshalText([]byte(textData.native))
 	if err != nil {
-		return readBytes, errorDecf(0, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
+		return dec, errorDecf(0, "%s: %s", ErrUnmarshalText, err).wrap(ErrMalformedData)
 	}
+	dec.native = t
 
-	return readBytes, nil
+	return dec, nil
 }
 
 // does not actually use analysis data, only native value. accepts
@@ -1202,19 +1199,18 @@ func encBinary(val analyzed[encoding.BinaryMarshaler]) ([]byte, error) {
 	return enc, nil
 }
 
-func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
-	var readBytes int
-	var byteLen int
+func decBinary(data []byte, b encoding.BinaryUnmarshaler) (decValue[any], error) {
+	var dec decValue[any]
 	var err error
 
-	byteLen, _, readBytes, err = decInt[tLen](data)
+	byteLen, err := decInt[tLen](data)
 	if err != nil {
-		return 0, errorDecf(0, "decode byte count: %s", err)
+		return decValue[any]{n: byteLen.n}, errorDecf(0, "decode byte count: %s", err)
 	}
+	dec.n = byteLen.n
+	data = data[dec.n:]
 
-	data = data[readBytes:]
-
-	if len(data) < byteLen {
+	if len(data) < byteLen.native {
 		s := "s"
 		verbS := ""
 		if len(data) == 1 {
@@ -1222,19 +1218,21 @@ func decBinary(data []byte, b encoding.BinaryUnmarshaler) (int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s at offset"
-		err := errorDecf(readBytes, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return readBytes, err
+		err := errorDecf(dec.n, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return dec, err
 	}
 	var binData []byte
 
-	if byteLen >= 0 {
-		binData = data[:byteLen]
+	if byteLen.native >= 0 {
+		binData = data[:byteLen.native]
 	}
 
 	err = b.UnmarshalBinary(binData)
 	if err != nil {
-		return readBytes, errorDecf(readBytes, "%s: %s", ErrUnmarshalBinary, err)
+		return dec, errorDecf(dec.n, "%s: %s", ErrUnmarshalBinary, err)
 	}
+	dec.native = b
+	dec.n += byteLen.native
 
-	return byteLen + readBytes, nil
+	return dec, nil
 }

@@ -799,20 +799,19 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 //
 // This function guarantees that decInfo.Ref will always be set.
 func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec decValue[E], err error) {
-	var hdr countHeader
-	var n int
+	var hdr decValue[countHeader]
 
 	if v.ti.Indir > 0 {
-		hdr, n, err = decCountHeader(data)
+		hdr, err = decCountHeader(data)
 		if err != nil {
 			return dec, errorDecf(0, "check count header: %s", err)
 		}
 	}
 
-	countHeaderBytes := n
-	effectiveExtraIndirs := hdr.ExtraNilIndirections()
+	countHeaderBytes := hdr.n
+	effectiveExtraIndirs := hdr.native.ExtraNilIndirections()
 
-	if !hdr.IsNil() {
+	if !hdr.native.IsNil() {
 		effectiveExtraIndirs = v.ti.Indir
 		dec, err = decFn(data)
 		if err != nil {
@@ -847,7 +846,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 			assignTarget = newTarget
 		}
 
-		if !hdr.IsNil() {
+		if !hdr.native.IsNil() {
 			refDecoded := dec.ref
 			if v.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
