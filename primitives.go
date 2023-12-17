@@ -8,7 +8,6 @@ import (
 	"encoding"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"reflect"
 	"strings"
@@ -159,14 +158,14 @@ func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](decoded E, di decValue[E], val analyzed[any]) {
+func zeroIndirAssign[E any](dec decValue[E], val analyzed[any]) {
 	if val.ti.Underlying {
 		// need to get fancier
 		refVal := val.ref
-		refVal.Elem().Set(di.ref.Convert(refVal.Type().Elem()))
+		refVal.Elem().Set(dec.ref.Convert(refVal.Type().Elem()))
 	} else {
 		tVal := val.native.(*E)
-		*tVal = decoded
+		*tVal = dec.native
 	}
 }
 
@@ -175,198 +174,210 @@ func zeroIndirAssign[E any](decoded E, di decValue[E], val analyzed[any]) {
 // string, float, complex), or implement encoding.BinaryUnmarshaler, or
 // implement encoding.TextUnmarshaler, or be a pointer to one of those types
 // with any level of indirection.
-func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
-	// by nature of doing an encoding, v MUST be a pointer to the typeinfo type,
+func decCheckedPrim(data []byte, value analyzed[any]) (decValue[any], error) {
+	// by nature of doing an encoding, v must be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
-	var di decValue
-	var n int
-	var err error
+	var dec decValue[any]
 
 	switch value.ti.Main {
 	case mtString:
-		var s string
-		s, di, n, err = decWithNilCheck(data, value, decString)
+		s, err := decWithNilCheck(data, value, decString)
+		dec.n += s.n
+		dec.native = s.native
 		if err != nil {
-			return n, err
+			return dec, err
 		}
 		if value.ti.Indir == 0 {
-			zeroIndirAssign(s, di, value)
+			zeroIndirAssign(s, value)
 		}
-		return n, nil
+		return dec, nil
 	case mtBool:
-		var b bool
-		b, di, n, err = decWithNilCheck(data, value, decBool)
+		b, err := decWithNilCheck(data, value, decBool)
+		dec.n += b.n
+		dec.native = b.native
 		if err != nil {
-			return n, err
+			return dec, err
 		}
-		log.Printf("%v\n", di)
 		if value.ti.Indir == 0 {
-			zeroIndirAssign(b, di, value)
+			zeroIndirAssign(b, value)
 		}
-		return n, nil
+		return dec, nil
 	case mtIntegral:
 		if value.ti.Signed {
 			switch value.ti.Bits {
 			case 64:
-				var i int64
-				i, di, n, err = decWithNilCheck(data, value, decInt[int64])
+				i, err := decWithNilCheck(data, value, decInt[int64])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 32:
-				var i int32
-				i, di, n, err = decWithNilCheck(data, value, decInt[int32])
+				i, err := decWithNilCheck(data, value, decInt[int32])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 16:
-				var i int16
-				i, di, n, err = decWithNilCheck(data, value, decInt[int16])
+				i, err := decWithNilCheck(data, value, decInt[int16])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 8:
-				var i int8
-				i, di, n, err = decWithNilCheck(data, value, decInt[int8])
+				i, err := decWithNilCheck(data, value, decInt[int8])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			default:
-				var i int
-				i, di, n, err = decWithNilCheck(data, value, decInt[int])
+				i, err := decWithNilCheck(data, value, decInt[int])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			}
 		} else {
 			switch value.ti.Bits {
 			case 64:
-				var i uint64
-				i, di, n, err = decWithNilCheck(data, value, decInt[uint64])
+				i, err := decWithNilCheck(data, value, decInt[uint64])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 32:
-				var i uint32
-				i, di, n, err = decWithNilCheck(data, value, decInt[uint32])
+				i, err := decWithNilCheck(data, value, decInt[uint32])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 16:
-				var i uint16
-				i, di, n, err = decWithNilCheck(data, value, decInt[uint16])
+				i, err := decWithNilCheck(data, value, decInt[uint16])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			case 8:
-				var i uint8
-				i, di, n, err = decWithNilCheck(data, value, decInt[uint8])
+				i, err := decWithNilCheck(data, value, decInt[uint8])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			default:
-				var i uint
-				i, di, n, err = decWithNilCheck(data, value, decInt[uint])
+				i, err := decWithNilCheck(data, value, decInt[uint])
+				dec.n += i.n
+				dec.native = i.native
 				if err != nil {
-					return n, err
+					return dec, err
 				}
 				if value.ti.Indir == 0 {
-					zeroIndirAssign(i, di, value)
+					zeroIndirAssign(i, value)
 				}
 			}
 		}
 
-		return n, nil
+		return dec, nil
 	case mtFloat:
 		switch value.ti.Bits {
 		case 32:
-			var f float32
-			f, di, n, err = decWithNilCheck(data, value, decFloat[float32])
+			f, err := decWithNilCheck(data, value, decFloat[float32])
+			dec.n += f.n
+			dec.native = f.native
 			if err != nil {
-				return n, err
+				return dec, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(f, di, value)
+				zeroIndirAssign(f, value)
 			}
 		default:
 			fallthrough
 		case 64:
-			var f float64
-			f, di, n, err = decWithNilCheck(data, value, decFloat[float64])
+			f, err := decWithNilCheck(data, value, decFloat[float64])
+			dec.n += f.n
+			dec.native = f.native
 			if err != nil {
-				return n, err
+				return dec, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(f, di, value)
+				zeroIndirAssign(f, value)
 			}
 		}
 
-		return n, nil
+		return dec, nil
 	case mtComplex:
 		switch value.ti.Bits {
 		case 64:
-			var c complex64
-			c, di, n, err = decWithNilCheck(data, value, decComplex[complex64])
+			c, err := decWithNilCheck(data, value, decComplex[complex64])
+			dec.n += c.n
+			dec.native = c.native
 			if err != nil {
-				return n, err
+				return dec, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(c, di, value)
+				zeroIndirAssign(c, value)
 			}
 		default:
 			fallthrough
 		case 128:
-			var c complex128
-			c, di, n, err = decWithNilCheck(data, value, decComplex[complex128])
+			c, err := decWithNilCheck(data, value, decComplex[complex128])
+			dec.n += c.n
+			dec.native = c.native
 			if err != nil {
-				return n, err
+				return dec, err
 			}
 			if value.ti.Indir == 0 {
-				zeroIndirAssign(c, di, value)
+				zeroIndirAssign(c, value)
 			}
 		}
 
-		return n, nil
+		return dec, nil
 	case mtBinary:
-		_, di, n, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		b, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refBinaryUnmarshalerType)
 			},
-			func(b []byte, unwrapped analyzed[any]) (decValue, int, error) {
-				recv := unwrapped.native.(encoding.BinaryUnmarshaler)
-				decN, err := decBinary(b, recv)
-				return decValue{}, decN, err
-			},
+			decBinary,
 		))
+		dec.n += b.n
+		dec.native = b.native
+		dec.ref = b.ref
 		if err != nil {
-			return n, err
+			return dec, err
 		}
 		if value.ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
@@ -379,22 +390,21 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			// detection which we do not need if operating on an mtBinary
 
 			refReceiver := value.ref
-			refReceiver.Elem().Set(di.ref)
+			refReceiver.Elem().Set(dec.ref)
 		}
-		return n, nil
+		return dec, nil
 	case mtText:
-		var t decValue[any]
-		t, err = decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
+		t, err := decWithNilCheck(data, value, fn_DecToWrappedReceiver(value,
 			func(t reflect.Type) bool {
 				return t.Implements(refTextUnmarshalerType)
 			},
-			func(b []byte, unwrapped analyzed[any]) (decValue[any], error) {
-				recv := unwrapped.native.(encoding.TextUnmarshaler)
-				return decText(b, recv)
-			},
+			decText,
 		))
+		dec.n += t.n
+		dec.native = t.native
+		dec.ref = t.ref
 		if err != nil {
-			return n, err
+			return dec, err
 		}
 		if value.ti.Indir == 0 {
 			// assume v is a *T, no future-proofing here.
@@ -407,9 +417,9 @@ func decCheckedPrim(data []byte, value analyzed[any]) (int, error) {
 			// detection which we do not need if operating on an metText
 
 			refReceiver := value.ref
-			refReceiver.Elem().Set(di.ref)
+			refReceiver.Elem().Set(dec.ref)
 		}
-		return n, nil
+		return dec, nil
 	default:
 		panic(fmt.Sprintf("%T cannot receive decoded REZI primitive type", value.native))
 	}
@@ -1160,7 +1170,9 @@ func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
 	return encString(analyzed[string]{native: tText}), nil
 }
 
-func decText(data []byte, t encoding.TextUnmarshaler) (decValue[any], error) {
+func decText(data []byte, v analyzed[any]) (decValue[any], error) {
+	t := v.native.(encoding.TextUnmarshaler)
+
 	var textData decValue[string]
 	var dec decValue[any]
 	var err error
@@ -1199,7 +1211,9 @@ func encBinary(val analyzed[encoding.BinaryMarshaler]) ([]byte, error) {
 	return enc, nil
 }
 
-func decBinary(data []byte, b encoding.BinaryUnmarshaler) (decValue[any], error) {
+func decBinary(data []byte, v analyzed[any]) (decValue[any], error) {
+	b := v.native.(encoding.BinaryUnmarshaler)
+
 	var dec decValue[any]
 	var err error
 
