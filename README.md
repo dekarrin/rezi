@@ -22,13 +22,13 @@ into a separate library for use with other projects.
 
 ### Installation
 
-Install REZI into your project using standard Go tools:
+Install REZI into your project:
 
 ```bash
-go get -u github.com/dekarrin/rezi/v2@latest
+$ go get -u github.com/dekarrin/rezi/v2@latest
 ```
 
-And import the REZI library to use it:
+And import the '/v2' path:
 
 ```golang
 import "github.com/dekarrin/rezi/v2"
@@ -36,7 +36,7 @@ import "github.com/dekarrin/rezi/v2"
 
 ### Usage
 
-The primary REZI format functions are `Enc()` for encoding data and `Dec` to
+The primary REZI format functions are `Enc` for encoding data and `Dec` to
 decode it. Both of these work similar to the `Marshal` and `Unmarshal` functions
 in the `json` library. For encoding, the value to be encoded is passed in
 directly, and for decoding, a pointer to a value of the correct type is passed

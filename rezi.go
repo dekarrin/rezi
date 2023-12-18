@@ -381,8 +381,8 @@
 // string encodings, which encoded data length as the count of codepoints rather
 // than bytes.
 //
-// Ann empty string is encoded using the short-form layout as a single info
-// byte, 0x00.
+// An empty string is encoded using the short-form layout as a single info byte,
+// 0x00.
 //
 //	encoding.BinaryMarshaler Values
 //
