@@ -592,23 +592,6 @@ type (
 	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
-func preAnalyzed[E any](oldAnalysis analyzed[any], newVal E) analyzed[E] {
-	return analyzed[E]{native: newVal, ref: oldAnalysis.ref, ti: oldAnalysis.ti}
-}
-
-func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
-	return func(val analyzed[E]) ([]byte, error) {
-		return fn(val), nil
-	}
-}
-
-// d is a shorthand function for creating decValues with only a valid n and
-// native. No other fields in the returned decValue are set. It's mostly used
-// for improving readability of directly returned decValues.
-func d[E any](value E, n int) decoded[E] {
-	return decoded[E]{native: value, n: n}
-}
-
 // Enc encodes a value to REZI-format bytes. The type of the value is examined
 // to determine how to encode it. No type information is included in the
 // returned bytes, so it is up to the caller to keep track of it and use a
@@ -949,6 +932,23 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 
 		return dec, decErr
 	}
+}
+
+func preAnalyzed[E any](oldAnalysis analyzed[any], newVal E) analyzed[E] {
+	return analyzed[E]{native: newVal, ref: oldAnalysis.ref, ti: oldAnalysis.ti}
+}
+
+func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
+	return func(val analyzed[E]) ([]byte, error) {
+		return fn(val), nil
+	}
+}
+
+// d is a shorthand function for creating decValues with only a valid n and
+// native. No other fields in the returned decValue are set. It's mostly used
+// for improving readability of directly returned decValues.
+func d[E any](value E, n int) decoded[E] {
+	return decoded[E]{native: value, n: n}
 }
 
 // countHeader represents the info available in the initial "info byte" of an
