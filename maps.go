@@ -206,6 +206,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 		data = data[n:]
 
 		refValue := reflect.New(refVType)
+		// TODO: use the internal one
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
 			return dec, errorDecf(dec.n, "map value[%v]: %v", refKey.Elem().Interface(), err)
