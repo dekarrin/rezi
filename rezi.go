@@ -634,30 +634,6 @@ func MustEnc(v interface{}) []byte {
 	return enc
 }
 
-// encWithTypeInfo has type analysis already performed, and it is not panic
-// safe.
-func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
-	value := analyzed[any]{
-		native: v,
-		ref:    reflect.ValueOf(v),
-		ti:     info,
-	}
-
-	if info.Primitive() {
-		return encCheckedPrim(value)
-	} else if info.Main == mtNil {
-		return encNilHeader(0), nil
-	} else if info.Main == mtMap {
-		return encCheckedMap(value)
-	} else if info.Main == mtSlice || info.Main == mtArray {
-		return encCheckedSlice(value)
-	} else if info.Main == mtStruct {
-		return encCheckedStruct(value)
-	} else {
-		panic("no possible encoding")
-	}
-}
-
 // Dec decodes a value from REZI-format bytes in data, starting with the first
 // byte in it. Returns the number of bytes consumed in order to read the
 // complete value. If the data slice was constructed by appending encoded values
@@ -709,6 +685,30 @@ func MustDec(data []byte, v interface{}) int {
 		panic(err.Error())
 	}
 	return n
+}
+
+// encWithTypeInfo has type analysis already performed, and it is not panic
+// safe.
+func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
+	value := analyzed[any]{
+		native: v,
+		ref:    reflect.ValueOf(v),
+		ti:     info,
+	}
+
+	if info.Primitive() {
+		return encCheckedPrim(value)
+	} else if info.Main == mtNil {
+		return encNilHeader(0), nil
+	} else if info.Main == mtMap {
+		return encCheckedMap(value)
+	} else if info.Main == mtSlice || info.Main == mtArray {
+		return encCheckedSlice(value)
+	} else if info.Main == mtStruct {
+		return encCheckedStruct(value)
+	} else {
+		panic("no possible encoding")
+	}
 }
 
 // decWithTypeInfo has type analysis already performed, and it is not panic
