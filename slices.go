@@ -43,38 +43,36 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 	return enc, nil
 }
 
-func decCheckedSlice(data []byte, v analyzed[any]) (int, error) {
+func decCheckedSlice(data []byte, v analyzed[any]) (decValue[any], error) {
 	if v.ti.Main != mtSlice && v.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
 
-	_, di, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	sl, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
 		decSlice,
 	))
 	if err != nil {
-		return n, err
+		return sl, err
 	}
 	if v.ti.Indir == 0 {
 		refReceiver := v.ref
-		refReceiver.Elem().Set(di.ref)
+		refReceiver.Elem().Set(sl.ref)
 	}
-	return n, err
+	return sl, err
 }
 
-func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
-	var di decValue
+func decSlice(data []byte, v analyzed[any]) (decValue[any], error) {
+	var dec decValue[any]
 
-	var totalConsumed int
-
-	toConsume, _, n, err := decInt[tLen](data)
+	toConsume, err := decInt[tLen](data)
 	if err != nil {
-		return di, 0, errorDecf(0, "decode byte count: %s", err)
+		return dec, errorDecf(0, "decode byte count: %s", err)
 	}
-	data = data[n:]
-	totalConsumed += n
+	data = data[toConsume.n:]
+	dec.n += toConsume.n
 
 	refSliceVal := v.ref
 	refSliceType := refSliceVal.Type().Elem()
@@ -86,7 +84,7 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 		sliceOrArrStr = "array"
 	}
 
-	if toConsume == 0 {
+	if toConsume.native == 0 {
 		// initialize to the empty slice/array
 		var empty reflect.Value
 		if isArray {
@@ -95,9 +93,10 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 			empty = reflect.MakeSlice(refSliceType, 0, 0)
 		}
 		refSliceVal.Elem().Set(empty)
-		di.ref = refSliceVal.Elem()
-		return di, totalConsumed, nil
-	} else if toConsume == -1 {
+		dec.native = refSliceVal.Elem().Interface()
+		dec.ref = refSliceVal.Elem()
+		return dec, nil
+	} else if toConsume.native == -1 {
 		var nilVal reflect.Value
 		if isArray {
 			nilVal = reflect.Zero(refArrType)
@@ -105,11 +104,12 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 			nilVal = reflect.Zero(refSliceType)
 		}
 		refSliceVal.Elem().Set(nilVal)
-		di.ref = nilVal
-		return di, totalConsumed, nil
+		dec.native = nilVal.Interface()
+		dec.ref = nilVal
+		return dec, nil
 	}
 
-	if len(data) < toConsume {
+	if len(data) < toConsume.native {
 		s := "s"
 		verbS := ""
 		if len(data) == 1 {
@@ -117,12 +117,12 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded %s byte count is %d but only %d byte%s remain%s in data at offset"
-		err := errorDecf(totalConsumed, errFmt, sliceOrArrStr, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return di, totalConsumed, err
+		err := errorDecf(dec.n, errFmt, sliceOrArrStr, toConsume.native, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return dec, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
-	data = data[:toConsume]
+	data = data[:toConsume.native]
 
 	var sl reflect.Value
 
@@ -135,13 +135,13 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 	var i int
 	var itemIdx int
 	refVType := refSliceType.Elem()
-	for i < toConsume {
+	for i < toConsume.native {
 		refValue := reflect.New(refVType)
 		n, err := Dec(data, refValue.Interface())
 		if err != nil {
-			return di, totalConsumed, errorDecf(totalConsumed, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
+			return dec, errorDecf(dec.n, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
 		}
-		totalConsumed += n
+		dec.n += n
 		i += n
 		data = data[n:]
 
@@ -153,7 +153,8 @@ func decSlice(data []byte, v analyzed[any]) (decValue, int, error) {
 		itemIdx++
 	}
 
-	di.ref = sl
 	refSliceVal.Elem().Set(sl)
-	return di, totalConsumed, nil
+	dec.native = sl.Interface()
+	dec.ref = sl
+	return dec, nil
 }

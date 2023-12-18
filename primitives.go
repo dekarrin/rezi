@@ -610,7 +610,7 @@ func decComplex[E anyComplex](data []byte) (decValue[E], error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded complex value byte count is %d but only %d byte%s remain%s at offset"
-		err := errorDecf(offset, errFmt, byteCount, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(offset, errFmt, byteCount.native, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return d(E(0.0+0.0i), 0), err
 	}
 
@@ -1232,7 +1232,7 @@ func decBinary(data []byte, v analyzed[any]) (decValue[any], error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded binary value byte count is %d but only %d byte%s remain%s at offset"
-		err := errorDecf(dec.n, errFmt, byteLen, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(dec.n, errFmt, byteLen.native, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return dec, err
 	}
 	var binData []byte

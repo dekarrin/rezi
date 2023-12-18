@@ -147,8 +147,8 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 	if err != nil {
 		return dec, errorDecf(0, "decode byte count: %s", err)
 	}
+	data = data[toConsume.n:]
 	dec.n += toConsume.n
-	data = data[dec.n:]
 
 	refVal := v.ref
 	refMapType := refVal.Type().Elem()
@@ -159,6 +159,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
+		dec.native = emptyMap.Interface()
 		dec.ref = emptyMap
 		return dec, nil
 	} else if toConsume.native == -1 {
@@ -167,6 +168,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
+		dec.native = nilMap.Interface()
 		dec.ref = nilMap
 		return dec, nil
 	}
@@ -179,7 +181,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data at offset"
-		err := errorDecf(dec.n, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(dec.n, errFmt, toConsume.native, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return dec, err
 	}
 

@@ -741,17 +741,20 @@ func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err erro
 		ti:     info,
 	}
 
+	var dec decValue[any]
 	if info.Primitive() {
-		return decCheckedPrim(data, value)
+		dec, err = decCheckedPrim(data, value)
 	} else if info.Main == mtMap {
-		return decCheckedMap(data, value)
+		dec, err = decCheckedMap(data, value)
 	} else if info.Main == mtSlice || info.Main == mtArray {
-		return decCheckedSlice(data, value)
+		dec, err = decCheckedSlice(data, value)
 	} else if info.Main == mtStruct {
-		return decCheckedStruct(data, value)
+		dec, err = decCheckedStruct(data, value)
 	} else {
 		panic("no possible decoding")
 	}
+
+	return dec.n, err
 }
 
 func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
