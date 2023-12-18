@@ -47,7 +47,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 
 // decCheckedStruct decodes a REZI bytes representation of a struct into a
 // compatible struct type.
-func decCheckedStruct(data []byte, v analyzed[any]) (decValue[any], error) {
+func decCheckedStruct(data []byte, v analyzed[any]) (decoded[any], error) {
 	if v.ti.Main != mtStruct {
 		panic("not a struct type")
 	}
@@ -74,7 +74,7 @@ func decCheckedStruct(data []byte, v analyzed[any]) (decValue[any], error) {
 		refSt := st.ref
 
 		if v.ti.Main == mtStruct && origStructVal.IsValid() {
-			refSt = setStructMembers(origStructVal, refSt, st)
+			refSt = makeStructWithFieldValues(origStructVal, refSt, st.fields)
 		}
 
 		refReceiver.Elem().Set(refSt)
@@ -83,8 +83,8 @@ func decCheckedStruct(data []byte, v analyzed[any]) (decValue[any], error) {
 }
 
 // decInfo will have Fields set to the successfully decoded fields.
-func decStruct(data []byte, v analyzed[any]) (decValue[any], error) {
-	var dec decValue[any]
+func decStruct(data []byte, v analyzed[any]) (decoded[any], error) {
+	var dec decoded[any]
 
 	refVal := v.ref
 	refStructType := refVal.Type().Elem()
@@ -160,13 +160,13 @@ func decStruct(data []byte, v analyzed[any]) (decValue[any], error) {
 	return dec, nil
 }
 
-func setStructMembers[E any](initial, decoded reflect.Value, info decValue[E]) reflect.Value {
+func makeStructWithFieldValues(initial, setValues reflect.Value, affectedFields []fieldInfo) reflect.Value {
 	newVal := reflect.New(initial.Type())
 	newVal.Elem().Set(initial)
 
-	for _, fi := range info.fields {
+	for _, fi := range affectedFields {
 		destPtr := newVal.Elem().Field(fi.Index).Addr()
-		fieldVal := decoded.Field(fi.Index)
+		fieldVal := setValues.Field(fi.Index)
 		destPtr.Elem().Set(fieldVal)
 	}
 

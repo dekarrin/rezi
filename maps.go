@@ -119,7 +119,7 @@ func encMap(val analyzed[any]) ([]byte, error) {
 }
 
 // decCheckedMap decodes a REZI map as a compatible map type.
-func decCheckedMap(data []byte, v analyzed[any]) (decValue[any], error) {
+func decCheckedMap(data []byte, v analyzed[any]) (decoded[any], error) {
 	if v.ti.Main != mtMap {
 		panic("not a map type")
 	}
@@ -140,8 +140,8 @@ func decCheckedMap(data []byte, v analyzed[any]) (decValue[any], error) {
 	return m, err
 }
 
-func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
-	var dec decValue[any]
+func decMap(data []byte, v analyzed[any]) (decoded[any], error) {
+	var dec decoded[any]
 
 	toConsume, err := decInt[tLen](data)
 	if err != nil {

@@ -158,7 +158,7 @@ func encCheckedPrim(value analyzed[any]) ([]byte, error) {
 
 // zeroIndirAssign performs the assignment of decoded to v, performing a type
 // conversion if needed.
-func zeroIndirAssign[E any](dec decValue[E], val analyzed[any]) {
+func zeroIndirAssign[E any](dec decoded[E], val analyzed[any]) {
 	if val.ti.Underlying {
 		// need to get fancier
 		refVal := val.ref
@@ -174,10 +174,10 @@ func zeroIndirAssign[E any](dec decValue[E], val analyzed[any]) {
 // string, float, complex), or implement encoding.BinaryUnmarshaler, or
 // implement encoding.TextUnmarshaler, or be a pointer to one of those types
 // with any level of indirection.
-func decCheckedPrim(data []byte, value analyzed[any]) (decValue[any], error) {
+func decCheckedPrim(data []byte, value analyzed[any]) (decoded[any], error) {
 	// by nature of doing an encoding, v must be a pointer to the typeinfo type,
 	// or an implementor of BinaryUnmarshaler.
-	var dec decValue[any]
+	var dec decoded[any]
 
 	switch value.ti.Main {
 	case mtString:
@@ -497,8 +497,8 @@ func encNilHeader(indirLevels int) []byte {
 // will *not* decode the actual count, if in fact the count is present.
 //
 // ref in the returned decValue will not be set.
-func decCountHeader(data []byte) (decValue[countHeader], error) {
-	var hdr decValue[countHeader]
+func decCountHeader(data []byte) (decoded[countHeader], error) {
+	var hdr decoded[countHeader]
 
 	if len(data) < 1 {
 		return hdr, errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
@@ -525,7 +525,7 @@ func encBool(val analyzed[bool]) []byte {
 }
 
 // returned decValue does not set ref automatically.
-func decBool(data []byte) (decValue[bool], error) {
+func decBool(data []byte) (decoded[bool], error) {
 	if len(data) < 1 {
 		return d(false, 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -574,7 +574,7 @@ func encComplex[E anyComplex](val analyzed[E]) []byte {
 }
 
 // returned decValue does not set ref automatically.
-func decComplex[E anyComplex](data []byte) (decValue[E], error) {
+func decComplex[E anyComplex](data []byte) (decoded[E], error) {
 	if len(data) < 1 {
 		return d(E(0.0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -752,7 +752,7 @@ func encFloat[E anyFloat](val analyzed[E]) []byte {
 }
 
 // returned decValue does not set ref automatically.
-func decFloat[E anyFloat](data []byte) (decValue[E], error) {
+func decFloat[E anyFloat](data []byte) (decoded[E], error) {
 	if len(data) < 1 {
 		return d(E(0.0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -928,7 +928,7 @@ func encInt[E integral](val analyzed[E]) []byte {
 // such. does not do further checks on count header.
 //
 // returned decValue does not set ref automatically.
-func decInt[E integral](data []byte) (decValue[E], error) {
+func decInt[E integral](data []byte) (decoded[E], error) {
 	if len(data) < 1 {
 		return d(E(0), 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -1032,7 +1032,7 @@ func encString(val analyzed[string]) []byte {
 // decString decodes a string of any version. Assumes header is not nil.
 //
 // returned decValue does not set ref automatically.
-func decString(data []byte) (decValue[string], error) {
+func decString(data []byte) (decoded[string], error) {
 	if len(data) < 1 {
 		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -1056,7 +1056,7 @@ func decString(data []byte) (decValue[string], error) {
 }
 
 // returned decValue does not set ref automatically.
-func decStringV1(data []byte) (decValue[string], error) {
+func decStringV1(data []byte) (decoded[string], error) {
 	if len(data) < 1 {
 		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -1104,7 +1104,7 @@ func decStringV1(data []byte) (decValue[string], error) {
 }
 
 // returned decValue does not set ref automatically.
-func decStringV0(data []byte) (decValue[string], error) {
+func decStringV0(data []byte) (decoded[string], error) {
 	if len(data) < 1 {
 		return d("", 0), errorDecf(0, "%s", io.ErrUnexpectedEOF).wrap(ErrMalformedData)
 	}
@@ -1170,11 +1170,11 @@ func encText(val analyzed[encoding.TextMarshaler]) ([]byte, error) {
 	return encString(analyzed[string]{native: tText}), nil
 }
 
-func decText(data []byte, v analyzed[any]) (decValue[any], error) {
+func decText(data []byte, v analyzed[any]) (decoded[any], error) {
 	t := v.native.(encoding.TextUnmarshaler)
 
-	var textData decValue[string]
-	var dec decValue[any]
+	var textData decoded[string]
+	var dec decoded[any]
 	var err error
 
 	textData, err = decString(data)
@@ -1211,15 +1211,15 @@ func encBinary(val analyzed[encoding.BinaryMarshaler]) ([]byte, error) {
 	return enc, nil
 }
 
-func decBinary(data []byte, v analyzed[any]) (decValue[any], error) {
+func decBinary(data []byte, v analyzed[any]) (decoded[any], error) {
 	b := v.native.(encoding.BinaryUnmarshaler)
 
-	var dec decValue[any]
+	var dec decoded[any]
 	var err error
 
 	byteLen, err := decInt[tLen](data)
 	if err != nil {
-		return decValue[any]{n: byteLen.n}, errorDecf(0, "decode byte count: %s", err)
+		return decoded[any]{n: byteLen.n}, errorDecf(0, "decode byte count: %s", err)
 	}
 	dec.n = byteLen.n
 	data = data[dec.n:]

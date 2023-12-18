@@ -43,7 +43,7 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 	return enc, nil
 }
 
-func decCheckedSlice(data []byte, v analyzed[any]) (decValue[any], error) {
+func decCheckedSlice(data []byte, v analyzed[any]) (decoded[any], error) {
 	if v.ti.Main != mtSlice && v.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
@@ -64,8 +64,8 @@ func decCheckedSlice(data []byte, v analyzed[any]) (decValue[any], error) {
 	return sl, err
 }
 
-func decSlice(data []byte, v analyzed[any]) (decValue[any], error) {
-	var dec decValue[any]
+func decSlice(data []byte, v analyzed[any]) (decoded[any], error) {
+	var dec decoded[any]
 
 	toConsume, err := decInt[tLen](data)
 	if err != nil {

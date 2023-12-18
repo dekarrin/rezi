@@ -548,12 +548,10 @@ import (
 	"reflect"
 )
 
-// decValue holds a decoded value as well as information gained during
+// decoded holds a decoded value as well as information gained during
 // decoding to be used in further processing of the decoded data. It's mostly
 // used for gathering the return values from decFn.
-//
-// TODO: after above todo is done, turn it into just decoded[E].
-type decValue[E any] struct {
+type decoded[E any] struct {
 	// native is the actual value that was decoded
 	native E
 
@@ -578,8 +576,8 @@ type decValue[E any] struct {
 // d is a shorthand function for creating decValues with only a valid n and
 // native. No other fields in the returned decValue are set. It's mostly used
 // for improving readability of directly returned decValues.
-func d[E any](value E, n int) decValue[E] {
-	return decValue[E]{native: value, n: n}
+func d[E any](value E, n int) decoded[E] {
+	return decoded[E]{native: value, n: n}
 }
 
 type (
@@ -588,7 +586,7 @@ type (
 
 	// the decInfo in decFunc is any additional info needed for further
 	// stages of decode. It can be empty if no further info is required.
-	decFunc[E any] func([]byte) (decValue[E], error)
+	decFunc[E any] func([]byte) (decoded[E], error)
 	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
@@ -739,7 +737,7 @@ func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err erro
 		ti:     info,
 	}
 
-	var dec decValue[any]
+	var dec decoded[any]
 	if info.Primitive() {
 		dec, err = decCheckedPrim(data, value)
 	} else if info.Main == mtMap {
@@ -799,8 +797,8 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // decoded value this function returns.
 //
 // This function guarantees that decInfo.Ref will always be set.
-func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec decValue[E], err error) {
-	var hdr decValue[countHeader]
+func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec decoded[E], err error) {
+	var hdr decoded[countHeader]
 
 	if v.ti.Indir > 0 {
 		hdr, err = decCountHeader(data)
@@ -856,7 +854,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 			}
 
 			if v.ti.Main == mtStruct && origStructVal.IsValid() {
-				refDecoded = setStructMembers(origStructVal, refDecoded, dec)
+				refDecoded = makeStructWithFieldValues(origStructVal, refDecoded, dec.fields)
 			}
 
 			assignTarget.Elem().Set(refDecoded)
@@ -874,8 +872,8 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 // returns any extra data (may be nil), bytes consumed, and error status. it
 // need not return a valid value in decValue.native, as that will be set
 // automatically and any existing value is overwritten.
-func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decValue[any], error)) decFunc[interface{}] {
-	return func(data []byte) (decValue[interface{}], error) {
+func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decoded[any], error)) decFunc[interface{}] {
+	return func(data []byte) (decoded[interface{}], error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
 		refWrapped := wrapped.ref
 		receiverType := refWrapped.Type()
@@ -908,7 +906,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 			if receiverType.Elem().Kind() == reflect.Func {
 				// if we have been given a *function* pointer, reject it, we
 				// cannot do this.
-				return decValue[any]{}, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
+				return decoded[any]{}, errorDecf(0, "function pointer type receiver is not supported").wrap(ErrInvalidType)
 			}
 			// receiverType is *T
 
@@ -932,7 +930,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 			}
 		}
 
-		var decoded interface{}
+		var decodedValue interface{}
 
 		receiver := receiverValue.Interface()
 		recvAnalyzed := analyzed[any]{native: receiver, ref: receiverValue, ti: wrapped.ti}
@@ -943,11 +941,11 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		}
 
 		if receiverType.Kind() == reflect.Pointer {
-			decoded = receiverValue.Elem().Interface()
+			decodedValue = receiverValue.Elem().Interface()
 		} else {
-			decoded = receiver
+			decodedValue = receiver
 		}
-		dec.native = decoded
+		dec.native = decodedValue
 
 		return dec, decErr
 	}
@@ -1093,16 +1091,16 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 		return errorDecf(0, "no bytes to decode").wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 	}
 
-	decoded := countHeader{}
+	decodedHdr := countHeader{}
 
 	infoByte := data[0]
 
-	decoded.Length = int(infoByte & infoBitsLen)
-	decoded.Negative = infoByte&infoBitsSign != 0
-	decoded.DecodedCount = 1 // for the initial info byte
+	decodedHdr.Length = int(infoByte & infoBitsLen)
+	decodedHdr.Negative = infoByte&infoBitsSign != 0
+	decodedHdr.DecodedCount = 1 // for the initial info byte
 
 	if infoByte&infoBitsNil != 0 {
-		decoded.NilAt++
+		decodedHdr.NilAt++
 		// need to hold off on indir check until after we've processed all bytes
 		// so we will hold on to info byte and check back later
 	}
@@ -1110,8 +1108,8 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// scan all extension bytes
 	extByte := infoByte
 	for extByte&infoBitsExt != 0 {
-		decoded.ExtensionLevel++
-		if len(data) < decoded.ExtensionLevel+1 {
+		decodedHdr.ExtensionLevel++
+		if len(data) < decodedHdr.ExtensionLevel+1 {
 			s := "s"
 			verbS := ""
 			if len(data) == 1 {
@@ -1119,19 +1117,19 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 				verbS = "s"
 			}
 			const errFmt = "count header length is at least %d but only %d byte%s remain%s in data"
-			err := errorDecf(decoded.DecodedCount, errFmt, decoded.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+			err := errorDecf(decodedHdr.DecodedCount, errFmt, decodedHdr.ExtensionLevel+1, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 			return err
 		}
-		extByte = data[decoded.ExtensionLevel]
+		extByte = data[decodedHdr.ExtensionLevel]
 
 		// we have consumed an additional byte, add it to total decoded
-		decoded.DecodedCount++
+		decodedHdr.DecodedCount++
 
 		// interpret the extension byte based on which one it is
-		if decoded.ExtensionLevel == 1 {
+		if decodedHdr.ExtensionLevel == 1 {
 			// first extension byte, layout: BXUUVVVV.
-			decoded.Version = int(extByte & infoBitsVersion)
-			decoded.ByteLength = extByte&infoBitsByteCount != 0
+			decodedHdr.Version = int(extByte & infoBitsVersion)
+			decodedHdr.ByteLength = extByte&infoBitsByteCount != 0
 		}
 
 		// future: more extension bytes, if needed. for now, just run through
@@ -1141,15 +1139,15 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// all extension bytes processed, now decode any indirection level int if
 	// present
 	if infoByte&infoBitsIndir != 0 {
-		extraIndirs, err := decInt[tNilLevel](data[decoded.DecodedCount:])
+		extraIndirs, err := decInt[tNilLevel](data[decodedHdr.DecodedCount:])
 		if err != nil {
-			return errorDecf(decoded.DecodedCount, "%s", err)
+			return errorDecf(decodedHdr.DecodedCount, "%s", err)
 		}
-		decoded.DecodedCount += extraIndirs.n
-		decoded.NilAt += extraIndirs.native
+		decodedHdr.DecodedCount += extraIndirs.n
+		decodedHdr.NilAt += extraIndirs.native
 	}
 
-	*hdr = decoded
+	*hdr = decodedHdr
 
 	return nil
 }
