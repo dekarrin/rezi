@@ -381,8 +381,8 @@
 // string encodings, which encoded data length as the count of codepoints rather
 // than bytes.
 //
-// Ann empty string is encoded using the short-form layout as a single info
-// byte, 0x00.
+// An empty string is encoded using the short-form layout as a single info byte,
+// 0x00.
 //
 //	encoding.BinaryMarshaler Values
 //
@@ -445,6 +445,10 @@
 // begins.
 //
 //	Array Values
+//
+//	Layout:
+//
+//	(same as slice values)
 //
 // Arrays are encoded in an identical fashion to slices. They do not record the
 // size of the array type.
@@ -603,13 +607,15 @@ type (
 // the error. Do not check error types with the equality operator ==; this will
 // always return false.
 //
-// Non-nil errors from this function can match the following error types: Error
-// in all cases. ErrInvalidType if the type of v is not supported.
-// ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
-// error from its MarshalBinary method (additionally, the returned error will
-// match the same types that the error returned from MarshalBinary would match).
-// ErrMarshalText if an implementor of encoding.TextMarshal returns an error
-// from its MarshalText method.
+// Non-nil errors from this function can match the following error types:
+//   - Error in all cases.
+//   - ErrInvalidType if the type of v is not supported.
+//   - ErrMarshalBinary if an implementor of encoding.BinaryMarshaler returns an
+//     error from its MarshalBinary method (additionally, the returned error
+//     will match the same types that the error returned from MarshalBinary
+//     would match).
+//   - ErrMarshalText if an implementor of encoding.TextMarshal returns an error
+//     from its MarshalText method.
 func Enc(v interface{}) (data []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -635,7 +641,7 @@ func MustEnc(v interface{}) []byte {
 }
 
 // Dec decodes a value from REZI-format bytes in data, starting with the first
-// byte in it. Returns the number of bytes consumed in order to read the
+// byte in it. It returns the number of bytes consumed in order to read the
 // complete value. If the data slice was constructed by appending encoded values
 // together, then skipping over n bytes after a successful call to Dec will
 // result in the next call to Dec reading the next subsequent value.
@@ -652,17 +658,20 @@ func MustEnc(v interface{}) []byte {
 // the error. Do not check error types with the equality operator ==; this will
 // always return false.
 //
-// Non-nil errors from this function can match the following error types: Error
-// in all cases. ErrInvalidType if the type pointed to by v is not supported or
-// if v is a nil pointer. ErrUnmarshalBinary if an implementor of
-// encoding.BinaryUnmarshaler returns an error from its UnmarshalBinary method
-// (additionally, the returned error will match the same types that the error
-// returned from UnmarshalBinary would match). ErrUnmarshalText if an
-// implementor of encoding.TextUnmarshaler returns an error from its
-// UnmarshalText method. io.ErrUnexpectedEOF if there are fewer bytes than
-// necessary to decode the value. ErrMalformedData if there is any problem with
-// the data itself (including there being fewer bytes than necessary to decode
-// the value).
+// Non-nil errors from this function can match the following error types:
+//   - Error in all cases.
+//   - ErrInvalidType if the type pointed to by v is not supported or if v is a
+//     nil pointer.
+//   - ErrUnmarshalBinary if an implementor of encoding.BinaryUnmarshaler
+//     returns an error from its UnmarshalBinary method (additionally, the
+//     returned error will match the same types that the error returned from
+//     UnmarshalBinary would match).
+//   - ErrUnmarshalText if an implementor of encoding.TextUnmarshaler returns an
+//     error from its UnmarshalText method.
+//   - io.ErrUnexpectedEOF if there are fewer bytes than necessary to decode the
+//     value.
+//   - ErrMalformedData if there is any problem with the data itself (including
+//     there being fewer bytes than necessary to decode the value).
 func Dec(data []byte, v interface{}) (n int, err error) {
 	defer func() {
 		if r := recover(); r != nil {

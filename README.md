@@ -4,10 +4,11 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/dekarrin/rezi/v2.svg)](https://pkg.go.dev/github.com/dekarrin/rezi/v2)
 
 The Rarefied Encoding (Compressible) for Interchange (REZI) library performs
-binary marshaling of data to REZI-format bytes. It can encode and decode most
-simple Go types to bytes. It further allows customization of decoding and
-encoding of user-defined types via `encoding.BinaryMarshaler` or
-`encoding.TextMarshaler`.
+binary marshaling of data to formatted binary data bytes. It can encode and
+decode most simple Go types out-of-the-box, whether user-defined or built-in,
+and for those cases where the automatic format just doesn't cut it, it
+allows customization of user-defined types that implement binary or text
+marshaling interfaces from the built-in Go `encoding` package.
 
 All data is encoded in a deterministic fashion, or as deterministically as
 possible. Any non-determinism in the resulting encoded value will arise from
@@ -21,13 +22,13 @@ into a separate library for use with other projects.
 
 ### Installation
 
-Install REZI into your project using standard Go tools:
+Install REZI into your project:
 
 ```bash
-go get -u github.com/dekarrin/rezi/v2@latest
+$ go get -u github.com/dekarrin/rezi/v2@latest
 ```
 
-And import the REZI library to use it:
+And import the '/v2' path:
 
 ```golang
 import "github.com/dekarrin/rezi/v2"
@@ -35,7 +36,7 @@ import "github.com/dekarrin/rezi/v2"
 
 ### Usage
 
-The primary REZI format functions are `Enc()` for encoding data and `Dec` to
+The primary REZI format functions are `Enc` for encoding data and `Dec` to
 decode it. Both of these work similar to the `Marshal` and `Unmarshal` functions
 in the `json` library. For encoding, the value to be encoded is passed in
 directly, and for decoding, a pointer to a value of the correct type is passed
