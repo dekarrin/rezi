@@ -552,8 +552,6 @@ import (
 // decoding to be used in further processing of the decoded data. It's mostly
 // used for gathering the return values from decFn.
 //
-// TODO: combine this into 'decValue[E]' type and make it hold n and the value
-// itself.
 // TODO: after above todo is done, turn it into just decoded[E].
 type decValue[E any] struct {
 	// native is the actual value that was decoded

@@ -197,7 +197,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 	for i < toConsume.native {
 		// dynamically create the map key type
 		refKey := reflect.New(refKType)
-		n, err := Dec(data, refKey.Interface())
+		n, err := decWithTypeInfo(data, refKey.Interface(), *v.ti.KeyType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "map key: %v", err)
 		}
@@ -206,8 +206,7 @@ func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
 		data = data[n:]
 
 		refValue := reflect.New(refVType)
-		// TODO: use the internal one
-		n, err = Dec(data, refValue.Interface())
+		n, err = decWithTypeInfo(data, refValue.Interface(), *v.ti.ValType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "map value[%v]: %v", refKey.Elem().Interface(), err)
 		}

@@ -131,7 +131,7 @@ func decStruct(data []byte, v analyzed[any]) (decValue[any], error) {
 	for i < toConsume.native {
 		// get field name
 		var fNameVal string
-		n, err := Dec(data, &fNameVal)
+		n, err := decWithTypeInfo(data, &fNameVal, typeInfo{Indir: 0, Underlying: false, Main: mtString, Dec: true})
 		if err != nil {
 			return dec, errorDecf(dec.n, "decode %s field name: %s", msgTypeName, err)
 		}
@@ -145,7 +145,7 @@ func decStruct(data []byte, v analyzed[any]) (decValue[any], error) {
 			return dec, errorDecf(dec.n, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
 		}
 		fieldPtr := target.Field(fi.Index).Addr()
-		n, err = Dec(data, fieldPtr.Interface())
+		n, err = decWithTypeInfo(data, fieldPtr.Interface(), fi.Type)
 		if err != nil {
 			return dec, errorDecf(dec.n, "%s.%s: %v", msgTypeName, fi.Name, err)
 		}

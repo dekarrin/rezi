@@ -137,7 +137,7 @@ func decSlice(data []byte, v analyzed[any]) (decValue[any], error) {
 	refVType := refSliceType.Elem()
 	for i < toConsume.native {
 		refValue := reflect.New(refVType)
-		n, err := Dec(data, refValue.Interface())
+		n, err := decWithTypeInfo(data, refValue.Interface(), *v.ti.ValType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
 		}
