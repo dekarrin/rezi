@@ -73,7 +73,7 @@ func (smk sortableMapKeys) Less(i, j int) bool {
 
 // encCheckedMap encodes a compatible map as a REZI map.
 func encCheckedMap(value analyzed[any]) ([]byte, error) {
-	if value.ti.Main != mtMap {
+	if value.info.Main != mtMap {
 		panic("not a map type")
 	}
 
@@ -83,14 +83,14 @@ func encCheckedMap(value analyzed[any]) ([]byte, error) {
 // requires keyType type info to be avail under *mapVal.ti.KeyType and ref to be
 // set.
 func encMap(value analyzed[any]) ([]byte, error) {
-	if value.native == nil || value.ref.IsNil() {
+	if value.v == nil || value.reflect.IsNil() {
 		return encNilHeader(0), nil
 	}
 
-	mapKeys := value.ref.MapKeys()
+	mapKeys := value.reflect.MapKeys()
 	keysToSort := sortableMapKeys{
 		keys: mapKeys,
-		ti:   *value.ti.KeyType,
+		ti:   *value.info.KeyType,
 	}
 	sort.Sort(keysToSort)
 	mapKeys = keysToSort.keys
@@ -99,13 +99,13 @@ func encMap(value analyzed[any]) ([]byte, error) {
 
 	for i := range mapKeys {
 		k := mapKeys[i]
-		v := value.ref.MapIndex(k)
+		v := value.reflect.MapIndex(k)
 
-		keyData, err := encWithTypeInfo(k.Interface(), *value.ti.KeyType)
+		keyData, err := encWithTypeInfo(k.Interface(), *value.info.KeyType)
 		if err != nil {
 			return nil, errorf("map key %v: %v", k.Interface(), err)
 		}
-		valData, err := encWithTypeInfo(v.Interface(), *value.ti.ValType)
+		valData, err := encWithTypeInfo(v.Interface(), *value.info.ValType)
 		if err != nil {
 			return nil, errorf("map value[%v]: %v", k.Interface(), err)
 		}
@@ -120,7 +120,7 @@ func encMap(value analyzed[any]) ([]byte, error) {
 
 // decCheckedMap decodes a REZI map as a compatible map type.
 func decCheckedMap(data []byte, recv analyzed[any]) (decoded[any], error) {
-	if recv.ti.Main != mtMap {
+	if recv.info.Main != mtMap {
 		panic("not a map type")
 	}
 
@@ -133,9 +133,9 @@ func decCheckedMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 	if err != nil {
 		return m, err
 	}
-	if recv.ti.Indir == 0 {
-		refReceiver := recv.ref
-		refReceiver.Elem().Set(m.ref)
+	if recv.info.Indir == 0 {
+		refReceiver := recv.reflect
+		refReceiver.Elem().Set(m.reflect)
 	}
 	return m, err
 }
@@ -150,30 +150,30 @@ func decMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 	data = data[toConsume.n:]
 	dec.n += toConsume.n
 
-	refVal := recv.ref
+	refVal := recv.reflect
 	refMapType := refVal.Type().Elem()
 
-	if toConsume.native == 0 {
+	if toConsume.v == 0 {
 		// initialize to the empty map
 		emptyMap := reflect.MakeMap(refMapType)
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
-		dec.native = emptyMap.Interface()
-		dec.ref = emptyMap
+		dec.v = emptyMap.Interface()
+		dec.reflect = emptyMap
 		return dec, nil
-	} else if toConsume.native == -1 {
+	} else if toConsume.v == -1 {
 		// initialize to the nil map
 		nilMap := reflect.Zero(refMapType)
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
-		dec.native = nilMap.Interface()
-		dec.ref = nilMap
+		dec.v = nilMap.Interface()
+		dec.reflect = nilMap
 		return dec, nil
 	}
 
-	if len(data) < toConsume.native {
+	if len(data) < toConsume.v {
 		s := "s"
 		verbS := ""
 		if len(data) == 1 {
@@ -181,12 +181,12 @@ func decMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data at offset"
-		err := errorDecf(dec.n, errFmt, toConsume.native, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		err := errorDecf(dec.n, errFmt, toConsume.v, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
 		return dec, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
-	data = data[:toConsume.native]
+	data = data[:toConsume.v]
 
 	// create the map we will be populating
 	m := reflect.MakeMap(refMapType)
@@ -194,10 +194,10 @@ func decMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 	var i int
 	refKType := refMapType.Key()
 	refVType := refMapType.Elem()
-	for i < toConsume.native {
+	for i < toConsume.v {
 		// dynamically create the map key type
 		refKey := reflect.New(refKType)
-		n, err := decWithTypeInfo(data, refKey.Interface(), *recv.ti.KeyType)
+		n, err := decWithTypeInfo(data, refKey.Interface(), *recv.info.KeyType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "map key: %v", err)
 		}
@@ -206,7 +206,7 @@ func decMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 		data = data[n:]
 
 		refValue := reflect.New(refVType)
-		n, err = decWithTypeInfo(data, refValue.Interface(), *recv.ti.ValType)
+		n, err = decWithTypeInfo(data, refValue.Interface(), *recv.info.ValType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "map value[%v]: %v", refKey.Elem().Interface(), err)
 		}
@@ -218,7 +218,7 @@ func decMap(data []byte, recv analyzed[any]) (decoded[any], error) {
 	}
 
 	refVal.Elem().Set(m)
-	dec.native = m.Interface()
-	dec.ref = m
+	dec.v = m.Interface()
+	dec.reflect = m
 	return dec, nil
 }

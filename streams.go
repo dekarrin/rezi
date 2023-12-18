@@ -522,7 +522,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		if count.n != len(buf) {
 			return decodable, errorDecf(totalRead, "header byte-count int: actual decoded len < read len").wrap(err)
 		}
-		remByteCount = count.native
+		remByteCount = count.v
 		totalRead += (count.n - len(hdrBytes))
 	} else if info.Main != mtIntegral && info.Main != mtFloat {
 		// for non-ints, we need to load the rest of the integer ourselves, then
@@ -545,7 +545,7 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		if count.n != len(decodable) {
 			return decodable, errorDecf(0, "count header: actual decoded len < read len").wrap(err)
 		}
-		remByteCount = count.native
+		remByteCount = count.v
 		totalRead += count.n
 	} else {
 		// if it is an int, rem bytes is hdr.Length
@@ -604,7 +604,7 @@ func (r *Reader) loadV0StringBytes(hdr countHeader, hdrBytes []byte) ([]byte, er
 	totalRead := len(loaded)
 
 	// we now have a rune count. begin loading bytes until we have hit it
-	for loadedRunes := 0; loadedRunes < runeCount.native; loadedRunes++ {
+	for loadedRunes := 0; loadedRunes < runeCount.v; loadedRunes++ {
 		// first, load in byte 1. this will tell us if we need more
 		firstByteBuf, err := r.loadBytes(1)
 		lastErr = err

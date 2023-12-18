@@ -552,16 +552,16 @@ import (
 // decoding to be used in further processing of the decoded data. It's mostly
 // used for gathering the return values from decFn.
 type decoded[E any] struct {
-	// native is the actual value that was decoded
-	native E
+	// v is the actual value that was decoded
+	v E
 
 	// n is the number of bytes that were consumed in order to decode the value.
 	n int
 
-	// ref is the value that was decoded but as a reflect.Value. This is so that
-	// creating it more than once can be avoided. Not always set by every decode
-	// function; check with IsValid() before using.
-	ref reflect.Value
+	// reflect is the value that was decoded but as a reflect.Value. This is so
+	// that creating it more than once can be avoided. Not always set by every
+	// decode function; check with IsValid() before using.
+	reflect reflect.Value
 
 	// fields is a slice of all valid fields that were detected (and read)
 	// during the decode of an automatically-supported struct. This is used to
@@ -577,9 +577,9 @@ type decoded[E any] struct {
 // reflect.Value to different subroutines. it's mostly just used for argument
 // grouping.
 type analyzed[E any] struct {
-	native E
-	ref    reflect.Value
-	ti     typeInfo
+	v       E
+	reflect reflect.Value
+	info    typeInfo
 }
 
 type (
@@ -691,9 +691,9 @@ func MustDec(data []byte, v interface{}) int {
 // safe.
 func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
 	value := analyzed[any]{
-		native: v,
-		ref:    reflect.ValueOf(v),
-		ti:     info,
+		v:       v,
+		reflect: reflect.ValueOf(v),
+		info:    info,
 	}
 
 	if info.Primitive() {
@@ -715,9 +715,9 @@ func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
 // safe.
 func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err error) {
 	recv := analyzed[any]{
-		native: v,
-		ref:    reflect.ValueOf(v),
-		ti:     info,
+		v:       v,
+		reflect: reflect.ValueOf(v),
+		info:    info,
 	}
 
 	var dec decoded[any]
@@ -737,13 +737,13 @@ func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err erro
 }
 
 func encWithNilCheck[E any](value analyzed[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
-	if value.ti.Indir > 0 {
+	if value.info.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
-		encodeTarget := value.ref
+		encodeTarget := value.reflect
 		// encodeTarget is a *THING but we want a THING
 
 		nilLevel := -1
-		for i := 0; i < value.ti.Indir; i++ {
+		for i := 0; i < value.info.Indir; i++ {
 			if encodeTarget.IsNil() {
 				// so if it were a *string we deal w, nil level can only be 0.
 				// if it were a **string we deal w, nil level can be 0 or 1.
@@ -759,18 +759,18 @@ func encWithNilCheck[E any](value analyzed[any], encFn encFunc[E], convFn func(r
 		}
 		convTarget := convFn(encodeTarget)
 		reAnalyzed := analyzed[E]{
-			native: convTarget,
-			ref:    reflect.ValueOf(convTarget),
-			ti:     value.ti,
+			v:       convTarget,
+			reflect: reflect.ValueOf(convTarget),
+			info:    value.info,
 		}
 		return encFn(reAnalyzed)
 	} else {
 		// if the type we have is actually a new UDT with some underlying basic
 		// Go type, then in fact we want to encode it as the actual kind type.
-		if value.ti.Underlying {
-			value.native = convFn(value.ref)
+		if value.info.Underlying {
+			value.v = convFn(value.reflect)
 		}
-		return encFn(preAnalyzed(value, value.native.(E)))
+		return encFn(preAnalyzed(value, value.v.(E)))
 	}
 }
 
@@ -783,7 +783,7 @@ func encWithNilCheck[E any](value analyzed[any], encFn encFunc[E], convFn func(r
 func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (dec decoded[E], err error) {
 	var hdr decoded[countHeader]
 
-	if recv.ti.Indir > 0 {
+	if recv.info.Indir > 0 {
 		hdr, err = decCountHeader(data)
 		if err != nil {
 			return dec, errorDecf(0, "check count header: %s", err)
@@ -791,35 +791,35 @@ func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (
 	}
 
 	countHeaderBytes := hdr.n
-	effectiveExtraIndirs := hdr.native.ExtraNilIndirections()
+	effectiveExtraIndirs := hdr.v.ExtraNilIndirections()
 
-	if hdr.native.IsNil() {
+	if hdr.v.IsNil() {
 		dec.n += hdr.n
 	} else {
-		effectiveExtraIndirs = recv.ti.Indir
+		effectiveExtraIndirs = recv.info.Indir
 		dec, err = decFn(data)
 		if err != nil {
 			return dec, errorDecf(countHeaderBytes, "%s", err)
 		}
 		// if we got no Ref in the decValue, we should fix that here
-		if !dec.ref.IsValid() {
-			dec.ref = reflect.ValueOf(dec.native)
+		if !dec.reflect.IsValid() {
+			dec.reflect = reflect.ValueOf(dec.v)
 		}
 	}
 
-	if recv.ti.Indir > 0 {
+	if recv.info.Indir > 0 {
 		// the user has passed in a ptr-ptr-to. We cannot directly assign.
-		assignTarget := recv.ref
+		assignTarget := recv.reflect
 		// assignTarget is a **string but we want a *string
 
 		// if it's a struct, we must get the original value, if one exists, in order
 		// to preserve the original member values
 		var origStructVal reflect.Value
-		if recv.ti.Main == mtStruct {
+		if recv.info.Main == mtStruct {
 			origStructVal = unwrapOriginalStructValue(assignTarget)
 		}
 
-		for i := 0; i < recv.ti.Indir && i < effectiveExtraIndirs; i++ {
+		for i := 0; i < recv.info.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
 			// *what does it mean*
@@ -830,13 +830,13 @@ func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (
 			assignTarget = newTarget
 		}
 
-		if !hdr.native.IsNil() {
-			refDecoded := dec.ref
-			if recv.ti.Underlying {
+		if !hdr.v.IsNil() {
+			refDecoded := dec.reflect
+			if recv.info.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
 
-			if recv.ti.Main == mtStruct && origStructVal.IsValid() {
+			if recv.info.Main == mtStruct && origStructVal.IsValid() {
 				refDecoded = makeStructWithFieldValues(origStructVal, refDecoded, dec.fields)
 			}
 
@@ -844,7 +844,7 @@ func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (
 		} else {
 			zeroVal := reflect.Zero(assignTarget.Elem().Type())
 			assignTarget.Elem().Set(zeroVal)
-			dec.ref = zeroVal
+			dec.reflect = zeroVal
 		}
 	}
 
@@ -858,16 +858,16 @@ func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (
 func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) bool, decToUnwrappedFn func([]byte, analyzed[any]) (decoded[any], error)) decFunc[interface{}] {
 	return func(data []byte) (decoded[interface{}], error) {
 		// v is *(...*)T, ret-val of decFn (this lambda) is T.
-		refWrapped := wrapped.ref
+		refWrapped := wrapped.reflect
 		receiverType := refWrapped.Type()
 		refUnwrapped := refWrapped
 
 		if receiverType.Kind() == reflect.Pointer { // future-proofing - binary unmarshaler might come in as a T
 			// for every * in the (...*) part of *(...*)T up until the
 			// implementor/slice-ptr, do a deref.
-			for i := 0; i < wrapped.ti.Indir; i++ {
+			for i := 0; i < wrapped.info.Indir; i++ {
 				receiverType = receiverType.Elem()
-				if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() {
+				if (wrapped.info.Main == mtText || wrapped.info.Main == mtBinary) && refUnwrapped.IsValid() {
 					if !refUnwrapped.IsNil() {
 						refUnwrapped = refUnwrapped.Elem()
 					} else {
@@ -899,14 +899,14 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 			// automatic and we have full control; we don't (and can't) rely on
 			// already set things and use reflect after actual decoding to copy
 			// the decoded values into the passed-in pointer.
-			if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() && !refUnwrapped.IsNil() {
+			if (wrapped.info.Main == mtText || wrapped.info.Main == mtBinary) && refUnwrapped.IsValid() && !refUnwrapped.IsNil() {
 				receiverValue = refUnwrapped
 			} else {
 				receiverValue = reflect.New(receiverType.Elem())
 			}
 		} else {
 			// receiverType is itself T (future-proofing)
-			if (wrapped.ti.Main == mtText || wrapped.ti.Main == mtBinary) && refUnwrapped.IsValid() {
+			if (wrapped.info.Main == mtText || wrapped.info.Main == mtBinary) && refUnwrapped.IsValid() {
 				receiverValue = refUnwrapped
 			} else {
 				receiverValue = reflect.Zero(receiverType)
@@ -916,7 +916,7 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		var decodedValue interface{}
 
 		receiver := receiverValue.Interface()
-		recvAnalyzed := analyzed[any]{native: receiver, ref: receiverValue, ti: wrapped.ti}
+		recvAnalyzed := analyzed[any]{v: receiver, reflect: receiverValue, info: wrapped.info}
 		dec, decErr := decToUnwrappedFn(data, recvAnalyzed)
 
 		if decErr != nil {
@@ -928,14 +928,14 @@ func fn_DecToWrappedReceiver(wrapped analyzed[any], assertFn func(reflect.Type) 
 		} else {
 			decodedValue = receiver
 		}
-		dec.native = decodedValue
+		dec.v = decodedValue
 
 		return dec, decErr
 	}
 }
 
 func preAnalyzed[E any](oldAnalysis analyzed[any], newVal E) analyzed[E] {
-	return analyzed[E]{native: newVal, ref: oldAnalysis.ref, ti: oldAnalysis.ti}
+	return analyzed[E]{v: newVal, reflect: oldAnalysis.reflect, info: oldAnalysis.info}
 }
 
 func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
@@ -948,7 +948,7 @@ func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
 // native. No other fields in the returned decValue are set. It's mostly used
 // for improving readability of directly returned decValues.
 func d[E any](value E, n int) decoded[E] {
-	return decoded[E]{native: value, n: n}
+	return decoded[E]{v: value, n: n}
 }
 
 // countHeader represents the info available in the initial "info byte" of an
@@ -1078,7 +1078,7 @@ func (hdr countHeader) MarshalBinary() ([]byte, error) {
 	// okay, if nilAt is > 1 then we need to additionally encode an int of that
 	// value
 	if hdr.NilAt > 1 {
-		encoded = append(encoded, encInt(analyzed[int]{native: hdr.NilAt - 1})...)
+		encoded = append(encoded, encInt(analyzed[int]{v: hdr.NilAt - 1})...)
 	}
 
 	return encoded, nil
@@ -1144,7 +1144,7 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 			return errorDecf(decodedHdr.DecodedCount, "%s", err)
 		}
 		decodedHdr.DecodedCount += extraIndirs.n
-		decodedHdr.NilAt += extraIndirs.native
+		decodedHdr.NilAt += extraIndirs.v
 	}
 
 	*hdr = decodedHdr
