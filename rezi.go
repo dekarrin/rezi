@@ -814,7 +814,9 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 	countHeaderBytes := hdr.n
 	effectiveExtraIndirs := hdr.native.ExtraNilIndirections()
 
-	if !hdr.native.IsNil() {
+	if hdr.native.IsNil() {
+		dec.n += hdr.n
+	} else {
 		effectiveExtraIndirs = v.ti.Indir
 		dec, err = decFn(data)
 		if err != nil {
