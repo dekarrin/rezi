@@ -119,60 +119,59 @@ func encMap(val analyzed[any]) ([]byte, error) {
 }
 
 // decCheckedMap decodes a REZI map as a compatible map type.
-func decCheckedMap(data []byte, v analyzed[any]) (int, error) {
+func decCheckedMap(data []byte, v analyzed[any]) (decValue[any], error) {
 	if v.ti.Main != mtMap {
 		panic("not a map type")
 	}
 
-	_, di, n, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	m, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Map
 		},
 		decMap,
 	))
 	if err != nil {
-		return n, err
+		return m, err
 	}
 	if v.ti.Indir == 0 {
 		refReceiver := v.ref
-		refReceiver.Elem().Set(di.ref)
+		refReceiver.Elem().Set(m.ref)
 	}
-	return n, err
+	return m, err
 }
 
-func decMap(data []byte, v analyzed[any]) (decValue, int, error) {
-	var di decValue
-	var totalConsumed int
+func decMap(data []byte, v analyzed[any]) (decValue[any], error) {
+	var dec decValue[any]
 
-	toConsume, _, n, err := decInt[tLen](data)
+	toConsume, err := decInt[tLen](data)
 	if err != nil {
-		return di, 0, errorDecf(0, "decode byte count: %s", err)
+		return dec, errorDecf(0, "decode byte count: %s", err)
 	}
-	data = data[n:]
-	totalConsumed += n
+	dec.n += toConsume.n
+	data = data[dec.n:]
 
 	refVal := v.ref
 	refMapType := refVal.Type().Elem()
 
-	if toConsume == 0 {
+	if toConsume.native == 0 {
 		// initialize to the empty map
 		emptyMap := reflect.MakeMap(refMapType)
 
 		// set it to the value
 		refVal.Elem().Set(emptyMap)
-		di.ref = emptyMap
-		return di, totalConsumed, nil
-	} else if toConsume == -1 {
+		dec.ref = emptyMap
+		return dec, nil
+	} else if toConsume.native == -1 {
 		// initialize to the nil map
 		nilMap := reflect.Zero(refMapType)
 
 		// set it to the value
 		refVal.Elem().Set(nilMap)
-		di.ref = nilMap
-		return di, totalConsumed, nil
+		dec.ref = nilMap
+		return dec, nil
 	}
 
-	if len(data) < toConsume {
+	if len(data) < toConsume.native {
 		s := "s"
 		verbS := ""
 		if len(data) == 1 {
@@ -180,12 +179,12 @@ func decMap(data []byte, v analyzed[any]) (decValue, int, error) {
 			verbS = "s"
 		}
 		const errFmt = "decoded map byte count is %d but only %d byte%s remain%s in data at offset"
-		err := errorDecf(totalConsumed, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
-		return di, totalConsumed, err
+		err := errorDecf(dec.n, errFmt, toConsume, len(data), s, verbS).wrap(io.ErrUnexpectedEOF, ErrMalformedData)
+		return dec, err
 	}
 
 	// clamp values we are allowed to read so we don't try to read other data
-	data = data[:toConsume]
+	data = data[:toConsume.native]
 
 	// create the map we will be populating
 	m := reflect.MakeMap(refMapType)
@@ -193,23 +192,23 @@ func decMap(data []byte, v analyzed[any]) (decValue, int, error) {
 	var i int
 	refKType := refMapType.Key()
 	refVType := refMapType.Elem()
-	for i < toConsume {
+	for i < toConsume.native {
 		// dynamically create the map key type
 		refKey := reflect.New(refKType)
 		n, err := Dec(data, refKey.Interface())
 		if err != nil {
-			return di, totalConsumed, errorDecf(totalConsumed, "map key: %v", err)
+			return dec, errorDecf(dec.n, "map key: %v", err)
 		}
-		totalConsumed += n
+		dec.n += n
 		i += n
 		data = data[n:]
 
 		refValue := reflect.New(refVType)
 		n, err = Dec(data, refValue.Interface())
 		if err != nil {
-			return di, totalConsumed, errorDecf(totalConsumed, "map value[%v]: %v", refKey.Elem().Interface(), err)
+			return dec, errorDecf(dec.n, "map value[%v]: %v", refKey.Elem().Interface(), err)
 		}
-		totalConsumed += n
+		dec.n += n
 		i += n
 		data = data[n:]
 
@@ -217,6 +216,7 @@ func decMap(data []byte, v analyzed[any]) (decValue, int, error) {
 	}
 
 	refVal.Elem().Set(m)
-	di.ref = m
-	return di, totalConsumed, nil
+	dec.native = m.Interface()
+	dec.ref = m
+	return dec, nil
 }

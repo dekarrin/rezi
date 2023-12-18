@@ -96,7 +96,7 @@ func Test_decBool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, _, actualRead, err := decBool(tc.input)
+			actual, err := decBool(tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -104,8 +104,8 @@ func Test_decBool(t *testing.T) {
 				return
 			}
 
-			assert.Equal(tc.expectValue, actualValue)
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectValue, actual.native)
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -225,7 +225,7 @@ func Test_decInt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, _, actualRead, err := decInt[int](tc.input)
+			actual, err := decInt[int](tc.input)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -233,8 +233,8 @@ func Test_decInt(t *testing.T) {
 				return
 			}
 
-			assert.Equal(tc.expectValue, actualValue)
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectValue, actual.native)
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -404,18 +404,18 @@ func Test_decFloat(t *testing.T) {
 			assert := assert.New(t)
 			expectBits := math.Float64bits(tc.expect)
 
-			actual, _, actualRead, err := decFloat[float64](tc.input)
+			actual, err := decFloat[float64](tc.input)
 			if tc.expectErr {
 				assert.Error(err)
 				return
 			} else if !assert.NoError(err) {
 				return
 			}
-			actualBits := math.Float64bits(actual)
+			actualBits := math.Float64bits(actual.native)
 
-			assert.Equal(tc.expect, actual, "float values differ")
+			assert.Equal(tc.expect, actual.native, "float values differ")
 			assert.Equal(expectBits, actualBits, "bit values differ")
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -620,20 +620,20 @@ func Test_decComplex(t *testing.T) {
 			expectRBits := math.Float64bits(real(tc.expect))
 			expectIBits := math.Float64bits(imag(tc.expect))
 
-			actual, _, actualRead, err := decComplex[complex128](tc.input)
+			actual, err := decComplex[complex128](tc.input)
 			if tc.expectErr {
 				assert.Error(err)
 				return
 			} else if !assert.NoError(err) {
 				return
 			}
-			actualRBits := math.Float64bits(real(actual))
-			actualIBits := math.Float64bits(imag(actual))
+			actualRBits := math.Float64bits(real(actual.native))
+			actualIBits := math.Float64bits(imag(actual.native))
 
-			assert.Equal(tc.expect, actual, "complex values differ")
+			assert.Equal(tc.expect, actual.native, "complex values differ")
 			assert.Equal(expectRBits, actualRBits, "real-part bit values differ")
 			assert.Equal(expectIBits, actualIBits, "real-part bit values differ")
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -716,7 +716,7 @@ func Test_decStringV0(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, _, actualRead, err := decStringV0(tc.input)
+			actual, err := decStringV0(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
@@ -725,8 +725,8 @@ func Test_decStringV0(t *testing.T) {
 				return
 			}
 
-			assert.Equal(tc.expectValue, actualValue)
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectValue, actual.native)
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -776,7 +776,7 @@ func Test_decStringV1(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert := assert.New(t)
 
-			actualValue, _, actualRead, err := decStringV1(tc.input)
+			actual, err := decStringV1(tc.input)
 			if tc.expectError {
 				if !assert.Error(err) {
 					return
@@ -785,8 +785,8 @@ func Test_decStringV1(t *testing.T) {
 				return
 			}
 
-			assert.Equal(tc.expectValue, actualValue)
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectValue, actual.native)
+			assert.Equal(tc.expectRead, actual.n, "num read bytes does not match expected")
 		})
 	}
 }
@@ -841,13 +841,14 @@ func Test_decText(t *testing.T) {
 		)
 
 		var actual testText
-		actualRead, err := decText(input, &actual)
+		recv := analyzed[any]{native: &actual}
+		actualResult, err := decText(input, recv)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Equal(expect, actual)
-		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+		assert.Equal(expectConsumed, actualResult.n, "num read bytes does not match expected")
 	})
 
 	t.Run("IPv4", func(t *testing.T) {
@@ -860,13 +861,14 @@ func Test_decText(t *testing.T) {
 		)
 
 		var actual net.IP
-		actualRead, err := decText(input, &actual)
+		recv := analyzed[any]{native: &actual}
+		actualResult, err := decText(input, recv)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Equal(expect, actual)
-		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+		assert.Equal(expectConsumed, actualResult.n, "num read bytes does not match expected")
 	})
 
 	t.Run("IPv6", func(t *testing.T) {
@@ -879,13 +881,14 @@ func Test_decText(t *testing.T) {
 		)
 
 		var actual net.IP
-		actualRead, err := decText(input, &actual)
+		recv := analyzed[any]{native: &actual}
+		actualResult, err := decText(input, recv)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Equal(expect, actual)
-		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+		assert.Equal(expectConsumed, actualResult.n, "num read bytes does not match expected")
 	})
 
 	t.Run("big.Int", func(t *testing.T) {
@@ -898,13 +901,14 @@ func Test_decText(t *testing.T) {
 		)
 
 		actual := big.NewInt(1)
-		actualRead, err := decText(input, actual)
+		recv := analyzed[any]{native: actual} // deliberately not a pointer receiver since NewInt already returns a ptr.
+		actualResult, err := decText(input, recv)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Equal(expect, actual)
-		assert.Equal(expectConsumed, actualRead, "num read bytes does not match expected")
+		assert.Equal(expectConsumed, actualResult.n, "num read bytes does not match expected")
 	})
 }
 
@@ -1004,7 +1008,8 @@ func Test_decBinary(t *testing.T) {
 				actual.decErr = errors.New("error")
 			}
 
-			actualRead, err := decBinary(tc.input, &actual)
+			recv := analyzed[any]{native: &actual}
+			actualResult, err := decBinary(tc.input, recv)
 			if tc.expectError {
 				assert.Error(err)
 				return
@@ -1013,7 +1018,7 @@ func Test_decBinary(t *testing.T) {
 			}
 
 			assert.Equal(tc.expect, actual)
-			assert.Equal(tc.expectRead, actualRead, "num read bytes does not match expected")
+			assert.Equal(tc.expectRead, actualResult.n, "num read bytes does not match expected")
 		})
 	}
 }

@@ -1138,12 +1138,12 @@ func (hdr *countHeader) UnmarshalBinary(data []byte) error {
 	// all extension bytes processed, now decode any indirection level int if
 	// present
 	if infoByte&infoBitsIndir != 0 {
-		extraIndirs, _, n, err := decInt[tNilLevel](data[decoded.DecodedCount:])
+		extraIndirs, err := decInt[tNilLevel](data[decoded.DecodedCount:])
 		if err != nil {
 			return errorDecf(decoded.DecodedCount, "%s", err)
 		}
-		decoded.DecodedCount += n
-		decoded.NilAt += extraIndirs
+		decoded.DecodedCount += extraIndirs.n
+		decoded.NilAt += extraIndirs.native
 	}
 
 	*hdr = decoded

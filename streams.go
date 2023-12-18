@@ -501,16 +501,16 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 			return decodable, errorDecf(totalRead, "%s", err)
 		}
 
-		count, _, n, err := decInt[int](buf)
+		count, err := decInt[int](buf)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
 			return decodable, errorDecf(totalRead, "header byte-count int: %s", err)
 		}
-		if n != len(buf) {
+		if count.n != len(buf) {
 			return decodable, errorDecf(totalRead, "header byte-count int: actual decoded len < read len").wrap(err)
 		}
-		remByteCount = count
-		totalRead += (n - len(hdrBytes))
+		remByteCount = count.native
+		totalRead += (count.n - len(hdrBytes))
 	} else if info.Main != mtIntegral && info.Main != mtFloat {
 		// for non-ints, we need to load the rest of the integer ourselves, then
 		// remByteCount is the value of THAT
@@ -524,16 +524,16 @@ func (r *Reader) loadDecodeableBytes(info typeInfo) ([]byte, error) {
 		}
 
 		// okay, we have complete header and int bytes, decode to int type
-		count, _, n, err := decInt[int](decodable)
+		count, err := decInt[int](decodable)
 		// do not preserve this error, it will never be io.EOF.
 		if err != nil {
 			return decodable, errorDecf(0, "count header: %s", err)
 		}
-		if n != len(decodable) {
+		if count.n != len(decodable) {
 			return decodable, errorDecf(0, "count header: actual decoded len < read len").wrap(err)
 		}
-		remByteCount = count
-		totalRead += n
+		remByteCount = count.native
+		totalRead += count.n
 	} else {
 		// if it is an int, rem bytes is hdr.Length
 		remByteCount = hdr.Length
@@ -579,19 +579,19 @@ func (r *Reader) loadV0StringBytes(hdr countHeader, hdrBytes []byte) ([]byte, er
 	}
 
 	// okay, we have complete header and int bytes, decode to int type
-	runeCount, _, n, err := decInt[int](loaded)
+	runeCount, err := decInt[int](loaded)
 	// do not preserve this error, it will never be io.EOF.
 	if err != nil {
 		return loaded, errorDecf(0, "count header: %s", err)
 	}
-	if n != len(loaded) {
+	if runeCount.n != len(loaded) {
 		return loaded, errorDecf(0, "count header: actual decoded len < read len").wrap(err)
 	}
 
 	totalRead := len(loaded)
 
 	// we now have a rune count. begin loading bytes until we have hit it
-	for loadedRunes := 0; loadedRunes < runeCount; loadedRunes++ {
+	for loadedRunes := 0; loadedRunes < runeCount.native; loadedRunes++ {
 		// first, load in byte 1. this will tell us if we need more
 		firstByteBuf, err := r.loadBytes(1)
 		lastErr = err
