@@ -151,8 +151,21 @@ func (w *Writer) Flush() error {
 // total number written to the stream. When err == nil, n will be equal to
 // len(p).
 func (w *Writer) Write(p []byte) (n int, err error) {
-	// we can't just call w.Enc because we need to know if n
-	toWrite, err := Enc(p)
+	// we can't just call w.Enc because we need to know n
+
+	// since we are not calling Enc() directly, we must implement our own panic
+	// handler.
+	defer func() {
+		if r := recover(); r != nil {
+			err = errorf("%v", r)
+		}
+	}()
+
+	// manually create type info for []byte to avoid reflection analysis and any
+	// speed hits from that.
+	ti := typeInfo{Main: mtSlice, ValType: &typeInfo{Main: mtIntegral, Bits: 8, Signed: false}}
+
+	toWrite, err := encWithTypeInfo(p, ti)
 	if err != nil {
 		return 0, err
 	}
@@ -383,7 +396,7 @@ func (r *Reader) Dec(v interface{}) (err error) {
 		return err
 	}
 
-	n, err := Dec(datumBytes, v)
+	n, err := decWithTypeInfo(datumBytes, v, info)
 	if err != nil {
 		err = errorDecf(r.offset, "%s", err)
 		r.offset += len(datumBytes)
