@@ -281,7 +281,7 @@ func ref[E any](v E) *E {
 }
 
 func withNoAnalysis[E any](newVal E) analyzed[E] {
-	return analyzed[E]{native: newVal}
+	return analyzed[E]{v: newVal}
 }
 
 // testText is a small struct that implements TextMarshaler and TextUnmarshaler.
