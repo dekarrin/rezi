@@ -573,11 +573,13 @@ type decoded[E any] struct {
 	fields []fieldInfo
 }
 
-// d is a shorthand function for creating decValues with only a valid n and
-// native. No other fields in the returned decValue are set. It's mostly used
-// for improving readability of directly returned decValues.
-func d[E any](value E, n int) decoded[E] {
-	return decoded[E]{native: value, n: n}
+// analyzed is used to pass around a value along with its type info and
+// reflect.Value to different subroutines. it's mostly just used for argument
+// grouping.
+type analyzed[E any] struct {
+	native E
+	ref    reflect.Value
+	ti     typeInfo
 }
 
 type (
@@ -590,15 +592,6 @@ type (
 	encFunc[E any] func(analyzed[E]) ([]byte, error)
 )
 
-// analyzed is used to pass around a value along with its type info and
-// reflect.Value to different subroutines. it's mostly just used for argument
-// grouping.
-type analyzed[E any] struct {
-	native E
-	ref    reflect.Value
-	ti     typeInfo
-}
-
 func preAnalyzed[E any](oldAnalysis analyzed[any], newVal E) analyzed[E] {
 	return analyzed[E]{native: newVal, ref: oldAnalysis.ref, ti: oldAnalysis.ti}
 }
@@ -609,13 +602,11 @@ func nilErrEncoder[E any](fn func(analyzed[E]) []byte) encFunc[E] {
 	}
 }
 
-// MustEnc is identical to Enc, but panics if an error would be returned.
-func MustEnc(v interface{}) []byte {
-	enc, err := Enc(v)
-	if err != nil {
-		panic(err.Error())
-	}
-	return enc
+// d is a shorthand function for creating decValues with only a valid n and
+// native. No other fields in the returned decValue are set. It's mostly used
+// for improving readability of directly returned decValues.
+func d[E any](value E, n int) decoded[E] {
+	return decoded[E]{native: value, n: n}
 }
 
 // Enc encodes a value to REZI-format bytes. The type of the value is examined
@@ -651,6 +642,15 @@ func Enc(v interface{}) (data []byte, err error) {
 	return encWithTypeInfo(v, info)
 }
 
+// MustEnc is identical to Enc, but panics if an error would be returned.
+func MustEnc(v interface{}) []byte {
+	enc, err := Enc(v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return enc
+}
+
 // encWithTypeInfo has type analysis already performed, and it is not panic
 // safe.
 func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
@@ -673,15 +673,6 @@ func encWithTypeInfo(v interface{}, info typeInfo) (data []byte, err error) {
 	} else {
 		panic("no possible encoding")
 	}
-}
-
-// MustDec is identical to Dec, but panics if an error would be returned.
-func MustDec(data []byte, v interface{}) int {
-	n, err := Dec(data, v)
-	if err != nil {
-		panic(err.Error())
-	}
-	return n
 }
 
 // Dec decodes a value from REZI-format bytes in data, starting with the first
@@ -726,6 +717,15 @@ func Dec(data []byte, v interface{}) (n int, err error) {
 	}
 
 	return decWithTypeInfo(data, v, info)
+}
+
+// MustDec is identical to Dec, but panics if an error would be returned.
+func MustDec(data []byte, v interface{}) int {
+	n, err := Dec(data, v)
+	if err != nil {
+		panic(err.Error())
+	}
+	return n
 }
 
 // decWithTypeInfo has type analysis already performed, and it is not panic
