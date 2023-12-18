@@ -17,18 +17,18 @@ func encCheckedSlice(value analyzed[any]) ([]byte, error) {
 	return encWithNilCheck(value, encSlice, reflect.Value.Interface)
 }
 
-func encSlice(val analyzed[any]) ([]byte, error) {
-	isArray := val.ref.Type().Kind() == reflect.Array
+func encSlice(value analyzed[any]) ([]byte, error) {
+	isArray := value.ref.Type().Kind() == reflect.Array
 
-	if val.native == nil || (!isArray && val.ref.IsNil()) {
+	if value.native == nil || (!isArray && value.ref.IsNil()) {
 		return encNilHeader(0), nil
 	}
 
 	enc := make([]byte, 0)
 
-	for i := 0; i < val.ref.Len(); i++ {
-		v := val.ref.Index(i)
-		encData, err := encWithTypeInfo(v.Interface(), *val.ti.ValType)
+	for i := 0; i < value.ref.Len(); i++ {
+		v := value.ref.Index(i)
+		encData, err := encWithTypeInfo(v.Interface(), *value.ti.ValType)
 		if err != nil {
 			if isArray {
 				return nil, errorf("array item[%d]: %s", i, err)
@@ -43,28 +43,28 @@ func encSlice(val analyzed[any]) ([]byte, error) {
 	return enc, nil
 }
 
-func decCheckedSlice(data []byte, v analyzed[any]) (decoded[any], error) {
-	if v.ti.Main != mtSlice && v.ti.Main != mtArray {
+func decCheckedSlice(data []byte, recv analyzed[any]) (decoded[any], error) {
+	if recv.ti.Main != mtSlice && recv.ti.Main != mtArray {
 		panic("not a slice or array type")
 	}
 
-	sl, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	sl, err := decWithNilCheck(data, recv, fn_DecToWrappedReceiver(recv,
 		func(t reflect.Type) bool {
-			return t.Kind() == reflect.Pointer && ((v.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (v.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
+			return t.Kind() == reflect.Pointer && ((recv.ti.Main == mtSlice && t.Elem().Kind() == reflect.Slice) || (recv.ti.Main == mtArray && t.Elem().Kind() == reflect.Array))
 		},
 		decSlice,
 	))
 	if err != nil {
 		return sl, err
 	}
-	if v.ti.Indir == 0 {
-		refReceiver := v.ref
+	if recv.ti.Indir == 0 {
+		refReceiver := recv.ref
 		refReceiver.Elem().Set(sl.ref)
 	}
 	return sl, err
 }
 
-func decSlice(data []byte, v analyzed[any]) (decoded[any], error) {
+func decSlice(data []byte, recv analyzed[any]) (decoded[any], error) {
 	var dec decoded[any]
 
 	toConsume, err := decInt[tLen](data)
@@ -74,7 +74,7 @@ func decSlice(data []byte, v analyzed[any]) (decoded[any], error) {
 	data = data[toConsume.n:]
 	dec.n += toConsume.n
 
-	refSliceVal := v.ref
+	refSliceVal := recv.ref
 	refSliceType := refSliceVal.Type().Elem()
 	isArray := refSliceType.Kind() == reflect.Array
 	sliceOrArrStr := "slice"
@@ -137,7 +137,7 @@ func decSlice(data []byte, v analyzed[any]) (decoded[any], error) {
 	refVType := refSliceType.Elem()
 	for i < toConsume.native {
 		refValue := reflect.New(refVType)
-		n, err := decWithTypeInfo(data, refValue.Interface(), *v.ti.ValType)
+		n, err := decWithTypeInfo(data, refValue.Interface(), *recv.ti.ValType)
 		if err != nil {
 			return dec, errorDecf(dec.n, "%s item[%d]: %s", sliceOrArrStr, itemIdx, err)
 		}

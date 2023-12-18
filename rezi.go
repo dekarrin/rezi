@@ -714,7 +714,7 @@ func MustDec(data []byte, v interface{}) int {
 // decWithTypeInfo has type analysis already performed, and it is not panic
 // safe.
 func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err error) {
-	value := analyzed[any]{
+	recv := analyzed[any]{
 		native: v,
 		ref:    reflect.ValueOf(v),
 		ti:     info,
@@ -722,13 +722,13 @@ func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err erro
 
 	var dec decoded[any]
 	if info.Primitive() {
-		dec, err = decCheckedPrim(data, value)
+		dec, err = decCheckedPrim(data, recv)
 	} else if info.Main == mtMap {
-		dec, err = decCheckedMap(data, value)
+		dec, err = decCheckedMap(data, recv)
 	} else if info.Main == mtSlice || info.Main == mtArray {
-		dec, err = decCheckedSlice(data, value)
+		dec, err = decCheckedSlice(data, recv)
 	} else if info.Main == mtStruct {
-		dec, err = decCheckedStruct(data, value)
+		dec, err = decCheckedStruct(data, recv)
 	} else {
 		panic("no possible decoding")
 	}
@@ -736,14 +736,14 @@ func decWithTypeInfo(data []byte, v interface{}, info typeInfo) (n int, err erro
 	return dec.n, err
 }
 
-func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
-	if v.ti.Indir > 0 {
+func encWithNilCheck[E any](value analyzed[any], encFn encFunc[E], convFn func(reflect.Value) E) ([]byte, error) {
+	if value.ti.Indir > 0 {
 		// we cannot directly encode, we must get at the reel value.
-		encodeTarget := v.ref
+		encodeTarget := value.ref
 		// encodeTarget is a *THING but we want a THING
 
 		nilLevel := -1
-		for i := 0; i < v.ti.Indir; i++ {
+		for i := 0; i < value.ti.Indir; i++ {
 			if encodeTarget.IsNil() {
 				// so if it were a *string we deal w, nil level can only be 0.
 				// if it were a **string we deal w, nil level can be 0 or 1.
@@ -761,16 +761,16 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 		reAnalyzed := analyzed[E]{
 			native: convTarget,
 			ref:    reflect.ValueOf(convTarget),
-			ti:     v.ti,
+			ti:     value.ti,
 		}
 		return encFn(reAnalyzed)
 	} else {
 		// if the type we have is actually a new UDT with some underlying basic
 		// Go type, then in fact we want to encode it as the actual kind type.
-		if v.ti.Underlying {
-			v.native = convFn(v.ref)
+		if value.ti.Underlying {
+			value.native = convFn(value.ref)
 		}
-		return encFn(preAnalyzed(v, v.native.(E)))
+		return encFn(preAnalyzed(value, value.native.(E)))
 	}
 }
 
@@ -780,10 +780,10 @@ func encWithNilCheck[E any](v analyzed[any], encFn encFunc[E], convFn func(refle
 // decoded value this function returns.
 //
 // This function guarantees that decInfo.Ref will always be set.
-func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec decoded[E], err error) {
+func decWithNilCheck[E any](data []byte, recv analyzed[any], decFn decFunc[E]) (dec decoded[E], err error) {
 	var hdr decoded[countHeader]
 
-	if v.ti.Indir > 0 {
+	if recv.ti.Indir > 0 {
 		hdr, err = decCountHeader(data)
 		if err != nil {
 			return dec, errorDecf(0, "check count header: %s", err)
@@ -796,7 +796,7 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 	if hdr.native.IsNil() {
 		dec.n += hdr.n
 	} else {
-		effectiveExtraIndirs = v.ti.Indir
+		effectiveExtraIndirs = recv.ti.Indir
 		dec, err = decFn(data)
 		if err != nil {
 			return dec, errorDecf(countHeaderBytes, "%s", err)
@@ -807,19 +807,19 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 		}
 	}
 
-	if v.ti.Indir > 0 {
+	if recv.ti.Indir > 0 {
 		// the user has passed in a ptr-ptr-to. We cannot directly assign.
-		assignTarget := v.ref
+		assignTarget := recv.ref
 		// assignTarget is a **string but we want a *string
 
 		// if it's a struct, we must get the original value, if one exists, in order
 		// to preserve the original member values
 		var origStructVal reflect.Value
-		if v.ti.Main == mtStruct {
+		if recv.ti.Main == mtStruct {
 			origStructVal = unwrapOriginalStructValue(assignTarget)
 		}
 
-		for i := 0; i < v.ti.Indir && i < effectiveExtraIndirs; i++ {
+		for i := 0; i < recv.ti.Indir && i < effectiveExtraIndirs; i++ {
 			// *double indirection ALL THE WAY~*
 			// *acrosssss the sky*
 			// *what does it mean*
@@ -832,11 +832,11 @@ func decWithNilCheck[E any](data []byte, v analyzed[any], decFn decFunc[E]) (dec
 
 		if !hdr.native.IsNil() {
 			refDecoded := dec.ref
-			if v.ti.Underlying {
+			if recv.ti.Underlying {
 				refDecoded = refDecoded.Convert(assignTarget.Type().Elem())
 			}
 
-			if v.ti.Main == mtStruct && origStructVal.IsValid() {
+			if recv.ti.Main == mtStruct && origStructVal.IsValid() {
 				refDecoded = makeStructWithFieldValues(origStructVal, refDecoded, dec.fields)
 			}
 

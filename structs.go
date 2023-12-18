@@ -14,15 +14,15 @@ func encCheckedStruct(value analyzed[any]) ([]byte, error) {
 	return encWithNilCheck(value, encStruct, reflect.Value.Interface)
 }
 
-func encStruct(val analyzed[any]) ([]byte, error) {
+func encStruct(value analyzed[any]) ([]byte, error) {
 	enc := make([]byte, 0)
 
-	for _, fi := range val.ti.Fields.ByOrder {
-		v := val.ref.Field(fi.Index)
+	for _, fi := range value.ti.Fields.ByOrder {
+		v := value.ref.Field(fi.Index)
 
 		fNameData, err := encWithTypeInfo(fi.Name, typeInfo{Indir: 0, Underlying: false, Main: mtString})
 		if err != nil {
-			msgTypeName := val.ref.Type().Name()
+			msgTypeName := value.ref.Type().Name()
 			if msgTypeName == "" {
 				msgTypeName = "(anonymous type)"
 			}
@@ -30,7 +30,7 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 		}
 		fValData, err := encWithTypeInfo(v.Interface(), fi.Type)
 		if err != nil {
-			msgTypeName := val.ref.Type().Name()
+			msgTypeName := value.ref.Type().Name()
 			if msgTypeName == "" {
 				msgTypeName = "(anonymous type)"
 			}
@@ -47,12 +47,12 @@ func encStruct(val analyzed[any]) ([]byte, error) {
 
 // decCheckedStruct decodes a REZI bytes representation of a struct into a
 // compatible struct type.
-func decCheckedStruct(data []byte, v analyzed[any]) (decoded[any], error) {
-	if v.ti.Main != mtStruct {
+func decCheckedStruct(data []byte, recv analyzed[any]) (decoded[any], error) {
+	if recv.ti.Main != mtStruct {
 		panic("not a struct type")
 	}
 
-	st, err := decWithNilCheck(data, v, fn_DecToWrappedReceiver(v,
+	st, err := decWithNilCheck(data, recv, fn_DecToWrappedReceiver(recv,
 		func(t reflect.Type) bool {
 			return t.Kind() == reflect.Pointer && t.Elem().Kind() == reflect.Struct
 		},
@@ -61,19 +61,19 @@ func decCheckedStruct(data []byte, v analyzed[any]) (decoded[any], error) {
 	if err != nil {
 		return st, err
 	}
-	if v.ti.Indir == 0 {
-		refReceiver := v.ref
+	if recv.ti.Indir == 0 {
+		refReceiver := recv.ref
 
 		// if it's a struct, we must get the original value, if one exists, in order
 		// to preserve the original member values
 		var origStructVal reflect.Value
-		if v.ti.Main == mtStruct {
+		if recv.ti.Main == mtStruct {
 			origStructVal = unwrapOriginalStructValue(refReceiver)
 		}
 
 		refSt := st.ref
 
-		if v.ti.Main == mtStruct && origStructVal.IsValid() {
+		if recv.ti.Main == mtStruct && origStructVal.IsValid() {
 			refSt = makeStructWithFieldValues(origStructVal, refSt, st.fields)
 		}
 
@@ -83,10 +83,10 @@ func decCheckedStruct(data []byte, v analyzed[any]) (decoded[any], error) {
 }
 
 // decInfo will have Fields set to the successfully decoded fields.
-func decStruct(data []byte, v analyzed[any]) (decoded[any], error) {
+func decStruct(data []byte, recv analyzed[any]) (decoded[any], error) {
 	var dec decoded[any]
 
-	refVal := v.ref
+	refVal := recv.ref
 	refStructType := refVal.Type().Elem()
 	msgTypeName := refStructType.Name()
 	if msgTypeName == "" {
@@ -140,7 +140,7 @@ func decStruct(data []byte, v analyzed[any]) (decoded[any], error) {
 		data = data[n:]
 
 		// get field info from name
-		fi, ok := v.ti.Fields.ByName[fNameVal]
+		fi, ok := recv.ti.Fields.ByName[fNameVal]
 		if !ok {
 			return dec, errorDecf(dec.n, "field name .%s does not exist in decoded-to %s", fNameVal, msgTypeName).wrap(ErrMalformedData, ErrInvalidType)
 		}
